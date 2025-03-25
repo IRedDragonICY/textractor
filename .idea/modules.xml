@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/textracktor.iml" filepath="$PROJECT_DIR$/.idea/textracktor.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/textractor.iml" filepath="$PROJECT_DIR$/.idea/textractor.iml" />
     </modules>
   </component>
 </project>
