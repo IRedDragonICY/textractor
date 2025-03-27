@@ -222,12 +222,15 @@ const isFileText = (filename: string): boolean => {
     return !!extension && TEXT_FILE_EXTENSIONS.has(extension);
 };
 
+const getFileExtension = (filename: string): string => {
+    return filename.split('.').pop()?.toLowerCase() || 'text';
+};
+
 export default function Home() {
     const [files, setFiles] = useState<FileData[]>([]);
     const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
     const [isCopied, setIsCopied] = useState(false);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-    const [showTitles, setShowTitles] = useState(true);
     const [textFilesOnly, setTextFilesOnly] = useState(false);
     const textAreaRef = useRef<HTMLTextAreaElement>(null);
     const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -250,12 +253,12 @@ export default function Home() {
 
         if (filesToCombine.length === 0) return '';
 
-        return filesToCombine.map(file => (
-            showTitles
-                ? `--- ${file.name} ---\n${file.content}`
-                : file.content
-        )).join('\n\n');
-    }, [files, showTitles, textFilesOnly]);
+        return filesToCombine.map(file => {
+            const extension = getFileExtension(file.name);
+            const contentWithNewline = file.content.endsWith('\n') ? file.content : `${file.content}\n`;
+            return `${file.name}\n\`\`\`${extension}\n${contentWithNewline}\`\`\``;
+        }).join('\n\n');
+    }, [files, textFilesOnly]);
 
     const hasNonTextFiles = useMemo(() => {
         return textFilesOnly && files.some(file => !file.isText);
@@ -347,7 +350,6 @@ export default function Home() {
             });
     }, [combinedText]);
 
-    const handleShowTitlesChange = useCallback((checked: boolean) => setShowTitles(checked), []);
     const handleTextFilesOnlyChange = useCallback((checked: boolean) => setTextFilesOnly(checked), []);
 
     const activeFile = useMemo(() => activeId ? files.find(file => file.id === activeId) : null, [activeId, files]);
@@ -405,12 +407,6 @@ export default function Home() {
                     <div className="bg-gray-800 rounded-xl p-4 border border-gray-700/80 shadow-sm shrink-0">
                         <h3 className="text-base font-medium text-gray-100 mb-3">Settings</h3>
                         <div className="flex flex-col sm:flex-row flex-wrap gap-x-6 gap-y-3">
-                            <ToggleSwitch
-                                id="show-titles"
-                                label="Include Filenames"
-                                checked={showTitles}
-                                onChange={handleShowTitlesChange}
-                            />
                             <ToggleSwitch
                                 id="text-files-only"
                                 label="Combine Text Files Only"
