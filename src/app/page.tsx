@@ -28,7 +28,7 @@ const TEXT_FILE_EXTENSIONS = new Set([
     'txt', 'md', 'js', 'jsx', 'ts', 'tsx', 'html', 'css', 'scss', 'sass',
     'less', 'json', 'xml', 'yaml', 'yml', 'py', 'java', 'c', 'cpp', 'cs',
     'go', 'rs', 'php', 'rb', 'pl', 'sh', 'bat', 'h', 'swift', 'kt', 'sql',
-    'config', 'ini', 'env', 'gitignore', 'htaccess', 'log', 'csv', 'tsv'
+    'config', 'ini', 'env', 'gitignore', 'htaccess', 'log', 'csv', 'tsv', 'dart' // Added dart
 ]);
 
 interface FileData {
@@ -247,18 +247,21 @@ export default function Home() {
     );
 
     const combinedText = useMemo(() => {
-        const filesToCombine = textFilesOnly
+        const filesToConsider = textFilesOnly
             ? files.filter(file => file.isText)
             : files;
 
-        if (filesToCombine.length === 0) return '';
+        const outputBlocks = filesToConsider
+            .filter(file => file.isText && file.content) // Ensure it's text AND has content
+            .map(file => {
+                const extension = getFileExtension(file.name);
+                const contentWithNewline = file.content + (file.content.endsWith('\n') ? '' : '\n');
+                return `${file.name}\n\`\`\`${extension}\n${contentWithNewline}\`\`\``;
+            });
 
-        return filesToCombine.map(file => {
-            const extension = getFileExtension(file.name);
-            const contentWithNewline = file.content.endsWith('\n') ? file.content : `${file.content}\n`;
-            return `${file.name}\n\`\`\`${extension}\n${contentWithNewline}\`\`\``;
-        }).join('\n\n');
+        return outputBlocks.join('\n\n');
     }, [files, textFilesOnly]);
+
 
     const hasNonTextFiles = useMemo(() => {
         return textFilesOnly && files.some(file => !file.isText);
@@ -266,22 +269,48 @@ export default function Home() {
 
     const onDrop = useCallback((acceptedFiles: File[]) => {
         const newFilesPromises = acceptedFiles.map(file => {
-            return new Promise<FileData>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => {
-                    const content = reader.result as string;
+            return new Promise<FileData>((resolve) => {
+                const fileId = `file-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+                const isText = isFileText(file.name);
+
+                if (isText) {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        resolve({
+                            id: fileId,
+                            name: file.name,
+                            content: (reader.result as string) || "", // Ensure content is string, default to ""
+                            isText: true
+                        });
+                    };
+                    reader.onerror = (error) => {
+                        console.error(`Error reading text file ${file.name}:`, error);
+                        resolve({
+                            id: fileId,
+                            name: file.name,
+                            content: "", // Explicitly empty on error
+                            isText: true
+                        });
+                    };
+                    try {
+                       reader.readAsText(file);
+                    } catch (readError) {
+                         console.error(`Exception trying to read ${file.name}:`, readError);
+                         resolve({
+                            id: fileId,
+                            name: file.name,
+                            content: "", // Explicitly empty on exception
+                            isText: true
+                        });
+                    }
+                } else {
                     resolve({
-                        id: `file-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                        id: fileId,
                         name: file.name,
-                        content,
-                        isText: isFileText(file.name)
+                        content: "", // Empty for non-text
+                        isText: false
                     });
-                };
-                reader.onerror = (error) => {
-                    console.error(`Error reading file ${file.name}:`, error);
-                    reject(new Error(`Error reading file ${file.name}`));
-                };
-                reader.readAsText(file);
+                }
             });
         });
 
@@ -290,7 +319,8 @@ export default function Home() {
                 setFiles(prevFiles => [...prevFiles, ...newFilesData]);
             })
             .catch(error => {
-                console.error("Error processing dropped files:", error);
+                console.error("Unexpected error during Promise.all for file processing:", error);
+                alert("An unexpected error occurred while processing some files.");
             });
     }, []);
 
@@ -298,7 +328,6 @@ export default function Home() {
         onDrop,
         noClick: true,
         noKeyboard: true,
-        accept: { 'text/*': [...TEXT_FILE_EXTENSIONS].map(ext => `.${ext}`) }
     });
 
     const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -463,6 +492,7 @@ export default function Home() {
                                         variant="text"
                                         color="error"
                                         onClick={openDeleteConfirmation}
+                                        disabled={files.length === 0}
                                         startIcon={
                                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                                 <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -571,7 +601,7 @@ export default function Home() {
                                         value={combinedText}
                                         readOnly
                                         className="w-full h-full p-3 bg-gray-900 border border-gray-700 rounded-lg font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-300 resize-none scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800"
-                                        placeholder="Combined text will automatically appear here..."
+                                        placeholder={files.length > 0 ? "Combined text will appear here..." : "Upload files to see combined text..."}
                                         aria-label="Combined text output"
                                     />
                                     <AnimatePresence>
