@@ -28,7 +28,7 @@ const TEXT_FILE_EXTENSIONS = new Set([
     'txt', 'md', 'js', 'jsx', 'ts', 'tsx', 'html', 'css', 'scss', 'sass',
     'less', 'json', 'xml', 'yaml', 'yml', 'py', 'java', 'c', 'cpp', 'cs',
     'go', 'rs', 'php', 'rb', 'pl', 'sh', 'bat', 'h', 'swift', 'kt', 'sql',
-    'config', 'ini', 'env', 'gitignore', 'htaccess', 'log', 'csv', 'tsv', 'dart'
+    'config', 'ini', 'env', 'gitignore', 'htaccess', 'log', 'csv', 'tsv', 'dart', 'arb'
 ]);
 
 const MIME_TO_EXT: Record<string, string> = {
@@ -42,7 +42,7 @@ const MIME_TO_EXT: Record<string, string> = {
     'application/x-sh': 'sh', 'application/bat': 'bat', 'text/x-h': 'h',
     'text/x-swift': 'swift', 'text/x-kotlin': 'kt', 'application/sql': 'sql',
     'text/csv': 'csv', 'text/tab-separated-values': 'tsv', 'application/dart': 'dart',
-    'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif',
+    'application/arb': 'arb', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif',
     'image/webp': 'webp', 'image/svg+xml': 'svg', 'application/pdf': 'pdf',
     'application/zip': 'zip',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
@@ -292,7 +292,7 @@ export default function Home() {
                 content = await fileObject.text();
             } catch (error) {
                 console.error(`Error reading text file ${name}:`, error);
-                content = ""; // Assign empty string on error
+                content = "";
             }
         }
 
@@ -342,24 +342,21 @@ export default function Home() {
             const fileBlobs: Blob[] = [];
             for (const item of clipboardItems) {
                 const fileLikeTypes = item.types.filter(type =>
-                    !type.startsWith('text/') || type === 'text/plain' // Allow text/plain for potential .txt paste
+                    !type.startsWith('text/') || type === 'text/plain'
                 );
 
                 for (const type of fileLikeTypes) {
                     try {
                         const blob = await item.getType(type);
                         if (blob instanceof Blob && blob.size > 0) {
-                            // Crude check: if text/plain, avoid if it looks like just a filename list
                             if (type === 'text/plain') {
                                 const text = await blob.text();
-                                // Avoid if it's likely just filename(s) copied from Explorer/Finder
-                                if (text.split('\n').every(line => line.trim().length > 0 && !line.includes(' '))) { // Very basic heuristic
-                                   // console.log('Skipping likely filename paste:', text);
+                                if (text.split('\n').every(line => line.trim().length > 0 && !line.includes(' '))) {
                                     continue;
                                 }
                             }
                            fileBlobs.push(blob);
-                           break; // Prioritize first blob found for this item
+                           break;
                         }
                     } catch (err) { console.warn(`Could not get clipboard type ${type}:`, err); }
                 }
