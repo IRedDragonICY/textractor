@@ -59,6 +59,18 @@ interface FileData {
     content: string;
     isText: boolean;
     fileObject: File | Blob;
+    linesOfCode: number;
+    characterCount: number;
+}
+
+interface Statistics {
+    totalFiles: number;
+    totalTextFiles: number;
+    totalNonTextFiles: number;
+    totalLinesOfCode: number;
+    totalCharacters: number;
+    averageLinesPerFile: number;
+    averageCharactersPerFile: number;
 }
 
 const isFileText = (name: string, type: string): boolean => {
@@ -81,6 +93,18 @@ const generateFileName = (blob: Blob): string => {
     return `pasted_file_${timestamp}.${extension}`;
 };
 
+const countLinesOfCode = (content: string): number => {
+    if (!content) return 0;
+    return content.split('\n').filter(line => line.trim().length > 0).length;
+};
+
+const formatNumber = (num: number): string => {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num.toString();
+};
+
+// Icons
 const IconTextFile = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -130,6 +154,30 @@ const IconWarning = ({ className }: { className?: string }) => (
     </svg>
 );
 
+const IconCode = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+    </svg>
+);
+
+const IconCharacter = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+);
+
+const IconFile = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+    </svg>
+);
+
+const IconAverage = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+    </svg>
+);
+
 const FileIcon = React.memo(({ isTextFile }: { isTextFile: boolean }) => {
     return isTextFile ? <IconTextFile /> : <IconGenericFile />;
 });
@@ -142,17 +190,41 @@ const RemoveButton = React.memo(({ onClick, fileName }: { onClick: () => void; f
     }, [onClick]);
 
     return (
-        <button
+        <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
             onClick={handleClick}
-            className="ml-2 p-1.5 rounded-full text-gray-400 hover:text-red-400 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-red-500 transition-colors duration-200"
+            className="ml-2 p-1.5 rounded-full text-gray-400 hover:text-red-400 hover:bg-red-500/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-red-500 transition-all duration-200 group"
             aria-label={`Remove file ${fileName}`}
             type="button"
         >
             <IconTrash />
-        </button>
+        </motion.button>
     );
 });
 RemoveButton.displayName = 'RemoveButton';
+
+const StatCard = React.memo(({ icon, label, value, valueColor = "text-blue-400", delay = 0 }: { icon: React.ReactNode; label: string; value: string | number; valueColor?: string; delay?: number }) => {
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay, duration: 0.4, ease: "easeOut" }}
+            className="bg-gradient-to-br from-gray-800/80 to-gray-800/40 backdrop-blur-sm rounded-xl p-4 border border-gray-700/50 hover:border-gray-600/60 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/5"
+        >
+            <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400 group-hover:scale-110 transition-transform duration-200">
+                    {icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">{label}</p>
+                    <p className={`text-lg font-bold ${valueColor} truncate`}>{value}</p>
+                </div>
+            </div>
+        </motion.div>
+    );
+});
+StatCard.displayName = 'StatCard';
 
 const FileTile = React.memo(({ file, onRemove, isDragging = false }: { file: FileData; onRemove?: (id: string) => void; isDragging?: boolean }) => {
     const handleRemoveAction = useCallback(() => {
@@ -160,14 +232,30 @@ const FileTile = React.memo(({ file, onRemove, isDragging = false }: { file: Fil
     }, [onRemove, file.id]);
 
     return (
-        <div className={`bg-gray-800 rounded-lg border border-gray-700 p-3 flex items-center justify-between transition-all duration-200 shadow-sm ${isDragging ? 'ring-2 ring-blue-500 shadow-lg shadow-blue-500/20 scale-[1.01]' : 'hover:bg-gray-750 hover:border-gray-600'}`}>
-            <div className="flex items-center flex-1 min-w-0 select-none">
-                <div className="mr-3 text-blue-400 flex-shrink-0">
-                    <FileIcon isTextFile={file.isText} />
+        <div className={`bg-gradient-to-r from-gray-800/90 to-gray-800/60 backdrop-blur-sm rounded-xl border border-gray-700/60 p-4 transition-all duration-300 shadow-sm group ${isDragging ? 'ring-2 ring-blue-500/60 shadow-lg shadow-blue-500/20 scale-[1.02] border-blue-500/40' : 'hover:bg-gradient-to-r hover:from-gray-750/90 hover:to-gray-750/60 hover:border-gray-600/80 hover:shadow-md hover:shadow-gray-900/20'}`}>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center flex-1 min-w-0 select-none">
+                    <div className="mr-3 text-blue-400 flex-shrink-0 group-hover:scale-110 transition-transform duration-200">
+                        <FileIcon isTextFile={file.isText} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-100 truncate text-sm">{file.name}</p>
+                        {file.isText && (
+                            <div className="flex items-center gap-4 mt-1 text-xs text-gray-400">
+                                <span className="flex items-center gap-1">
+                                    <IconCode />
+                                    {formatNumber(file.linesOfCode)} lines
+                                </span>
+                                <span className="flex items-center gap-1">
+                                    <IconCharacter />
+                                    {formatNumber(file.characterCount)} chars
+                                </span>
+                            </div>
+                        )}
+                    </div>
                 </div>
-                <p className="font-medium text-gray-100 truncate text-sm flex-1 min-w-0">{file.name}</p>
+                {onRemove && <RemoveButton onClick={handleRemoveAction} fileName={file.name} />}
             </div>
-            {onRemove && <RemoveButton onClick={handleRemoveAction} fileName={file.name} />}
         </div>
     );
 });
@@ -178,11 +266,9 @@ const SortableItem = React.memo(({ file, onRemove, isDragging }: { file: FileDat
 
     const style = useMemo(() => ({
         transform: CSS.Transform.toString(transform),
-        transition: transition || 'transform 250ms ease',
+        transition: transition || 'transform 250ms cubic-bezier(0.25, 0.46, 0.45, 0.94)',
         zIndex: isDragging || isSorting ? 10 : 1,
-        opacity: isDragging || isSorting ? 0.5 : 1,
-        '--tw-scale-x': isDragging || isSorting ? '0.98' : '1',
-        '--tw-scale-y': isDragging || isSorting ? '0.98' : '1',
+        opacity: isDragging || isSorting ? 0.8 : 1,
     }), [transform, transition, isDragging, isSorting]);
 
     return (
@@ -192,12 +278,12 @@ const SortableItem = React.memo(({ file, onRemove, isDragging }: { file: FileDat
             {...listeners}
             style={style}
             layoutId={file.id}
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10, transition: { duration: 0.15 } }}
-            className={`cursor-grab active:cursor-grabbing select-none relative transform scale-100 ${isDragging || isSorting ? 'pointer-events-none' : ''}`}
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -15, scale: 0.95, transition: { duration: 0.2, ease: "easeIn" } }}
+            className={`cursor-grab active:cursor-grabbing select-none relative ${isDragging || isSorting ? 'pointer-events-none' : ''}`}
         >
-            <FileTile file={file} onRemove={onRemove} />
+            <FileTile file={file} onRemove={onRemove} isDragging={isDragging} />
         </motion.li>
     );
 });
@@ -210,41 +296,45 @@ const ToggleSwitch = React.memo(({ id, label, checked, onChange }: { id: string,
 
     return (
         <div className="flex items-center">
-            <div className="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+            <div className="relative inline-block w-11 mr-3 align-middle select-none transition duration-300 ease-in">
                 <input
                     type="checkbox" id={id} checked={checked} onChange={handleChange}
                     className="sr-only peer"
                 />
-                <label htmlFor={id} className={`block overflow-hidden h-6 rounded-full cursor-pointer ${ checked ? 'bg-blue-600' : 'bg-gray-600'} peer-focus:ring-2 peer-focus:ring-offset-2 peer-focus:ring-offset-gray-800 peer-focus:ring-blue-500`} >
-                    <span className={`block w-4 h-4 m-1 rounded-full bg-white shadow transform transition-transform duration-200 ease-in ${ checked ? 'translate-x-4' : 'translate-x-0'}`} aria-hidden="true" />
+                <label htmlFor={id} className={`block overflow-hidden h-6 rounded-full cursor-pointer shadow-inner transition-all duration-300 ${ checked ? 'bg-gradient-to-r from-blue-500 to-blue-600 shadow-blue-500/25' : 'bg-gray-600 shadow-gray-700/50'} peer-focus:ring-2 peer-focus:ring-offset-2 peer-focus:ring-offset-gray-800 peer-focus:ring-blue-500`} >
+                    <motion.span
+                        layout
+                        className={`block w-4 h-4 m-1 rounded-full bg-white shadow-lg transform transition-all duration-300 ease-out ${ checked ? 'translate-x-5' : 'translate-x-0'}`}
+                        aria-hidden="true"
+                    />
                 </label>
             </div>
-            <label htmlFor={id} className="text-sm text-gray-300 cursor-pointer select-none">{label}</label>
+            <label htmlFor={id} className="text-sm font-medium text-gray-300 cursor-pointer select-none">{label}</label>
         </div>
     );
 });
 ToggleSwitch.displayName = 'ToggleSwitch';
 
 const MaterialButton = React.memo(({ children, onClick, variant = 'contained', color = 'primary', startIcon = null, className = '', disabled = false }: { children: React.ReactNode, onClick: (event: React.MouseEvent<HTMLButtonElement>) => void, variant?: 'contained' | 'outlined' | 'text', color?: 'primary' | 'error' | 'default', startIcon?: React.ReactNode, className?: string, disabled?: boolean }) => {
-    const baseClasses = 'px-3 py-1.5 rounded-md font-medium text-xs transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 uppercase tracking-wider';
+    const baseClasses = 'px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 uppercase tracking-wide shadow-lg backdrop-blur-sm';
     const disabledClasses = 'opacity-50 cursor-not-allowed';
 
     const colorVariantClasses = useMemo(() => {
         const styles = {
             primary: {
-                contained: `bg-blue-600 text-white hover:bg-blue-700 shadow hover:shadow-md focus:ring-blue-500 ${disabled ? '' : 'active:bg-blue-800'}`,
-                outlined: `border border-blue-500 text-blue-400 hover:bg-blue-500/10 focus:ring-blue-500 ${disabled ? '' : 'active:bg-blue-500/20'}`,
-                text: `text-blue-400 hover:bg-blue-500/10 focus:ring-blue-500 ${disabled ? '' : 'active:bg-blue-500/20'}`
+                contained: `bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 shadow-blue-500/25 hover:shadow-blue-500/40 focus:ring-blue-500 ${disabled ? '' : 'active:from-blue-800 active:to-blue-900 hover:scale-105'}`,
+                outlined: `border-2 border-blue-500/60 text-blue-400 hover:bg-blue-500/10 hover:border-blue-400 focus:ring-blue-500 backdrop-blur-sm ${disabled ? '' : 'active:bg-blue-500/20 hover:scale-105'}`,
+                text: `text-blue-400 hover:bg-blue-500/10 focus:ring-blue-500 ${disabled ? '' : 'active:bg-blue-500/20 hover:scale-105'}`
             },
             error: {
-                contained: `bg-red-600 text-white hover:bg-red-700 shadow hover:shadow-md focus:ring-red-500 ${disabled ? '' : 'active:bg-red-800'}`,
-                outlined: `border border-red-500 text-red-400 hover:bg-red-500/10 focus:ring-red-500 ${disabled ? '' : 'active:bg-red-500/20'}`,
-                text: `text-red-400 hover:bg-red-500/10 focus:ring-red-500 ${disabled ? '' : 'active:bg-red-500/20'}`
+                contained: `bg-gradient-to-r from-red-600 to-red-700 text-white hover:from-red-700 hover:to-red-800 shadow-red-500/25 hover:shadow-red-500/40 focus:ring-red-500 ${disabled ? '' : 'active:from-red-800 active:to-red-900 hover:scale-105'}`,
+                outlined: `border-2 border-red-500/60 text-red-400 hover:bg-red-500/10 hover:border-red-400 focus:ring-red-500 ${disabled ? '' : 'active:bg-red-500/20 hover:scale-105'}`,
+                text: `text-red-400 hover:bg-red-500/10 focus:ring-red-500 ${disabled ? '' : 'active:bg-red-500/20 hover:scale-105'}`
             },
             default: {
-                contained: `bg-gray-700 text-gray-200 hover:bg-gray-600 shadow hover:shadow-md focus:ring-gray-500 ${disabled ? '' : 'active:bg-gray-800'}`,
-                outlined: `border border-gray-500 text-gray-300 hover:bg-gray-500/10 focus:ring-gray-500 ${disabled ? '' : 'active:bg-gray-500/20'}`,
-                text: `text-gray-300 hover:bg-gray-500/10 focus:ring-gray-500 ${disabled ? '' : 'active:bg-gray-500/20'}`
+                contained: `bg-gradient-to-r from-gray-700 to-gray-800 text-gray-200 hover:from-gray-600 hover:to-gray-700 shadow-gray-700/25 hover:shadow-gray-600/40 focus:ring-gray-500 ${disabled ? '' : 'active:from-gray-800 active:to-gray-900 hover:scale-105'}`,
+                outlined: `border-2 border-gray-500/60 text-gray-300 hover:bg-gray-500/10 hover:border-gray-400 focus:ring-gray-500 ${disabled ? '' : 'active:bg-gray-500/20 hover:scale-105'}`,
+                text: `text-gray-300 hover:bg-gray-500/10 focus:ring-gray-500 ${disabled ? '' : 'active:bg-gray-500/20 hover:scale-105'}`
             }
         };
         return styles[color][variant];
@@ -252,14 +342,14 @@ const MaterialButton = React.memo(({ children, onClick, variant = 'contained', c
 
     return (
         <motion.button
-            whileHover={!disabled ? { scale: 1.03, transition: { duration: 0.15 } } : {}}
-            whileTap={!disabled ? { scale: 0.97, transition: { duration: 0.1 } } : {}}
+            whileHover={!disabled ? { scale: 1.05 } : {}}
+            whileTap={!disabled ? { scale: 0.95 } : {}}
             onClick={onClick}
             disabled={disabled}
             className={`${baseClasses} ${colorVariantClasses} ${disabled ? disabledClasses : ''} ${className}`}
             type="button"
         >
-            {startIcon && <span className="mr-1.5 -ml-0.5 h-4 w-4" aria-hidden="true">{startIcon}</span>}
+            {startIcon && <span className="mr-2 -ml-1 h-4 w-4" aria-hidden="true">{startIcon}</span>}
             {children}
         </motion.button>
     );
@@ -286,17 +376,21 @@ export default function Home() {
         const type = fileObject.type || '';
         const isText = isFileText(name, type);
         let content = "";
+        let linesOfCode = 0;
+        let characterCount = 0;
 
         if (isText) {
             try {
                 content = await fileObject.text();
+                linesOfCode = countLinesOfCode(content);
+                characterCount = content.length;
             } catch (error) {
                 console.error(`Error reading text file ${name}:`, error);
                 content = "";
             }
         }
 
-        return { id: fileId, name, content, isText, fileObject };
+        return { id: fileId, name, content, isText, fileObject, linesOfCode, characterCount };
     }, []);
 
     const addFiles = useCallback((newFileObjects: (File | Blob)[]) => {
@@ -382,6 +476,23 @@ export default function Home() {
         onDrop, noClick: true, noKeyboard: true,
     });
 
+    const statistics = useMemo((): Statistics => {
+        const filesToConsider = textFilesOnly ? files.filter(f => f.isText) : files;
+        const textFiles = filesToConsider.filter(f => f.isText);
+        const totalLinesOfCode = textFiles.reduce((sum, file) => sum + file.linesOfCode, 0);
+        const totalCharacters = textFiles.reduce((sum, file) => sum + file.characterCount, 0);
+
+        return {
+            totalFiles: filesToConsider.length,
+            totalTextFiles: textFiles.length,
+            totalNonTextFiles: filesToConsider.length - textFiles.length,
+            totalLinesOfCode,
+            totalCharacters,
+            averageLinesPerFile: textFiles.length > 0 ? Math.round(totalLinesOfCode / textFiles.length) : 0,
+            averageCharactersPerFile: textFiles.length > 0 ? Math.round(totalCharacters / textFiles.length) : 0,
+        };
+    }, [files, textFilesOnly]);
+
     const combinedText = useMemo(() => {
         const filesToConsider = textFilesOnly ? files.filter(f => f.isText) : files;
         return filesToConsider
@@ -420,7 +531,7 @@ export default function Home() {
         navigator.clipboard.writeText(combinedText).then(() => {
             setIsCopied(true);
             if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-            copyTimeoutRef.current = setTimeout(() => setIsCopied(false), 2500);
+            copyTimeoutRef.current = setTimeout(() => setIsCopied(false), 3000);
         }).catch(err => { console.error('Could not copy text: ', err); alert('Failed to copy text.'); });
     }, [combinedText]);
 
@@ -431,62 +542,153 @@ export default function Home() {
     useEffect(() => () => { if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current); }, []);
 
     return (
-        <div {...getRootProps()} className={`min-h-screen flex flex-col relative bg-gray-900 text-gray-200 isolate ${isDragActive ? 'cursor-copy' : ''}`} >
+        <div {...getRootProps()} className={`min-h-screen flex flex-col relative bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800 text-gray-200 isolate ${isDragActive ? 'cursor-copy' : ''}`} >
             <input {...getInputProps()} />
 
-            <header className="px-6 md:px-10 py-4 border-b border-gray-700/50 shrink-0">
-                <div className="max-w-7xl mx-auto flex items-center gap-3">
-                    <motion.div initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1, duration: 0.4, type: "spring", stiffness: 150 }} className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-md shadow-blue-600/30 flex-shrink-0" aria-hidden="true" >
-                        <IconTextFile />
-                    </motion.div>
-                    <motion.h1 initial={{ opacity: 0, x: -15 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2, duration: 0.4, ease: "easeOut" }} className="text-xl md:text-2xl font-semibold text-gray-100 tracking-tight" >
-                        Textractor
-                    </motion.h1>
+            <header className="px-6 md:px-10 py-6 border-b border-gray-700/30 backdrop-blur-sm bg-gray-900/80 shrink-0">
+                <div className="max-w-7xl mx-auto flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.5, rotate: -180 }}
+                            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                            transition={{ delay: 0.1, duration: 0.6, type: "spring", stiffness: 150 }}
+                            className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 via-blue-600 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-600/30 flex-shrink-0"
+                            aria-hidden="true"
+                        >
+                            <IconTextFile />
+                        </motion.div>
+                        <div>
+                            <motion.h1
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: 0.2, duration: 0.5, ease: "easeOut" }}
+                                className="text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 tracking-tight"
+                            >
+                                Textractor
+                            </motion.h1>
+                            <motion.p
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: 0.3, duration: 0.5, ease: "easeOut" }}
+                                className="text-sm text-gray-400 font-medium"
+                            >
+                                Extract and combine text from multiple files
+                            </motion.p>
+                        </div>
+                    </div>
                 </div>
             </header>
 
-            <main className="flex-grow flex flex-col md:flex-row max-w-7xl w-full mx-auto p-6 md:p-10 gap-8 min-h-0">
-                <motion.section aria-labelledby="settings-and-files-heading" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, ease: "easeOut" }} className="w-full md:w-1/2 lg:w-2/5 flex flex-col gap-6 flex-shrink-0 min-h-0" >
+            <main className="flex-grow flex flex-col xl:flex-row max-w-7xl w-full mx-auto p-6 md:p-10 gap-8 min-h-0">
+                <motion.section
+                    aria-labelledby="settings-and-files-heading"
+                    initial={{ opacity: 0, x: -30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.6, ease: "easeOut" }}
+                    className="w-full xl:w-2/5 flex flex-col gap-6 flex-shrink-0 min-h-0"
+                >
                     <h2 id="settings-and-files-heading" className="sr-only">Settings and Uploaded Files</h2>
-                    <div className="bg-gray-800 rounded-xl p-4 border border-gray-700/80 shadow-sm shrink-0">
-                        <h3 className="text-base font-medium text-gray-100 mb-3">Settings</h3>
-                        <div className="flex flex-col sm:flex-row flex-wrap gap-x-6 gap-y-3">
-                            <ToggleSwitch id="text-files-only" label="Combine Text Files Only" checked={textFilesOnly} onChange={handleTextFilesOnlyChange} />
-                        </div>
+
+                    {/* Settings Card */}
+                    <div className="bg-gradient-to-br from-gray-800/80 to-gray-800/40 backdrop-blur-sm rounded-2xl p-6 border border-gray-700/50 shadow-xl shrink-0">
+                        <h3 className="text-lg font-bold text-gray-100 mb-4 flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                            Settings
+                        </h3>
+                        <ToggleSwitch id="text-files-only" label="Combine Text Files Only" checked={textFilesOnly} onChange={handleTextFilesOnlyChange} />
                     </div>
 
-                    <div role="button" tabIndex={0} onClick={open} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') open(); }} className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-200 ${isDragActive ? 'border-blue-500 bg-gray-800/60 scale-102' : 'border-gray-700 hover:border-blue-500/50 hover:bg-gray-800/50'} shadow-sm shrink-0`} >
-                        <div className="flex flex-col items-center justify-center pointer-events-none">
-                            <IconUpload className={`w-10 h-10 mb-3 transition-colors duration-200 ${isDragActive ? 'text-blue-400' : 'text-gray-600'}`} />
-                            <p className="text-base font-medium mb-1 text-gray-200">{isDragActive ? 'Drop files to upload' : 'Click or Drag/Paste Files Here'}</p>
-                            <p className="text-gray-400 text-xs">Select multiple files (Paste limited)</p>
-                        </div>
-                    </div>
-
+                    {/* Statistics Cards */}
                     <AnimatePresence>
                         {files.length > 0 && (
-                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.3, ease: "easeOut" }} className="flex flex-col flex-grow min-h-0" >
-                                <div className="flex justify-between items-center mb-3 px-1 shrink-0">
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="text-base font-medium text-gray-100">Files</h3>
-                                        <motion.span key={files.length} initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 200, damping: 12 }} className="inline-flex items-center justify-center bg-gray-700 text-blue-300 rounded-full h-5 w-5 text-xs font-bold" aria-live="polite" >
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                transition={{ duration: 0.4, ease: "easeOut" }}
+                                className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-2 gap-4 shrink-0"
+                            >
+                                <StatCard icon={<IconFile />} label="Total Files" value={statistics.totalFiles} delay={0.1} />
+                                <StatCard icon={<IconCode />} label="Lines of Code" value={formatNumber(statistics.totalLinesOfCode)} delay={0.2} />
+                                <StatCard icon={<IconCharacter />} label="Characters" value={formatNumber(statistics.totalCharacters)} delay={0.3} />
+                                <StatCard icon={<IconAverage />} label="Avg Lines/File" value={statistics.averageLinesPerFile} delay={0.4} />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* Upload Area */}
+                    <motion.div
+                        role="button"
+                        tabIndex={0}
+                        onClick={open}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') open(); }}
+                        className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 group ${isDragActive ? 'border-blue-500/80 bg-blue-500/5 scale-[1.02] shadow-lg shadow-blue-500/20' : 'border-gray-700/60 hover:border-blue-500/60 hover:bg-blue-500/5'} shadow-sm shrink-0`}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                    >
+                        <div className="flex flex-col items-center justify-center pointer-events-none">
+                            <motion.div
+                                animate={isDragActive ? { y: [-5, 0, -5] } : {}}
+                                transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+                            >
+                                <IconUpload className={`w-12 h-12 mb-4 transition-all duration-300 ${isDragActive ? 'text-blue-400 scale-110' : 'text-gray-500 group-hover:text-blue-400 group-hover:scale-110'}`} />
+                            </motion.div>
+                            <p className="text-lg font-bold mb-2 text-gray-200 group-hover:text-blue-300 transition-colors duration-300">
+                                {isDragActive ? 'Drop files to upload' : 'Click or Drag/Paste Files Here'}
+                            </p>
+                            <p className="text-gray-400 text-sm font-medium">Select multiple files • Supports paste from clipboard</p>
+                        </div>
+                    </motion.div>
+
+                    {/* Files List */}
+                    <AnimatePresence>
+                        {files.length > 0 && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                transition={{ duration: 0.4, ease: "easeOut" }}
+                                className="flex flex-col flex-grow min-h-0"
+                            >
+                                <div className="flex justify-between items-center mb-4 px-1 shrink-0">
+                                    <div className="flex items-center gap-3">
+                                        <h3 className="text-lg font-bold text-gray-100 flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                                            Files
+                                        </h3>
+                                        <motion.span
+                                            key={files.length}
+                                            initial={{ scale: 0.5, opacity: 0 }}
+                                            animate={{ scale: 1, opacity: 1 }}
+                                            transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                                            className="inline-flex items-center justify-center bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-full h-6 w-6 text-xs font-bold shadow-lg"
+                                            aria-live="polite"
+                                        >
                                             {files.length}
                                         </motion.span>
                                     </div>
-                                    <MaterialButton variant="text" color="error" onClick={openDeleteConfirmation} disabled={files.length === 0} startIcon={<IconTrash />} > Clear All </MaterialButton>
+                                    <MaterialButton variant="outlined" color="error" onClick={openDeleteConfirmation} disabled={files.length === 0} startIcon={<IconTrash />} >
+                                        Clear All
+                                    </MaterialButton>
                                 </div>
 
                                 {hasNonTextFiles && (
-                                    <motion.div role="status" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="bg-blue-900/20 border border-blue-700/40 rounded-lg p-2 mb-3 text-xs text-blue-300 flex items-center overflow-hidden shrink-0" >
-                                        <IconInfo className="h-4 w-4 mr-1.5 flex-shrink-0" />
-                                        <span className="leading-tight">Only text files will be included in the combined output.</span>
+                                    <motion.div
+                                        role="status"
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: 'auto' }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        className="bg-gradient-to-r from-blue-500/10 to-blue-600/10 border border-blue-500/30 rounded-xl p-4 mb-4 text-sm text-blue-300 flex items-center backdrop-blur-sm overflow-hidden shrink-0"
+                                    >
+                                        <IconInfo className="h-5 w-5 mr-3 flex-shrink-0" />
+                                        <span className="leading-relaxed font-medium">Only text files will be included in the combined output.</span>
                                     </motion.div>
                                 )}
 
                                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd} >
-                                    <div className="flex-grow overflow-y-auto min-h-[100px] pr-1 -mr-1 border border-gray-700/50 rounded-lg bg-gray-800/30 shadow-inner scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800/50">
+                                    <div className="flex-grow overflow-y-auto min-h-[200px] pr-2 -mr-2 border border-gray-700/30 rounded-xl bg-gradient-to-b from-gray-800/20 to-gray-800/5 backdrop-blur-sm shadow-inner scrollbar-thin scrollbar-thumb-gray-600/50 scrollbar-track-transparent">
                                         <SortableContext items={fileIds} strategy={verticalListSortingStrategy}>
-                                            <motion.ul layout className="space-y-2 p-2">
+                                            <motion.ul layout className="space-y-3 p-4">
                                                 <AnimatePresence initial={false}>
                                                     {files.map((file) => <SortableItem key={file.id} file={file} onRemove={removeFile} isDragging={activeId === file.id} /> )}
                                                 </AnimatePresence>
@@ -494,7 +696,11 @@ export default function Home() {
                                         </SortableContext>
                                     </div>
                                     <DragOverlay adjustScale={false} zIndex={1000}>
-                                        {activeFile && <div className="w-full select-none opacity-100 cursor-grabbing px-2"><FileTile file={activeFile} isDragging={true} /></div>}
+                                        {activeFile && (
+                                            <div className="w-full select-none opacity-90 cursor-grabbing px-2 transform rotate-3 scale-105">
+                                                <FileTile file={activeFile} isDragging={true} />
+                                            </div>
+                                        )}
                                     </DragOverlay>
                                 </DndContext>
                             </motion.div>
@@ -502,33 +708,83 @@ export default function Home() {
                     </AnimatePresence>
                 </motion.section>
 
-                <motion.section aria-labelledby="combined-text-heading" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5, ease: "easeOut", delay: 0.1 }} className="w-full md:w-1/2 lg:w-3/5 flex flex-col min-h-0" >
+                <motion.section
+                    aria-labelledby="combined-text-heading"
+                    initial={{ opacity: 0, x: 30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
+                    className="w-full xl:w-3/5 flex flex-col min-h-0"
+                >
                     <AnimatePresence mode="wait">
                         {files.length > 0 ? (
-                            <motion.div key="output-area-present" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3, ease: "easeInOut" }} className="bg-gray-800 rounded-xl shadow-lg border border-gray-700/80 p-4 flex flex-col flex-grow" >
-                                <div className="flex justify-between items-center mb-3 flex-shrink-0">
-                                    <h2 id="combined-text-heading" className="text-base font-medium text-gray-100">Combined Text {textFilesOnly ? '(Text Files Only)' : ''}</h2>
+                            <motion.div
+                                key="output-area-present"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                transition={{ duration: 0.4, ease: "easeOut" }}
+                                className="bg-gradient-to-br from-gray-800/90 to-gray-800/60 backdrop-blur-sm rounded-2xl shadow-2xl border border-gray-700/50 p-6 flex flex-col flex-grow"
+                            >
+                                <div className="flex justify-between items-center mb-4 flex-shrink-0">
+                                    <h2 id="combined-text-heading" className="text-lg font-bold text-gray-100 flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                                        Combined Text {textFilesOnly ? '(Text Files Only)' : ''}
+                                    </h2>
                                     <div className="relative flex-shrink-0">
-                                        <MaterialButton onClick={copyToClipboard} disabled={!combinedText || isCopied} startIcon={isCopied ? <IconCheck /> : <IconCopy /> } >
+                                        <MaterialButton
+                                            onClick={copyToClipboard}
+                                            disabled={!combinedText || isCopied}
+                                            startIcon={isCopied ? <IconCheck /> : <IconCopy />}
+                                            color={isCopied ? 'default' : 'primary'}
+                                        >
                                             {isCopied ? 'Copied!' : 'Copy Text'}
                                         </MaterialButton>
                                     </div>
                                 </div>
                                 <div className="relative flex-grow min-h-0">
-                                    <textarea ref={textAreaRef} value={combinedText} readOnly className="w-full h-full p-3 bg-gray-900 border border-gray-700 rounded-lg font-mono text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-300 resize-none scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800" placeholder={files.length > 0 ? "Combined text will appear here..." : "Upload or paste files..."} aria-label="Combined text output" />
+                                    <textarea
+                                        ref={textAreaRef}
+                                        value={combinedText}
+                                        readOnly
+                                        className="w-full h-full p-4 bg-gray-900/80 backdrop-blur-sm border border-gray-700/60 rounded-xl font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500/60 text-gray-300 resize-none scrollbar-thin scrollbar-thumb-gray-600/60 scrollbar-track-gray-800/30 shadow-inner transition-all duration-300"
+                                        placeholder={files.length > 0 ? "Combined text will appear here..." : "Upload or paste files..."}
+                                        aria-label="Combined text output"
+                                    />
                                     <AnimatePresence>
                                         {isCopied && (
-                                            <motion.div initial={{ opacity: 0, y: 10, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -10, scale: 0.9 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }} className="absolute bottom-3 right-3 bg-green-600/90 text-white px-2 py-0.5 rounded shadow-lg text-[10px] font-medium backdrop-blur-sm pointer-events-none" role="status" > Copied! </motion.div>
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 20, scale: 0.8 }}
+                                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                exit={{ opacity: 0, y: -10, scale: 0.8 }}
+                                                transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                                                className="absolute bottom-4 right-4 bg-gradient-to-r from-green-600 to-green-700 text-white px-4 py-2 rounded-xl shadow-lg text-sm font-bold backdrop-blur-sm pointer-events-none border border-green-500/30"
+                                                role="status"
+                                            >
+                                                ✓ Copied to clipboard!
+                                            </motion.div>
                                         )}
                                     </AnimatePresence>
                                 </div>
                             </motion.div>
                         ) : (
-                            <motion.div key="output-area-empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3, ease: "easeInOut" }} className="flex-grow flex items-center justify-center bg-gray-800 rounded-xl border border-dashed border-gray-700 p-10 text-center text-gray-500" >
-                                <div>
-                                    <IconTextFile />
-                                    <p className="text-lg font-medium mt-4" id="combined-text-heading">Combined Text Output</p>
-                                    <p className="text-sm mt-1">Upload or paste files on the left.</p>
+                            <motion.div
+                                key="output-area-empty"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.4, ease: "easeOut" }}
+                                className="flex-grow flex items-center justify-center bg-gradient-to-br from-gray-800/40 to-gray-800/20 backdrop-blur-sm rounded-2xl border border-dashed border-gray-700/60 p-12 text-center text-gray-500"
+                            >
+                                <div className="max-w-md">
+                                    <motion.div
+                                        animate={{ y: [-10, 0, -10] }}
+                                        transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+                                        className="mb-6"
+                                    >
+                                        <IconTextFile />
+                                    </motion.div>
+                                    <p className="text-xl font-bold mt-4 text-gray-300 mb-2" id="combined-text-heading">Combined Text Output</p>
+                                    <p className="text-sm text-gray-400 font-medium">Upload or paste files on the left to see the combined content here.</p>
                                 </div>
                             </motion.div>
                         )}
@@ -536,36 +792,80 @@ export default function Home() {
                 </motion.section>
             </main>
 
+            {/* Drag Overlay */}
             <AnimatePresence>
                 {isDragActive && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="fixed inset-0 bg-gray-900/70 backdrop-blur-sm flex items-center justify-center z-50 pointer-events-none" aria-hidden="true" >
-                        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }} transition={{ type: 'spring', stiffness: 200, damping: 15 }} className="bg-gray-800 p-10 rounded-xl border-2 border-dashed border-blue-500 max-w-lg w-full text-center shadow-2xl" >
-                            <motion.div animate={{ y: [-8, 0, -8] }} transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }} className="mx-auto mb-6" >
-                                <IconUpload className="w-20 h-20 text-blue-400 mx-auto" />
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="fixed inset-0 bg-gray-900/80 backdrop-blur-md flex items-center justify-center z-50 pointer-events-none"
+                        aria-hidden="true"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.8, opacity: 0 }}
+                            transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+                            className="bg-gradient-to-br from-gray-800/90 to-gray-800/70 backdrop-blur-sm p-12 rounded-2xl border-2 border-dashed border-blue-500/80 max-w-lg w-full text-center shadow-2xl shadow-blue-500/20"
+                        >
+                            <motion.div
+                                animate={{ y: [-12, 0, -12] }}
+                                transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+                                className="mx-auto mb-8"
+                            >
+                                <IconUpload className="w-24 h-24 text-blue-400 mx-auto" />
                             </motion.div>
-                            <h2 className="text-2xl font-medium text-white mb-2">Drop Files to Upload</h2>
-                            <p className="text-gray-300">Release your mouse button</p>
+                            <h2 className="text-3xl font-bold text-white mb-3">Drop Files to Upload</h2>
+                            <p className="text-gray-300 text-lg font-medium">Release your mouse button to add files</p>
                         </motion.div>
                     </motion.div>
                 )}
             </AnimatePresence>
 
+            {/* Delete Confirmation Dialog */}
             <AnimatePresence>
                 {deleteConfirmOpen && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="fixed inset-0 bg-gray-900/70 backdrop-blur-sm flex items-center justify-center z-[1001] p-4" onClick={closeDeleteConfirmation} role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-description" >
-                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} transition={{ type: 'spring', stiffness: 250, damping: 20 }} className="bg-gray-800 p-6 rounded-xl border border-gray-700 max-w-md w-full shadow-xl" onClick={e => e.stopPropagation()} role="document" >
-                            <div className="flex items-start mb-4">
-                                <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center mr-4 flex-shrink-0 mt-1" aria-hidden="true">
-                                    <IconWarning className="h-6 w-6 text-red-500" />
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="fixed inset-0 bg-gray-900/80 backdrop-blur-md flex items-center justify-center z-[1001] p-4"
+                        onClick={closeDeleteConfirmation}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="delete-dialog-title"
+                        aria-describedby="delete-dialog-description"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                            className="bg-gradient-to-br from-gray-800/95 to-gray-800/85 backdrop-blur-sm p-8 rounded-2xl border border-gray-700/60 max-w-md w-full shadow-2xl"
+                            onClick={e => e.stopPropagation()}
+                            role="document"
+                        >
+                            <div className="flex items-start mb-6">
+                                <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mr-4 flex-shrink-0 mt-1" aria-hidden="true">
+                                    <IconWarning className="h-7 w-7 text-red-500" />
                                 </div>
                                 <div>
-                                    <h3 id="delete-dialog-title" className="text-xl font-semibold text-gray-100">Delete All Files?</h3>
-                                    <p id="delete-dialog-description" className="text-gray-300 text-sm mt-2">Are you sure you want to delete all {files.length} uploaded file{files.length !== 1 ? 's' : ''}? This action cannot be undone.</p>
+                                    <h3 id="delete-dialog-title" className="text-2xl font-bold text-gray-100">Delete All Files?</h3>
+                                    <p id="delete-dialog-description" className="text-gray-300 text-sm mt-3 leading-relaxed">
+                                        Are you sure you want to delete all <span className="font-semibold text-red-400">{files.length}</span> uploaded file{files.length !== 1 ? 's' : ''}? This action cannot be undone.
+                                    </p>
                                 </div>
                             </div>
-                            <div className="flex justify-end gap-3 mt-6">
-                                <MaterialButton variant="text" color="default" onClick={closeDeleteConfirmation}> Cancel </MaterialButton>
-                                <MaterialButton color="error" variant="contained" onClick={deleteAllFiles} startIcon={<IconTrash />} > Delete All </MaterialButton>
+                            <div className="flex justify-end gap-4 mt-8">
+                                <MaterialButton variant="outlined" color="default" onClick={closeDeleteConfirmation}>
+                                    Cancel
+                                </MaterialButton>
+                                <MaterialButton color="error" variant="contained" onClick={deleteAllFiles} startIcon={<IconTrash />} >
+                                    Delete All
+                                </MaterialButton>
                             </div>
                         </motion.div>
                     </motion.div>
