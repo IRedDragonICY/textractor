@@ -23,6 +23,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion, AnimatePresence } from 'framer-motion';
+import { encode } from 'gpt-tokenizer';
 
 const TEXT_FILE_EXTENSIONS = new Set([
     'txt', 'md', 'js', 'jsx', 'ts', 'tsx', 'html', 'css', 'scss', 'sass',
@@ -61,6 +62,7 @@ interface FileData {
     fileObject: File | Blob;
     linesOfCode: number;
     characterCount: number;
+    tokenCount: number;
 }
 
 interface Statistics {
@@ -69,8 +71,10 @@ interface Statistics {
     totalNonTextFiles: number;
     totalLinesOfCode: number;
     totalCharacters: number;
+    totalTokens: number;
     averageLinesPerFile: number;
     averageCharactersPerFile: number;
+    averageTokensPerFile: number;
 }
 
 const isFileText = (name: string, type: string): boolean => {
@@ -98,13 +102,22 @@ const countLinesOfCode = (content: string): number => {
     return content.split('\n').filter(line => line.trim().length > 0).length;
 };
 
+const countTokens = (content: string): number => {
+    if (!content) return 0;
+    try {
+        return encode(content).length;
+    } catch (error) {
+        console.error("Tokenization error:", error);
+        return 0;
+    }
+};
+
 const formatNumber = (num: number): string => {
     if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
     if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
     return num.toString();
 };
 
-// Icons
 const IconTextFile = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -175,6 +188,12 @@ const IconFile = () => (
 const IconAverage = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+    </svg>
+);
+
+const IconToken = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10m16-10v10M8 4h8M8 20h8M9 9h6v6H9z" />
     </svg>
 );
 
@@ -378,19 +397,21 @@ export default function Home() {
         let content = "";
         let linesOfCode = 0;
         let characterCount = 0;
+        let tokenCount = 0;
 
         if (isText) {
             try {
                 content = await fileObject.text();
                 linesOfCode = countLinesOfCode(content);
                 characterCount = content.length;
+                tokenCount = countTokens(content);
             } catch (error) {
                 console.error(`Error reading text file ${name}:`, error);
                 content = "";
             }
         }
 
-        return { id: fileId, name, content, isText, fileObject, linesOfCode, characterCount };
+        return { id: fileId, name, content, isText, fileObject, linesOfCode, characterCount, tokenCount };
     }, []);
 
     const addFiles = useCallback((newFileObjects: (File | Blob)[]) => {
@@ -481,6 +502,7 @@ export default function Home() {
         const textFiles = filesToConsider.filter(f => f.isText);
         const totalLinesOfCode = textFiles.reduce((sum, file) => sum + file.linesOfCode, 0);
         const totalCharacters = textFiles.reduce((sum, file) => sum + file.characterCount, 0);
+        const totalTokens = textFiles.reduce((sum, file) => sum + file.tokenCount, 0);
 
         return {
             totalFiles: filesToConsider.length,
@@ -488,8 +510,10 @@ export default function Home() {
             totalNonTextFiles: filesToConsider.length - textFiles.length,
             totalLinesOfCode,
             totalCharacters,
+            totalTokens,
             averageLinesPerFile: textFiles.length > 0 ? Math.round(totalLinesOfCode / textFiles.length) : 0,
             averageCharactersPerFile: textFiles.length > 0 ? Math.round(totalCharacters / textFiles.length) : 0,
+            averageTokensPerFile: textFiles.length > 0 ? Math.round(totalTokens / textFiles.length) : 0,
         };
     }, [files, textFilesOnly]);
 
@@ -589,7 +613,6 @@ export default function Home() {
                 >
                     <h2 id="settings-and-files-heading" className="sr-only">Settings and Uploaded Files</h2>
 
-                    {/* Settings Card */}
                     <div className="bg-gradient-to-br from-gray-800/80 to-gray-800/40 backdrop-blur-sm rounded-2xl p-6 border border-gray-700/50 shadow-xl shrink-0">
                         <h3 className="text-lg font-bold text-gray-100 mb-4 flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full bg-blue-500"></div>
@@ -598,7 +621,6 @@ export default function Home() {
                         <ToggleSwitch id="text-files-only" label="Combine Text Files Only" checked={textFilesOnly} onChange={handleTextFilesOnlyChange} />
                     </div>
 
-                    {/* Statistics Cards */}
                     <AnimatePresence>
                         {files.length > 0 && (
                             <motion.div
@@ -606,17 +628,18 @@ export default function Home() {
                                 animate={{ opacity: 1, height: 'auto' }}
                                 exit={{ opacity: 0, height: 0 }}
                                 transition={{ duration: 0.4, ease: "easeOut" }}
-                                className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-2 gap-4 shrink-0"
+                                className="grid grid-cols-2 md:grid-cols-3 gap-4 shrink-0"
                             >
                                 <StatCard icon={<IconFile />} label="Total Files" value={statistics.totalFiles} delay={0.1} />
-                                <StatCard icon={<IconCode />} label="Lines of Code" value={formatNumber(statistics.totalLinesOfCode)} delay={0.2} />
-                                <StatCard icon={<IconCharacter />} label="Characters" value={formatNumber(statistics.totalCharacters)} delay={0.3} />
-                                <StatCard icon={<IconAverage />} label="Avg Lines/File" value={statistics.averageLinesPerFile} delay={0.4} />
+                                <StatCard icon={<IconCharacter />} label="Characters" value={formatNumber(statistics.totalCharacters)} delay={0.2} />
+                                <StatCard icon={<IconCode />} label="Lines of Code" value={formatNumber(statistics.totalLinesOfCode)} delay={0.3} />
+                                <StatCard icon={<IconToken />} label="Total Tokens" value={formatNumber(statistics.totalTokens)} delay={0.4} />
+                                <StatCard icon={<IconAverage />} label="Avg Lines/File" value={statistics.averageLinesPerFile} delay={0.5} />
+                                <StatCard icon={<IconAverage />} label="Avg Tokens/File" value={statistics.averageTokensPerFile} delay={0.6} />
                             </motion.div>
                         )}
                     </AnimatePresence>
 
-                    {/* Upload Area */}
                     <motion.div
                         role="button"
                         tabIndex={0}
@@ -640,7 +663,6 @@ export default function Home() {
                         </div>
                     </motion.div>
 
-                    {/* Files List */}
                     <AnimatePresence>
                         {files.length > 0 && (
                             <motion.div
@@ -792,7 +814,6 @@ export default function Home() {
                 </motion.section>
             </main>
 
-            {/* Drag Overlay */}
             <AnimatePresence>
                 {isDragActive && (
                     <motion.div
@@ -824,7 +845,6 @@ export default function Home() {
                 )}
             </AnimatePresence>
 
-            {/* Delete Confirmation Dialog */}
             <AnimatePresence>
                 {deleteConfirmOpen && (
                     <motion.div
