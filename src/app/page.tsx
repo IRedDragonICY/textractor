@@ -132,7 +132,12 @@ const saveSession = async (files: FileData[]) => {
         }));
 
         store.put(serializableFiles, 'currentSession');
-        return tx.commit?.() || new Promise(resolve => (tx.oncomplete = resolve));
+        
+        return new Promise<void>((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+            tx.commit?.();
+        });
     } catch (e) {
         console.error("Failed to save session", e);
     }
