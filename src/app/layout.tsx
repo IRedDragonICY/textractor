@@ -20,14 +20,14 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://textracktor.vercel.app"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://contextractor.vercel.app"),
   title: {
-    default: "Textracktor PRO - File to Text for LLMs",
-    template: "%s | Textracktor PRO",
+    default: "Contextractor - File to Text for LLMs",
+    template: "%s | Contextractor",
   },
   description: "Professional tool to extract clean text from code, ZIPs, and GitHub repositories. Optimize context for ChatGPT, Claude, and other LLMs.",
   keywords: [
-    "text extractor",
+    "context extractor",
     "code to text",
     "github to text",
     "llm context",
@@ -37,9 +37,9 @@ export const metadata: Metadata = {
     "repository converter",
     "file flattener"
   ],
-  authors: [{ name: "Textracktor Team" }],
-  creator: "Textracktor Team",
-  publisher: "Textracktor",
+  authors: [{ name: "Contextractor Team" }],
+  creator: "Contextractor Team",
+  publisher: "Contextractor",
   robots: {
     index: true,
     follow: true,
@@ -55,13 +55,13 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     url: "/",
-    title: "Textracktor PRO - Advanced File to Text Extractor",
+    title: "Contextractor - Advanced File to Text Extractor",
     description: "Extract clean text from code, ZIPs, and repositories for LLM context.",
-    siteName: "Textracktor PRO",
+    siteName: "Contextractor",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Textracktor PRO",
+    title: "Contextractor",
     description: "Extract clean text from code, ZIPs, and repositories for LLM context.",
   },
   icons: {
