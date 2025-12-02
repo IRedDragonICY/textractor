@@ -2,8 +2,8 @@ import { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Textracktor PRO',
-    short_name: 'Textracktor',
+    name: 'Contextractor PRO',
+    short_name: 'Contextractor',
     description: 'Extract text from files and repositories for LLMs',
     start_url: '/',
     display: 'standalone',

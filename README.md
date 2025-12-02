@@ -1,7 +1,7 @@
-# ✨ Textractor ✨
+# ✨ Contextractor ✨
 
 <p align="center">
-  <img src="./public/icon.jpg" alt="Textractor Logo" width="200"/>
+  <img src="./public/icon.jpg" alt="Contextractor Logo" width="200"/>
   <!-- Add a real screenshot URL once you have one -->
   <br/>
   <i>Combine text files effortlessly. Drag, drop, reorder, and copy.</i>
@@ -17,7 +17,7 @@
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
 </p>
 
-**Textractor** is a sleek web application built with Next.js and modern web technologies that allows you to easily upload, reorder, and combine the content of multiple text-based files. The combined output is conveniently formatted using Markdown code blocks, including the filename and guessed language extension, ready to be copied and used anywhere – perfect for feeding context to LLMs, compiling code snippets, or preparing documentation.
+**Contextractor** is a sleek web application built with Next.js and modern web technologies that allows you to easily upload, reorder, and combine the content of multiple text-based files. The combined output is conveniently formatted using Markdown code blocks, including the filename and guessed language extension, ready to be copied and used anywhere – perfect for feeding context to LLMs, compiling code snippets, or preparing documentation.
 
 ## 🚀 Features
 
@@ -43,7 +43,7 @@
 
 ## 🏁 Getting Started
 
-Follow these steps to get Textractor running on your local machine.
+Follow these steps to get Contextractor running on your local machine.
 
 ### Prerequisites
 
@@ -54,10 +54,9 @@ Follow these steps to get Textractor running on your local machine.
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/your-username/textractor.git
-    cd textractor
+    git clone https://github.com/IRedDragonICY/contextractor.git
+    cd contextractor
     ```
-    *(Replace `your-username/textractor.git` with the actual repository URL)*
 
 2.  **Install dependencies:**
     ```bash
@@ -92,7 +91,7 @@ Follow these steps to get Textractor running on your local machine.
 
 ## 📄 Supported Text File Extensions
 
-Textractor attempts to identify text files based on their extensions. The following extensions are currently recognized as text-based:
+Contextractor attempts to identify text files based on their extensions. The following extensions are currently recognized as text-based:
 
 
 txt, md, js, jsx, ts, tsx, html, css, scss, sass, less, json, xml, yaml, yml,
