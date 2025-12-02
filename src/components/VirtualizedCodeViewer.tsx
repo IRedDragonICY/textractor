@@ -33,16 +33,16 @@ const CodeLine = memo(({
 }) => (
     <div 
         style={style} 
-        className={`flex ${isHighlighted ? 'bg-[#004A77]/30' : ''}`}
+        className={`flex ${isHighlighted ? 'bg-[var(--theme-primary)]/20' : ''}`}
     >
         <span 
-            className="w-12 shrink-0 text-right pr-3 text-[#6e7072] select-none border-r border-[#444746] bg-[#1E1E1E]"
+            className="w-12 shrink-0 text-right pr-3 text-[var(--theme-text-tertiary)] select-none border-r border-[var(--theme-border)] bg-[var(--theme-surface)]"
             style={{ fontFamily: '"JetBrains Mono", "Fira Code", "Roboto Mono", monospace' }}
         >
             {lineNumber}
         </span>
         <span 
-            className="pl-4 whitespace-pre text-[#C4C7C5]"
+            className="pl-4 whitespace-pre text-[var(--theme-text-secondary)]"
             style={{ fontFamily: '"JetBrains Mono", "Fira Code", "Roboto Mono", monospace' }}
         >
             {content}
@@ -156,7 +156,7 @@ export const VirtualizedCodeViewer = memo(({
     // Empty state
     if (!content) {
         return (
-            <div className={`flex items-center justify-center h-full text-[#8E918F] ${className}`}>
+            <div className={`flex items-center justify-center h-full text-[var(--theme-text-tertiary)] ${className}`}>
                 <pre 
                     className="text-[13px] opacity-50"
                     style={{ fontFamily: '"JetBrains Mono", "Fira Code", "Roboto Mono", monospace' }}
@@ -171,7 +171,7 @@ export const VirtualizedCodeViewer = memo(({
         <div 
             ref={containerRef}
             onScroll={handleScroll}
-            className={`overflow-auto h-full scrollbar-thin scrollbar-thumb-[#444746] scrollbar-track-transparent ${className}`}
+            className={`overflow-auto h-full scrollbar-thin scrollbar-thumb-[var(--theme-border)] scrollbar-track-transparent ${className}`}
             style={{
                 // GPU acceleration hints
                 willChange: 'scroll-position',

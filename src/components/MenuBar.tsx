@@ -1,11 +1,12 @@
 // Modern Menu Bar Component - VS Code / Electron Style
-// Professional-grade menu bar with File, Edit, Help menus
+// Professional-grade menu bar with File, Edit, View, Help menus
 
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
+import { useTheme } from '@/hooks/useTheme';
 
 // Icons
 const ICONS = {
@@ -22,6 +23,10 @@ const ICONS = {
     keyboard: "M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z",
     close: "M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z",
     check: "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z",
+    sun: "M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z",
+    moon: "M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z",
+    system: "M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z",
+    palette: "M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z",
 };
 
 interface MenuItem {
@@ -32,6 +37,7 @@ interface MenuItem {
     onClick?: () => void;
     disabled?: boolean;
     divider?: boolean;
+    checked?: boolean;
 }
 
 interface MenuProps {
@@ -70,6 +76,7 @@ export const MenuBar: React.FC<MenuBarProps> = ({
 }) => {
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
     const menuBarRef = useRef<HTMLDivElement>(null);
+    const { theme, setTheme } = useTheme();
 
     // Close menu on click outside
     useEffect(() => {
@@ -103,6 +110,32 @@ export const MenuBar: React.FC<MenuBarProps> = ({
             ],
         },
         {
+            label: 'View',
+            items: [
+                { 
+                    id: 'theme-light', 
+                    label: 'Light Theme', 
+                    icon: ICONS.sun, 
+                    onClick: () => setTheme('light'),
+                    checked: theme === 'light',
+                },
+                { 
+                    id: 'theme-dark', 
+                    label: 'Dark Theme', 
+                    icon: ICONS.moon, 
+                    onClick: () => setTheme('dark'),
+                    checked: theme === 'dark',
+                },
+                { 
+                    id: 'theme-system', 
+                    label: 'System Theme', 
+                    icon: ICONS.system, 
+                    onClick: () => setTheme('system'),
+                    checked: theme === 'system',
+                },
+            ],
+        },
+        {
             label: 'Help',
             items: [
                 { id: 'shortcuts', label: 'Keyboard Shortcuts', icon: ICONS.keyboard, shortcut: 'Ctrl+/', onClick: onShowShortcuts },
@@ -125,7 +158,7 @@ export const MenuBar: React.FC<MenuBarProps> = ({
     return (
         <div 
             ref={menuBarRef}
-            className="bg-[#1E1E1E] h-[30px] flex items-center px-2 text-[13px] select-none"
+            className="bg-[var(--theme-surface)] h-[30px] flex items-center px-2 text-[13px] select-none"
         >
             {menus.map(menu => (
                 <div key={menu.label} className="relative">
@@ -135,8 +168,8 @@ export const MenuBar: React.FC<MenuBarProps> = ({
                         className={`
                             px-3 py-1 rounded-sm transition-colors
                             ${activeMenu === menu.label 
-                                ? 'bg-[#094771] text-white' 
-                                : 'text-[#CCCCCC] hover:bg-[#2A2D2E]'
+                                ? 'bg-[var(--theme-menu-hover)] text-[var(--theme-text-primary)]' 
+                                : 'text-[var(--theme-text-secondary)] hover:bg-[var(--theme-surface-hover)]'
                             }
                         `}
                     >
@@ -150,11 +183,11 @@ export const MenuBar: React.FC<MenuBarProps> = ({
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -5 }}
                                 transition={{ duration: 0.1 }}
-                                className="absolute top-full left-0 mt-0.5 bg-[#252526] border border-[#454545] rounded-md shadow-xl py-1 min-w-[220px] z-[100]"
+                                className="absolute top-full left-0 mt-0.5 bg-[var(--theme-menu-bg)] border border-[var(--theme-border)] rounded-md shadow-xl py-1 min-w-[220px] z-[100]"
                             >
                                 {menu.items.map((item, idx) => (
                                     item.divider ? (
-                                        <div key={`divider-${idx}`} className="h-px bg-[#454545] my-1" />
+                                        <div key={`divider-${idx}`} className="h-px bg-[var(--theme-border)] my-1" />
                                     ) : (
                                         <button
                                             key={item.id}
@@ -163,17 +196,23 @@ export const MenuBar: React.FC<MenuBarProps> = ({
                                             className={`
                                                 w-full flex items-center gap-3 px-3 py-1.5 text-left transition-colors
                                                 ${item.disabled 
-                                                    ? 'text-[#5A5A5A] cursor-not-allowed' 
-                                                    : 'text-[#CCCCCC] hover:bg-[#094771] hover:text-white'
+                                                    ? 'text-[var(--theme-text-muted)] cursor-not-allowed' 
+                                                    : 'text-[var(--theme-text-secondary)] hover:bg-[var(--theme-menu-hover)] hover:text-[var(--theme-text-primary)]'
                                                 }
                                             `}
                                         >
-                                            {item.icon && (
+                                            {item.checked !== undefined ? (
+                                                <div className="w-4 h-4 shrink-0 flex items-center justify-center">
+                                                    {item.checked && (
+                                                        <GoogleIcon path={ICONS.check} className="w-4 h-4 text-[var(--theme-primary)]" />
+                                                    )}
+                                                </div>
+                                            ) : item.icon ? (
                                                 <GoogleIcon path={item.icon} className="w-4 h-4 shrink-0" />
-                                            )}
+                                            ) : null}
                                             <span className="flex-1">{item.label}</span>
                                             {item.shortcut && (
-                                                <span className="text-[11px] text-[#6E6E6E] ml-4">
+                                                <span className="text-[11px] text-[var(--theme-text-muted)] ml-4">
                                                     {item.shortcut}
                                                 </span>
                                             )}
@@ -203,61 +242,61 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-[200] bg-[var(--theme-overlay)] backdrop-blur-sm flex items-center justify-center p-4"
             onClick={onClose}
         >
             <motion.div
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
-                className="bg-[#252526] rounded-2xl p-8 w-full max-w-md shadow-2xl border border-[#454545]"
+                className="bg-[var(--theme-surface-elevated)] rounded-2xl p-8 w-full max-w-md shadow-2xl border border-[var(--theme-border)]"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Logo & Title */}
                 <div className="text-center mb-6">
-                    <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-[#A8C7FA] to-[#7FCFB6] rounded-2xl flex items-center justify-center shadow-lg">
+                    <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-[var(--theme-primary)] to-[var(--theme-accent)] rounded-2xl flex items-center justify-center shadow-lg">
                         <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
                             <path d="M12 8L24 4L36 8V20C36 28 30 35 24 38C18 35 12 28 12 20V8Z" fill="white" fillOpacity="0.9"/>
                             <path d="M20 22L23 25L28 18" stroke="#1E1E1E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                     </div>
-                    <h2 className="text-2xl font-semibold text-[#E3E3E3] mb-1">Contextractor</h2>
-                    <p className="text-[#8E918F] text-sm">Version 1.0.0 PRO</p>
+                    <h2 className="text-2xl font-semibold text-[var(--theme-text-primary)] mb-1">Contextractor</h2>
+                    <p className="text-[var(--theme-text-tertiary)] text-sm">Version 1.0.0 PRO</p>
                 </div>
 
                 {/* Description */}
                 <div className="text-center mb-6">
-                    <p className="text-[#C4C7C5] text-sm leading-relaxed">
+                    <p className="text-[var(--theme-text-secondary)] text-sm leading-relaxed">
                         Extract clean, formatted context from your code for AI & LLMs. 
                         Built for developers who need to share code context efficiently.
                     </p>
                 </div>
 
                 {/* Features */}
-                <div className="bg-[#1E1E1E] rounded-xl p-4 mb-6">
-                    <h3 className="text-xs font-medium text-[#8E918F] uppercase tracking-wide mb-3">Features</h3>
-                    <ul className="space-y-2 text-sm text-[#C4C7C5]">
+                <div className="bg-[var(--theme-surface)] rounded-xl p-4 mb-6">
+                    <h3 className="text-xs font-medium text-[var(--theme-text-tertiary)] uppercase tracking-wide mb-3">Features</h3>
+                    <ul className="space-y-2 text-sm text-[var(--theme-text-secondary)]">
                         <li className="flex items-center gap-2">
-                            <GoogleIcon path={ICONS.check} className="w-4 h-4 text-[#7FCFB6]" />
+                            <GoogleIcon path={ICONS.check} className="w-4 h-4 text-[var(--theme-accent)]" />
                             Multi-file context extraction
                         </li>
                         <li className="flex items-center gap-2">
-                            <GoogleIcon path={ICONS.check} className="w-4 h-4 text-[#7FCFB6]" />
+                            <GoogleIcon path={ICONS.check} className="w-4 h-4 text-[var(--theme-accent)]" />
                             Multiple output formats
                         </li>
                         <li className="flex items-center gap-2">
-                            <GoogleIcon path={ICONS.check} className="w-4 h-4 text-[#7FCFB6]" />
+                            <GoogleIcon path={ICONS.check} className="w-4 h-4 text-[var(--theme-accent)]" />
                             GitHub/GitLab integration
                         </li>
                         <li className="flex items-center gap-2">
-                            <GoogleIcon path={ICONS.check} className="w-4 h-4 text-[#7FCFB6]" />
+                            <GoogleIcon path={ICONS.check} className="w-4 h-4 text-[var(--theme-accent)]" />
                             Session management & history
                         </li>
                     </ul>
                 </div>
 
                 {/* Credits */}
-                <div className="text-center text-xs text-[#6E6E6E] mb-6">
+                <div className="text-center text-xs text-[var(--theme-text-muted)] mb-6">
                     <p>Made with ❤️ by Top Agency Developers</p>
                     <p className="mt-1">© 2025 Contextractor. All rights reserved.</p>
                 </div>
@@ -265,7 +304,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                 {/* Close Button */}
                 <button
                     onClick={onClose}
-                    className="w-full py-2.5 bg-[#094771] hover:bg-[#0A5A8E] text-white rounded-lg transition-colors font-medium"
+                    className="w-full py-2.5 bg-[var(--theme-button-filled)] hover:bg-[var(--theme-button-filled-hover)] text-white rounded-lg transition-colors font-medium"
                 >
                     Close
                 </button>
@@ -306,25 +345,25 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-[200] bg-[var(--theme-overlay)] backdrop-blur-sm flex items-center justify-center p-4"
             onClick={onClose}
         >
             <motion.div
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
-                className="bg-[#252526] rounded-2xl p-6 w-full max-w-lg shadow-2xl border border-[#454545]"
+                className="bg-[var(--theme-surface-elevated)] rounded-2xl p-6 w-full max-w-lg shadow-2xl border border-[var(--theme-border)]"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-semibold text-[#E3E3E3] flex items-center gap-2">
-                        <GoogleIcon path={ICONS.keyboard} className="w-5 h-5 text-[#A8C7FA]" />
+                    <h2 className="text-xl font-semibold text-[var(--theme-text-primary)] flex items-center gap-2">
+                        <GoogleIcon path={ICONS.keyboard} className="w-5 h-5 text-[var(--theme-primary)]" />
                         Keyboard Shortcuts
                     </h2>
                     <button
                         onClick={onClose}
-                        className="p-1.5 text-[#8E918F] hover:text-[#E3E3E3] hover:bg-[#3C3C3C] rounded-lg transition-colors"
+                        className="p-1.5 text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-surface-hover)] rounded-lg transition-colors"
                     >
                         <GoogleIcon path={ICONS.close} className="w-5 h-5" />
                     </button>
@@ -334,17 +373,17 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
                 <div className="space-y-6">
                     {shortcuts.map(section => (
                         <div key={section.category}>
-                            <h3 className="text-xs font-medium text-[#8E918F] uppercase tracking-wide mb-3">
+                            <h3 className="text-xs font-medium text-[var(--theme-text-tertiary)] uppercase tracking-wide mb-3">
                                 {section.category}
                             </h3>
                             <div className="space-y-2">
                                 {section.items.map(shortcut => (
                                     <div 
                                         key={shortcut.keys}
-                                        className="flex items-center justify-between py-2 px-3 bg-[#1E1E1E] rounded-lg"
+                                        className="flex items-center justify-between py-2 px-3 bg-[var(--theme-surface)] rounded-lg"
                                     >
-                                        <span className="text-sm text-[#C4C7C5]">{shortcut.description}</span>
-                                        <kbd className="px-2 py-1 bg-[#333537] text-[#A8C7FA] text-xs rounded font-mono">
+                                        <span className="text-sm text-[var(--theme-text-secondary)]">{shortcut.description}</span>
+                                        <kbd className="px-2 py-1 bg-[var(--theme-surface-hover)] text-[var(--theme-primary)] text-xs rounded font-mono">
                                             {shortcut.keys}
                                         </kbd>
                                     </div>

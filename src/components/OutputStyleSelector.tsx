@@ -35,8 +35,8 @@ export const OutputStyleSelector = ({ value, onChange, className }: OutputStyleS
                     flex items-center gap-3 pl-4 pr-4 py-2.5 rounded-full w-full
                     border transition-colors duration-200 overflow-hidden
                     ${isOpen 
-                        ? 'bg-[#2B2930] border-[#A8C7FA] text-[#E3E3E3]' 
-                        : 'bg-[#333537] border-[#444746] text-[#C4C7C5] hover:bg-[#444746]'
+                        ? 'bg-[var(--theme-surface-hover)] border-[var(--theme-primary)] text-[var(--theme-text-primary)]' 
+                        : 'bg-[var(--theme-surface-elevated)] border-[var(--theme-border)] text-[var(--theme-text-secondary)] hover:bg-[var(--theme-surface-hover)]'
                     }
                 `}
             >
@@ -44,7 +44,7 @@ export const OutputStyleSelector = ({ value, onChange, className }: OutputStyleS
                 <div className="relative w-4.5 h-4.5 flex items-center justify-center shrink-0">
                     <AnimatedIcon 
                         path={UI_ICONS.tune} 
-                        className={`w-full h-full ${isOpen ? 'text-[#A8C7FA]' : 'text-[#C4C7C5]'}`}
+                        className={`w-full h-full ${isOpen ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-text-secondary)]'}`}
                     />
                 </div>
 
@@ -54,7 +54,7 @@ export const OutputStyleSelector = ({ value, onChange, className }: OutputStyleS
                 <motion.div
                     animate={{ rotate: isOpen ? 180 : 0 }}
                     transition={{ duration: 0.2 }}
-                    className={`shrink-0 ${isOpen ? 'text-[#A8C7FA]' : 'text-[#8E918F]'}`}
+                    className={`shrink-0 ${isOpen ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-text-tertiary)]'}`}
                 >
                     <GoogleIcon path={UI_ICONS.expand_more} className="w-4 h-4" />
                 </motion.div>
@@ -70,11 +70,11 @@ export const OutputStyleSelector = ({ value, onChange, className }: OutputStyleS
                         className={`
                             absolute top-full mt-2 
                             w-full min-w-[300px] md:min-w-[380px] md:w-[380px]
-                            bg-[#1E1E1E] border border-[#444746] rounded-2xl shadow-2xl overflow-hidden z-50 flex flex-col
+                            bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-2xl shadow-2xl overflow-hidden z-50 flex flex-col
                             left-0 md:left-auto md:right-0
                         `}
                     >
-                        <div className="p-2 grid gap-1 max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-[#444746] scrollbar-track-transparent">
+                        <div className="p-2 grid gap-1 max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--theme-border)] scrollbar-track-transparent">
                             {OUTPUT_STYLES_CONFIG.map((option) => {
                                 const isActive = value === option.id;
                                 return (
@@ -87,8 +87,8 @@ export const OutputStyleSelector = ({ value, onChange, className }: OutputStyleS
                                         className={`
                                             group relative flex items-start gap-4 p-3 rounded-xl text-left transition-all duration-200 shrink-0
                                             ${isActive 
-                                                ? 'bg-[#004A77] text-[#C2E7FF]' 
-                                                : 'text-[#C4C7C5] hover:bg-[#333537] hover:text-[#E3E3E3]'
+                                                ? 'bg-[var(--theme-primary)]/20 text-[var(--theme-primary)]' 
+                                                : 'text-[var(--theme-text-secondary)] hover:bg-[var(--theme-surface-hover)] hover:text-[var(--theme-text-primary)]'
                                             }
                                         `}
                                     >
@@ -96,26 +96,26 @@ export const OutputStyleSelector = ({ value, onChange, className }: OutputStyleS
                                         {isActive && (
                                             <motion.div 
                                                 layoutId="activeIndicator"
-                                                className="absolute left-0 top-3 bottom-3 w-1 bg-[#A8C7FA] rounded-r-full" 
+                                                className="absolute left-0 top-3 bottom-3 w-1 bg-[var(--theme-primary)] rounded-r-full" 
                                             />
                                         )}
 
                                         <div className="flex-1 min-w-0 z-10 ml-2">
                                             <div className="flex items-center justify-between mb-1">
-                                                <span className={`text-sm font-medium ${isActive ? 'text-[#D3E3FD]' : 'text-[#E3E3E3]'}`}>
+                                                <span className={`text-sm font-medium ${isActive ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-text-primary)]'}`}>
                                                     {option.label}
                                                 </span>
                                                 {isActive && (
                                                     <motion.div
                                                         initial={{ scale: 0 }}
                                                         animate={{ scale: 1 }}
-                                                        className="text-[#A8C7FA]"
+                                                        className="text-[var(--theme-primary)]"
                                                     >
                                                         <GoogleIcon path={UI_ICONS.check} className="w-4 h-4" />
                                                     </motion.div>
                                                 )}
                                             </div>
-                                            <p className={`text-xs leading-relaxed mb-2 ${isActive ? 'text-[#C2E7FF]/80' : 'text-[#8E918F] group-hover:text-[#C4C7C5]'}`}>
+                                            <p className={`text-xs leading-relaxed mb-2 ${isActive ? 'text-[var(--theme-primary)]/80' : 'text-[var(--theme-text-tertiary)] group-hover:text-[var(--theme-text-secondary)]'}`}>
                                                 {option.description}
                                             </p>
                                             
@@ -123,8 +123,8 @@ export const OutputStyleSelector = ({ value, onChange, className }: OutputStyleS
                                             <div className={`
                                                 text-[10px] font-mono p-2.5 rounded-lg border
                                                 ${isActive 
-                                                    ? 'bg-[#001d35] border-[#A8C7FA]/20 text-[#A8C7FA]' 
-                                                    : 'bg-[#131314] border-[#444746] text-[#8E918F] group-hover:border-[#8E918F]/50'
+                                                    ? 'bg-[var(--theme-primary)]/10 border-[var(--theme-primary)]/20 text-[var(--theme-primary)]' 
+                                                    : 'bg-[var(--theme-bg)] border-[var(--theme-border)] text-[var(--theme-text-tertiary)] group-hover:border-[var(--theme-text-tertiary)]/50'
                                                 }
                                             `}>
                                                 <pre className="whitespace-pre-wrap break-all opacity-90">

@@ -39,6 +39,7 @@ import { VirtualizedFileList } from '@/components/VirtualizedFileList';
 import { useSearch } from '@/hooks/useSearch';
 import { useSessionManager, fileDataToSessionFile, convertSessionFiles } from '@/hooks/useSessionManager';
 import { useHistory } from '@/hooks/useHistory';
+import { ThemeProvider, useThemeProvider } from '@/hooks/useTheme';
 
 // Services & Utils
 import { formatNumber } from '@/lib/format';
@@ -50,7 +51,18 @@ import { OutputStyle, FileData, ViewMode, TreeNode } from '@/types';
 import { UI_ICONS, ICONS_PATHS } from '@/constants';
 import { OutputStyleType, ViewModeType } from '@/types/session';
 
-export default function Contextractor() {
+// Main App Wrapper with Theme Provider
+export default function ContextractorApp() {
+    const themeValue = useThemeProvider();
+    
+    return (
+        <ThemeProvider value={themeValue}>
+            <Contextractor />
+        </ThemeProvider>
+    );
+}
+
+function Contextractor() {
     // Session Manager
     const {
         sessions,
@@ -398,11 +410,11 @@ export default function Contextractor() {
     };
 
     return (
-        <div {...getRootProps()} className="h-screen bg-[#131314] text-[#E3E3E3] font-sans flex flex-col selection:bg-[#004A77] selection:text-[#C2E7FF] outline-none overflow-hidden">
+        <div {...getRootProps()} className="h-screen bg-[var(--theme-bg)] text-[var(--theme-text-primary)] font-sans flex flex-col selection:bg-[var(--theme-selection-bg)] selection:text-[var(--theme-selection-text)] outline-none overflow-hidden theme-transition">
             <input {...getInputProps()} />
 
             {/* Modern Menu Bar - VS Code Style */}
-            <div className="flex items-center bg-[#1E1E1E] border-b border-[#3C3C3C]">
+            <div className="flex items-center bg-[var(--theme-surface)] border-b border-[var(--theme-border-subtle)]">
                 {/* Mobile Menu Button */}
                 <div className="lg:hidden px-2">
                     <GoogleButton
@@ -513,14 +525,14 @@ export default function Contextractor() {
                 {/* Explorer Section - Responsive Sidebar */}
                 <section className={`
                     flex flex-col gap-4 h-full shrink-0
-                    fixed inset-y-0 left-0 z-40 w-[320px] bg-[#1E1E1E] p-4 border-r border-[#444746] shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.2,0,0,1)]
+                    fixed inset-y-0 left-0 z-40 w-[320px] bg-[var(--theme-surface)] p-4 border-r border-[var(--theme-border)] shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.2,0,0,1)]
                     lg:relative lg:inset-auto lg:z-auto lg:w-[460px] lg:bg-transparent lg:p-0 lg:border-none lg:shadow-none lg:translate-x-0
                     ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
                 `}>
                     {/* Mobile Sidebar Header */}
                     <div className="flex items-center justify-between mb-2 lg:hidden">
-                        <h2 className="text-lg font-medium text-[#E3E3E3] flex items-center gap-2">
-                            <GoogleIcon path={ICONS_PATHS.folder_open} className="w-5 h-5 text-[#A8C7FA]" />
+                        <h2 className="text-lg font-medium text-[var(--theme-text-primary)] flex items-center gap-2">
+                            <GoogleIcon path={ICONS_PATHS.folder_open} className="w-5 h-5 text-[var(--theme-primary)]" />
                             Files
                         </h2>
                         <GoogleButton variant="icon" icon={UI_ICONS.close} onClick={() => setIsMobileSidebarOpen(false)} />
@@ -542,22 +554,22 @@ export default function Contextractor() {
                             whileHover={{ scale: 1.01 }}
                             whileTap={{ scale: 0.98 }}
                             className={`
-                                rounded-3xl border border-dashed border-[#444746] bg-[#1E1E1E] p-6 cursor-pointer
+                                rounded-3xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-surface)] p-6 cursor-pointer
                                 transition-colors duration-200 flex flex-col items-center text-center gap-3
-                                hover:bg-[#2B2930] hover:border-[#8E918F] group relative overflow-hidden
+                                hover:bg-[var(--theme-surface-hover)] hover:border-[var(--theme-text-tertiary)] group relative overflow-hidden
                                 ${processing ? 'opacity-50 pointer-events-none' : ''}
                             `}
                         >
                             {processing ? (
-                                <div className="w-12 h-12 border-4 border-[#333537] border-t-[#A8C7FA] rounded-full animate-spin mb-1"></div>
+                                <div className="w-12 h-12 border-4 border-[var(--theme-surface-elevated)] border-t-[var(--theme-primary)] rounded-full animate-spin mb-1"></div>
                             ) : (
-                                <div className="w-12 h-12 bg-[#333537] rounded-full flex items-center justify-center text-[#C4C7C5] group-hover:text-[#A8C7FA] transition-colors shadow-md">
+                                <div className="w-12 h-12 bg-[var(--theme-surface-elevated)] rounded-full flex items-center justify-center text-[var(--theme-text-secondary)] group-hover:text-[var(--theme-primary)] transition-colors shadow-md">
                                     <GoogleIcon path={UI_ICONS.upload} className="w-6 h-6" />
                                 </div>
                             )}
                             <div>
-                                <p className="text-[#E3E3E3] font-medium text-sm">Click to upload or drop</p>
-                                <p className="text-xs text-[#8E918F] mt-1">ZIPs, Folders, Code & Clipboard</p>
+                                <p className="text-[var(--theme-text-primary)] font-medium text-sm">Click to upload or drop</p>
+                                <p className="text-xs text-[var(--theme-text-tertiary)] mt-1">ZIPs, Folders, Code & Clipboard</p>
                             </div>
                         </motion.div>
 
@@ -565,7 +577,7 @@ export default function Contextractor() {
                             <GoogleButton
                                 variant="outlined"
                                 icon={UI_ICONS.github}
-                                className="w-full justify-center border-[#444746] bg-[#1E1E1E]"
+                                className="w-full justify-center border-[var(--theme-border)] bg-[var(--theme-surface)]"
                                 onClick={(e) => { if(e) e.stopPropagation(); setGitModalOpen(true); }}
                             >
                                 Import Repository
@@ -581,9 +593,9 @@ export default function Contextractor() {
                         </div>
                     )}
 
-                    <div className="flex-1 flex flex-col min-h-0 bg-[#1E1E1E] rounded-3xl border border-[#444746] overflow-hidden shadow-lg">
-                        <div className="px-4 py-3 border-b border-[#444746] bg-[#1E1E1E] sticky top-0 z-10 shrink-0 flex items-center justify-between">
-                            <h3 className="text-[#C4C7C5] font-medium text-sm uppercase tracking-wide pl-2">Explorer</h3>
+                    <div className="flex-1 flex flex-col min-h-0 bg-[var(--theme-surface)] rounded-3xl border border-[var(--theme-border)] overflow-hidden shadow-lg">
+                        <div className="px-4 py-3 border-b border-[var(--theme-border)] bg-[var(--theme-surface)] sticky top-0 z-10 shrink-0 flex items-center justify-between">
+                            <h3 className="text-[var(--theme-text-secondary)] font-medium text-sm uppercase tracking-wide pl-2">Explorer</h3>
 
                             <div className="flex items-center gap-2">
                                 {/* Reset Button */}
@@ -592,12 +604,12 @@ export default function Contextractor() {
                                         variant="icon"
                                         onClick={() => setDeleteConfirmOpen(true)}
                                         icon={UI_ICONS.delete}
-                                        className="w-8 h-8 text-[#8E918F] hover:text-[#F2B8B5]"
+                                        className="w-8 h-8 text-[var(--theme-text-tertiary)] hover:text-[var(--theme-error)]"
                                     />
                                 )}
 
                                 {/* View Toggle */}
-                                <div className="flex bg-[#333537] rounded-full p-1">
+                                <div className="flex bg-[var(--theme-surface-elevated)] rounded-full p-1">
                                     <GoogleButton
                                         variant="icon"
                                         icon={UI_ICONS.view_tree}
@@ -616,10 +628,10 @@ export default function Contextractor() {
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-[#444746] scrollbar-track-transparent">
+                        <div className="flex-1 overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-[var(--theme-border)] scrollbar-track-transparent">
                             {isLoadingSession ? (
-                                <div className="flex items-center justify-center h-full text-[#8E918F] gap-2">
-                                    <div className="w-4 h-4 border-2 border-[#444746] border-t-[#A8C7FA] rounded-full animate-spin"></div>
+                                <div className="flex items-center justify-center h-full text-[var(--theme-text-tertiary)] gap-2">
+                                    <div className="w-4 h-4 border-2 border-[var(--theme-border)] border-t-[var(--theme-primary)] rounded-full animate-spin"></div>
                                     <span className="text-sm">Restoring session...</span>
                                 </div>
                             ) : viewMode === 'list' ? (
@@ -654,7 +666,7 @@ export default function Contextractor() {
                             )}
 
                             {!isLoadingSession && files.length === 0 && (
-                                <div className="flex flex-col items-center justify-center h-full text-[#8E918F] py-10 opacity-60">
+                                <div className="flex flex-col items-center justify-center h-full text-[var(--theme-text-tertiary)] py-10 opacity-60">
                                     <GoogleIcon path={ICONS_PATHS.folder_open} className="w-16 h-16 mb-4 opacity-20" />
                                     <p className="text-sm">Workspace empty</p>
                                 </div>
@@ -664,26 +676,26 @@ export default function Contextractor() {
                 </section>
 
                 <section className="flex-1 flex flex-col h-full min-w-0">
-                    <div className="bg-[#1E1E1E] lg:rounded-3xl lg:border border-[#444746] flex flex-col h-full lg:shadow-lg overflow-hidden relative border-t lg:border-t-0">
-                        <div className="px-4 lg:px-6 py-4 border-b border-[#444746] flex items-center justify-between bg-[#1E1E1E] shrink-0 flex-wrap gap-4">
+                    <div className="bg-[var(--theme-surface)] lg:rounded-3xl lg:border border-[var(--theme-border)] flex flex-col h-full lg:shadow-lg overflow-hidden relative border-t lg:border-t-0">
+                        <div className="px-4 lg:px-6 py-4 border-b border-[var(--theme-border)] flex items-center justify-between bg-[var(--theme-surface)] shrink-0 flex-wrap gap-4">
 
-                            <div className="flex-1 min-w-[240px] flex items-center gap-3 bg-[#2B2930] rounded-full px-5 py-2.5 border border-[#444746] focus-within:border-[#A8C7FA] focus-within:bg-[#1E1E1E] transition-all">
-                                <GoogleIcon path={UI_ICONS.search} className="text-[#8E918F] w-5 h-5" />
+                            <div className="flex-1 min-w-[240px] flex items-center gap-3 bg-[var(--theme-surface-hover)] rounded-full px-5 py-2.5 border border-[var(--theme-border)] focus-within:border-[var(--theme-primary)] focus-within:bg-[var(--theme-surface)] transition-all">
+                                <GoogleIcon path={UI_ICONS.search} className="text-[var(--theme-text-tertiary)] w-5 h-5" />
                                 <input
                                     type="text"
                                     placeholder="Find in code..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="bg-transparent border-none outline-none text-[#E3E3E3] text-sm w-full placeholder-[#8E918F]"
+                                    className="bg-transparent border-none outline-none text-[var(--theme-text-primary)] text-sm w-full placeholder-[var(--theme-text-tertiary)]"
                                 />
                                 {searchTerm && (
-                                    <div className="flex items-center gap-2 pl-2 border-l border-[#444746]">
-                                        <span className="text-xs text-[#8E918F] whitespace-nowrap font-mono">
+                                    <div className="flex items-center gap-2 pl-2 border-l border-[var(--theme-border)]">
+                                        <span className="text-xs text-[var(--theme-text-tertiary)] whitespace-nowrap font-mono">
                                             {searchMatches.length > 0 ? `${currentMatchIdx + 1}/${searchMatches.length}` : '0'}
                                         </span>
-                                        <button onClick={handlePrevMatch} className="p-1 hover:text-[#A8C7FA] text-[#C4C7C5] disabled:opacity-30"><GoogleIcon path={UI_ICONS.arrow_up} className="w-4 h-4"/></button>
-                                        <button onClick={handleNextMatch} className="p-1 hover:text-[#A8C7FA] text-[#C4C7C5] disabled:opacity-30"><GoogleIcon path={UI_ICONS.arrow_down} className="w-4 h-4"/></button>
-                                        <button onClick={() => setSearchTerm("")} className="p-1 hover:text-[#F2B8B5] text-[#8E918F]"><GoogleIcon path={UI_ICONS.close} className="w-4 h-4"/></button>
+                                        <button onClick={handlePrevMatch} className="p-1 hover:text-[var(--theme-primary)] text-[var(--theme-text-secondary)] disabled:opacity-30"><GoogleIcon path={UI_ICONS.arrow_up} className="w-4 h-4"/></button>
+                                        <button onClick={handleNextMatch} className="p-1 hover:text-[var(--theme-primary)] text-[var(--theme-text-secondary)] disabled:opacity-30"><GoogleIcon path={UI_ICONS.arrow_down} className="w-4 h-4"/></button>
+                                        <button onClick={() => setSearchTerm("")} className="p-1 hover:text-[var(--theme-error)] text-[var(--theme-text-tertiary)]"><GoogleIcon path={UI_ICONS.close} className="w-4 h-4"/></button>
                                     </div>
                                 )}
                             </div>
@@ -708,7 +720,7 @@ export default function Contextractor() {
                         </div>
 
                         {/* High-Performance Virtualized Code Viewer */}
-                        <div className="relative flex-1 min-h-0 bg-[#1A1A1A] overflow-hidden">
+                        <div className="relative flex-1 min-h-0 bg-[var(--theme-bg)] overflow-hidden">
                             {/* Hidden textarea for copy and select all functionality */}
                             <textarea
                                 ref={textAreaRef}
@@ -721,9 +733,9 @@ export default function Contextractor() {
                             
                             {/* Processing indicator */}
                             {isTextPending && (
-                                <div className="absolute top-2 right-2 z-10 bg-[#1E1E1E]/90 backdrop-blur-sm px-3 py-1.5 rounded-full border border-[#444746] flex items-center gap-2">
-                                    <div className="w-3 h-3 border-2 border-[#A8C7FA] border-t-transparent rounded-full animate-spin" />
-                                    <span className="text-xs text-[#A8C7FA]">Processing...</span>
+                                <div className="absolute top-2 right-2 z-10 bg-[var(--theme-surface)]/90 backdrop-blur-sm px-3 py-1.5 rounded-full border border-[var(--theme-border)] flex items-center gap-2">
+                                    <div className="w-3 h-3 border-2 border-[var(--theme-primary)] border-t-transparent rounded-full animate-spin" />
+                                    <span className="text-xs text-[var(--theme-primary)]">Processing...</span>
                                 </div>
                             )}
                             
@@ -746,16 +758,16 @@ export default function Contextractor() {
                 {isDragActive && (
                     <motion.div
                         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 bg-[#004A77]/40 backdrop-blur-md flex items-center justify-center pointer-events-none"
+                        className="fixed inset-0 z-50 bg-[var(--theme-primary)]/30 backdrop-blur-md flex items-center justify-center pointer-events-none"
                     >
                         <motion.div
                             initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }}
-                            className="bg-[#1E1E1E] p-10 rounded-[32px] shadow-2xl border border-[#A8C7FA]/30 flex flex-col items-center"
+                            className="bg-[var(--theme-surface)] p-10 rounded-[32px] shadow-2xl border border-[var(--theme-primary)]/30 flex flex-col items-center"
                         >
-                            <div className="w-24 h-24 bg-[#333537] rounded-full flex items-center justify-center text-[#A8C7FA] mb-6 animate-bounce border-2 border-[#444746]">
+                            <div className="w-24 h-24 bg-[var(--theme-surface-elevated)] rounded-full flex items-center justify-center text-[var(--theme-primary)] mb-6 animate-bounce border-2 border-[var(--theme-border)]">
                                 <GoogleIcon path={UI_ICONS.upload} className="w-10 h-10" />
                             </div>
-                            <h2 className="text-3xl text-[#E3E3E3] font-normal">Drop to analyze</h2>
+                            <h2 className="text-3xl text-[var(--theme-text-primary)] font-normal">Drop to analyze</h2>
                         </motion.div>
                     </motion.div>
                 )}
@@ -767,7 +779,7 @@ export default function Contextractor() {
                         initial={{ opacity: 0, y: 20, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 20, scale: 0.95 }}
-                        className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-[#E3E3E3] text-[#062E6F] px-6 py-3.5 rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.4)] text-sm font-medium flex items-center gap-3 border border-white/50"
+                        className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-[var(--theme-primary)] text-[var(--theme-primary-contrast)] px-6 py-3.5 rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.4)] text-sm font-medium flex items-center gap-3"
                     >
                         <GoogleIcon path={UI_ICONS.check} className="w-5 h-5" />
                         Content copied to clipboard
@@ -779,20 +791,20 @@ export default function Contextractor() {
                 {deleteConfirmOpen && (
                     <motion.div
                         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+                        className="fixed inset-0 z-50 bg-[var(--theme-overlay)] backdrop-blur-sm flex items-center justify-center p-4"
                         onClick={() => setDeleteConfirmOpen(false)}
                     >
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-                            className="bg-[#2B2930] rounded-[28px] p-8 w-full max-w-sm shadow-2xl border border-[#444746]"
+                            className="bg-[var(--theme-surface-elevated)] rounded-[28px] p-8 w-full max-w-sm shadow-2xl border border-[var(--theme-border)]"
                             onClick={e => e.stopPropagation()}
                         >
                             <div className="flex flex-col items-center text-center mb-6">
-                                <div className="w-12 h-12 rounded-full bg-[#601410] text-[#F9DEDC] flex items-center justify-center mb-4">
+                                <div className="w-12 h-12 rounded-full bg-[var(--theme-error)]/20 text-[var(--theme-error)] flex items-center justify-center mb-4">
                                     <GoogleIcon path={UI_ICONS.delete} className="w-6 h-6" />
                                 </div>
-                                <h3 className="text-2xl text-[#E3E3E3] leading-8">Reset workspace?</h3>
-                                <p className="text-[#C4C7C5] text-sm mt-2 leading-5">
+                                <h3 className="text-2xl text-[var(--theme-text-primary)] leading-8">Reset workspace?</h3>
+                                <p className="text-[var(--theme-text-secondary)] text-sm mt-2 leading-5">
                                     This will remove all {files.length} files. This action cannot be undone.
                                 </p>
                             </div>
@@ -801,7 +813,7 @@ export default function Contextractor() {
                                 <GoogleButton variant="tonal" className="flex-1" onClick={() => setDeleteConfirmOpen(false)}>
                                     Cancel
                                 </GoogleButton>
-                                <GoogleButton variant="filled" className="bg-[#8C1D18] text-[#F9DEDC] hover:bg-[#601410] flex-1 border-none" onClick={() => {
+                                <GoogleButton variant="filled" className="bg-[var(--theme-error)] text-white hover:brightness-90 flex-1 border-none" onClick={() => {
                                     clearWorkspace();
                                     setDeleteConfirmOpen(false);
                                 }}>

@@ -12,18 +12,18 @@ export const TreeItem = ({ node, level, onRemove }: { node: TreeNode, level: num
     const indent = level * 16;
 
     const iconInfo = isFolder
-        ? { path: isOpen ? ICONS_PATHS.folder_open : ICONS_PATHS.folder, color: isOpen ? '#A8C7FA' : '#C4C7C5' }
+        ? { path: isOpen ? ICONS_PATHS.folder_open : ICONS_PATHS.folder, color: isOpen ? 'var(--theme-primary)' : 'var(--theme-text-secondary)' }
         : getFileIconInfo(node.name);
 
     return (
         <div className="select-none">
             <div
-                className={`flex items-center py-1 pr-2 rounded-lg group transition-colors cursor-pointer hover:bg-[#2B2930] border border-transparent hover:border-[#444746]`}
+                className={`flex items-center py-1 pr-2 rounded-lg group transition-colors cursor-pointer hover:bg-[var(--theme-surface-hover)] border border-transparent hover:border-[var(--theme-border)]`}
                 style={{ paddingLeft: `${indent + 8}px` }}
                 onClick={() => isFolder && setIsOpen(!isOpen)}
             >
                 <div className="flex items-center flex-1 min-w-0 overflow-hidden">
-                    <span className={`mr-1 text-[#8E918F] transition-transform duration-200 flex-shrink-0 ${isOpen ? 'rotate-90' : ''} ${!isFolder && 'opacity-0 w-4'}`}>
+                    <span className={`mr-1 text-[var(--theme-text-tertiary)] transition-transform duration-200 flex-shrink-0 ${isOpen ? 'rotate-90' : ''} ${!isFolder && 'opacity-0 w-4'}`}>
                         {isFolder && <GoogleIcon path={UI_ICONS.chevron_right} className="w-4 h-4" />}
                     </span>
 
@@ -31,12 +31,12 @@ export const TreeItem = ({ node, level, onRemove }: { node: TreeNode, level: num
                         <GoogleIcon path={iconInfo.path} style={{ color: iconInfo.color }} className="w-5 h-5" />
                     </span>
 
-                    <span className={`text-[13px] truncate font-mono ${isFolder ? 'text-[#E3E3E3] font-bold tracking-tight' : 'text-[#C4C7C5]'}`}>
+                    <span className={`text-[13px] truncate font-mono ${isFolder ? 'text-[var(--theme-text-primary)] font-bold tracking-tight' : 'text-[var(--theme-text-secondary)]'}`}>
                         {node.name}
                     </span>
 
                     {!isFolder && node.fileData && (
-                        <span className="ml-auto text-[10px] text-[#8E918F] opacity-0 group-hover:opacity-100 transition-opacity bg-[#1E1E1E] px-1.5 py-0.5 rounded border border-[#444746]">
+                        <span className="ml-auto text-[10px] text-[var(--theme-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity bg-[var(--theme-surface)] px-1.5 py-0.5 rounded border border-[var(--theme-border)]">
                             {formatNumber(node.fileData.tokenCount)}
                         </span>
                     )}
@@ -45,7 +45,7 @@ export const TreeItem = ({ node, level, onRemove }: { node: TreeNode, level: num
                 {/* Delete Button - Now enabled for Folders too */}
                 <button
                     onClick={(e) => { e.stopPropagation(); onRemove(node); }}
-                    className="p-1 opacity-0 group-hover:opacity-100 text-[#C4C7C5] hover:text-[#F2B8B5] hover:bg-[#F2B8B5]/10 rounded-full transition-all ml-1 shrink-0"
+                    className="p-1 opacity-0 group-hover:opacity-100 text-[var(--theme-text-secondary)] hover:text-[var(--theme-error)] hover:bg-[var(--theme-error)]/10 rounded-full transition-all ml-1 shrink-0"
                 >
                     <GoogleIcon path={UI_ICONS.delete} className="w-3.5 h-3.5" />
                 </button>
@@ -58,7 +58,7 @@ export const TreeItem = ({ node, level, onRemove }: { node: TreeNode, level: num
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.2 }}
-                        className="overflow-hidden border-l border-[#444746]/30 ml-[calc(1rem+4px)]"
+                        className="overflow-hidden border-l border-[var(--theme-border)]/30 ml-[calc(1rem+4px)]"
                     >
                         {node.children.map(child => (
                             <TreeItem key={child.id} node={child} level={level} onRemove={onRemove} />

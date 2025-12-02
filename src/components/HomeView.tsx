@@ -147,7 +147,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
     }, [recentProjects, searchQuery, sortBy]);
 
     return (
-        <div className="h-full bg-[#131314] overflow-auto">
+        <div className="h-full bg-[var(--theme-bg)] overflow-auto">
             <div className="max-w-6xl mx-auto px-6 py-8">
                 {/* Header */}
                 <motion.div
@@ -160,10 +160,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
                             <AnimatedLogo />
                         </div>
                     </div>
-                    <h1 className="text-3xl font-light text-[#E3E3E3] mb-2">
+                    <h1 className="text-3xl font-light text-[var(--theme-text-primary)] mb-2">
                         Welcome to <span className="font-medium">Contextractor</span>
                     </h1>
-                    <p className="text-[#8E918F] text-sm">
+                    <p className="text-[var(--theme-text-tertiary)] text-sm">
                         Extract clean context from your code for AI & LLMs
                     </p>
                 </motion.div>
@@ -208,9 +208,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         {/* Section Header */}
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
-                                <GoogleIcon path={ICONS.clock} className="w-5 h-5 text-[#8E918F]" />
-                                <h2 className="text-lg font-medium text-[#E3E3E3]">Recent</h2>
-                                <span className="text-xs text-[#8E918F] bg-[#333537] px-2 py-0.5 rounded-full">
+                                <GoogleIcon path={ICONS.clock} className="w-5 h-5 text-[var(--theme-text-tertiary)]" />
+                                <h2 className="text-lg font-medium text-[var(--theme-text-primary)]">Recent</h2>
+                                <span className="text-xs text-[var(--theme-text-tertiary)] bg-[var(--theme-surface-hover)] px-2 py-0.5 rounded-full">
                                     {recentProjects.length}
                                 </span>
                             </div>
@@ -220,14 +220,14 @@ export const HomeView: React.FC<HomeViewProps> = ({
                                 <div className="relative">
                                     <GoogleIcon 
                                         path={ICONS.search} 
-                                        className="w-4 h-4 text-[#8E918F] absolute left-3 top-1/2 -translate-y-1/2" 
+                                        className="w-4 h-4 text-[var(--theme-text-tertiary)] absolute left-3 top-1/2 -translate-y-1/2" 
                                     />
                                     <input
                                         type="text"
                                         placeholder="Search recent..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="bg-[#2B2930] border border-[#444746] rounded-lg pl-9 pr-3 py-1.5 text-sm text-[#E3E3E3] placeholder-[#8E918F] w-48 focus:outline-none focus:border-[#A8C7FA] transition-colors"
+                                        className="bg-[var(--theme-input-bg)] border border-[var(--theme-border)] rounded-lg pl-9 pr-3 py-1.5 text-sm text-[var(--theme-text-primary)] placeholder-[var(--theme-text-tertiary)] w-48 focus:outline-none focus:border-[var(--theme-primary)] transition-colors"
                                     />
                                 </div>
 
@@ -235,7 +235,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                                 <select
                                     value={sortBy}
                                     onChange={(e) => setSortBy(e.target.value as SortBy)}
-                                    className="bg-[#2B2930] border border-[#444746] rounded-lg px-3 py-1.5 text-sm text-[#E3E3E3] focus:outline-none focus:border-[#A8C7FA] transition-colors cursor-pointer"
+                                    className="bg-[var(--theme-input-bg)] border border-[var(--theme-border)] rounded-lg px-3 py-1.5 text-sm text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-primary)] transition-colors cursor-pointer"
                                 >
                                     <option value="lastOpened">Last Opened</option>
                                     <option value="name">Name</option>
@@ -244,13 +244,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
                                 </select>
 
                                 {/* View Toggle */}
-                                <div className="flex bg-[#333537] rounded-lg p-0.5">
+                                <div className="flex bg-[var(--theme-surface-hover)] rounded-lg p-0.5">
                                     <button
                                         onClick={() => setViewMode('grid')}
                                         className={`p-1.5 rounded transition-colors ${
                                             viewMode === 'grid' 
-                                                ? 'bg-[#444746] text-[#E3E3E3]' 
-                                                : 'text-[#8E918F] hover:text-[#E3E3E3]'
+                                                ? 'bg-[var(--theme-border)] text-[var(--theme-text-primary)]' 
+                                                : 'text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)]'
                                         }`}
                                     >
                                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -261,8 +261,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                                         onClick={() => setViewMode('list')}
                                         className={`p-1.5 rounded transition-colors ${
                                             viewMode === 'list' 
-                                                ? 'bg-[#444746] text-[#E3E3E3]' 
-                                                : 'text-[#8E918F] hover:text-[#E3E3E3]'
+                                                ? 'bg-[var(--theme-border)] text-[var(--theme-text-primary)]' 
+                                                : 'text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)]'
                                         }`}
                                     >
                                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -274,7 +274,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                                 {/* Clear All */}
                                 <button
                                     onClick={onClearRecentProjects}
-                                    className="text-[#8E918F] hover:text-[#F2B8B5] transition-colors p-1.5"
+                                    className="text-[var(--theme-text-tertiary)] hover:text-[var(--theme-error)] transition-colors p-1.5"
                                     title="Clear all recent"
                                 >
                                     <GoogleIcon path={ICONS.clearAll} className="w-4 h-4" />
@@ -322,8 +322,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                                     animate={{ opacity: 1 }}
                                     className="text-center py-12"
                                 >
-                                    <GoogleIcon path={ICONS.search} className="w-12 h-12 text-[#444746] mx-auto mb-4" />
-                                    <p className="text-[#8E918F]">No projects match your search</p>
+                                    <GoogleIcon path={ICONS.search} className="w-12 h-12 text-[var(--theme-border)] mx-auto mb-4" />
+                                    <p className="text-[var(--theme-text-tertiary)]">No projects match your search</p>
                                 </motion.div>
                             )}
                         </AnimatePresence>
@@ -338,11 +338,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         transition={{ delay: 0.2 }}
                         className="text-center py-16"
                     >
-                        <div className="w-20 h-20 bg-[#2B2930] rounded-full flex items-center justify-center mx-auto mb-6">
-                            <GoogleIcon path={ICONS.folder} className="w-10 h-10 text-[#444746]" />
+                        <div className="w-20 h-20 bg-[var(--theme-surface-hover)] rounded-full flex items-center justify-center mx-auto mb-6">
+                            <GoogleIcon path={ICONS.folder} className="w-10 h-10 text-[var(--theme-border)]" />
                         </div>
-                        <h3 className="text-xl text-[#E3E3E3] mb-2">No recent projects</h3>
-                        <p className="text-[#8E918F] text-sm max-w-md mx-auto">
+                        <h3 className="text-xl text-[var(--theme-text-primary)] mb-2">No recent projects</h3>
+                        <p className="text-[var(--theme-text-tertiary)] text-sm max-w-md mx-auto">
                             Your recent projects will appear here. Start by uploading files or importing a repository.
                         </p>
                     </motion.div>
@@ -372,7 +372,7 @@ const QuickActionCard: React.FC<QuickActionCardProps> = ({
         whileHover={{ scale: 1.02, y: -2 }}
         whileTap={{ scale: 0.98 }}
         onClick={onClick}
-        className="bg-[#1E1E1E] border border-[#444746] rounded-2xl p-6 text-left group hover:border-[#8E918F] transition-all duration-200"
+        className="bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-2xl p-6 text-left group hover:border-[var(--theme-text-tertiary)] transition-all duration-200"
     >
         <div 
             className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110"
@@ -380,8 +380,8 @@ const QuickActionCard: React.FC<QuickActionCardProps> = ({
         >
             <GoogleIcon path={icon} className="w-6 h-6" style={{ color }} />
         </div>
-        <h3 className="text-[#E3E3E3] font-medium mb-1">{title}</h3>
-        <p className="text-[#8E918F] text-sm">{description}</p>
+        <h3 className="text-[var(--theme-text-primary)] font-medium mb-1">{title}</h3>
+        <p className="text-[var(--theme-text-tertiary)] text-sm">{description}</p>
     </motion.button>
 );
 
@@ -417,7 +417,7 @@ const RecentProjectCard: React.FC<RecentProjectCardProps> = ({
             onMouseEnter={onHover}
             onMouseLeave={onLeave}
             onClick={onOpen}
-            className="group bg-[#1E1E1E] border border-[#444746] rounded-xl overflow-hidden cursor-pointer hover:border-[#8E918F] transition-all duration-200"
+            className="group bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-xl overflow-hidden cursor-pointer hover:border-[var(--theme-text-tertiary)] transition-all duration-200"
         >
             {/* Thumbnail/Preview Area */}
             <div 
@@ -452,7 +452,7 @@ const RecentProjectCard: React.FC<RecentProjectCardProps> = ({
                                 e.stopPropagation();
                                 onRemove();
                             }}
-                            className="absolute top-2 right-2 w-7 h-7 bg-[#2B2930] rounded-full flex items-center justify-center text-[#8E918F] hover:text-[#F2B8B5] hover:bg-[#3C3C3C] transition-colors"
+                            className="absolute top-2 right-2 w-7 h-7 bg-[var(--theme-surface-hover)] rounded-full flex items-center justify-center text-[var(--theme-text-tertiary)] hover:text-[var(--theme-error)] hover:bg-[var(--theme-surface-elevated)] transition-colors"
                         >
                             <GoogleIcon path={ICONS.delete} className="w-4 h-4" />
                         </motion.button>
@@ -462,12 +462,12 @@ const RecentProjectCard: React.FC<RecentProjectCardProps> = ({
 
             {/* Content */}
             <div className="p-4">
-                <h3 className="text-[#E3E3E3] font-medium truncate mb-2 group-hover:text-[#A8C7FA] transition-colors">
+                <h3 className="text-[var(--theme-text-primary)] font-medium truncate mb-2 group-hover:text-[var(--theme-primary)] transition-colors">
                     {project.name}
                 </h3>
 
                 {/* Stats */}
-                <div className="flex items-center gap-3 text-xs text-[#8E918F]">
+                <div className="flex items-center gap-3 text-xs text-[var(--theme-text-tertiary)]">
                     <div className="flex items-center gap-1">
                         <GoogleIcon path={ICONS.file} className="w-3 h-3" />
                         <span>{project.fileCount}</span>
@@ -484,7 +484,7 @@ const RecentProjectCard: React.FC<RecentProjectCardProps> = ({
 
                 {/* Time */}
                 <div 
-                    className="mt-3 text-xs text-[#6E6E6E] flex items-center gap-1"
+                    className="mt-3 text-xs text-[var(--theme-text-muted)] flex items-center gap-1"
                     title={formatFullDate(project.lastOpened)}
                 >
                     <GoogleIcon path={ICONS.clock} className="w-3 h-3" />
@@ -519,7 +519,7 @@ const RecentProjectRow: React.FC<RecentProjectRowProps> = ({
             exit={{ opacity: 0, x: 20 }}
             transition={{ delay: index * 0.03 }}
             onClick={onOpen}
-            className="group flex items-center gap-4 bg-[#1E1E1E] border border-[#444746] rounded-lg p-3 cursor-pointer hover:border-[#8E918F] hover:bg-[#252526] transition-all duration-200"
+            className="group flex items-center gap-4 bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-lg p-3 cursor-pointer hover:border-[var(--theme-text-tertiary)] hover:bg-[var(--theme-surface-elevated)] transition-all duration-200"
         >
             {/* Icon */}
             <div 
@@ -535,14 +535,14 @@ const RecentProjectRow: React.FC<RecentProjectRowProps> = ({
 
             {/* Name & Language */}
             <div className="flex-1 min-w-0">
-                <h3 className="text-[#E3E3E3] font-medium truncate group-hover:text-[#A8C7FA] transition-colors">
+                <h3 className="text-[var(--theme-text-primary)] font-medium truncate group-hover:text-[var(--theme-primary)] transition-colors">
                     {project.name}
                 </h3>
-                <p className="text-xs text-[#8E918F]">{langConfig.name}</p>
+                <p className="text-xs text-[var(--theme-text-tertiary)]">{langConfig.name}</p>
             </div>
 
             {/* Stats */}
-            <div className="hidden sm:flex items-center gap-4 text-xs text-[#8E918F]">
+            <div className="hidden sm:flex items-center gap-4 text-xs text-[var(--theme-text-tertiary)]">
                 <div className="flex items-center gap-1 min-w-[60px]">
                     <GoogleIcon path={ICONS.file} className="w-3 h-3" />
                     <span>{project.fileCount} files</span>
@@ -559,7 +559,7 @@ const RecentProjectRow: React.FC<RecentProjectRowProps> = ({
 
             {/* Time */}
             <div 
-                className="text-xs text-[#6E6E6E] min-w-[70px] text-right"
+                className="text-xs text-[var(--theme-text-muted)] min-w-[70px] text-right"
                 title={formatFullDate(project.lastOpened)}
             >
                 {formatRelativeTime(project.lastOpened)}
@@ -572,7 +572,7 @@ const RecentProjectRow: React.FC<RecentProjectRowProps> = ({
                         e.stopPropagation();
                         onOpen();
                     }}
-                    className="p-1.5 text-[#8E918F] hover:text-[#A8C7FA] hover:bg-[#3C3C3C] rounded transition-colors"
+                    className="p-1.5 text-[var(--theme-text-tertiary)] hover:text-[var(--theme-primary)] hover:bg-[var(--theme-surface-elevated)] rounded transition-colors"
                     title="Open"
                 >
                     <GoogleIcon path={ICONS.openInNew} className="w-4 h-4" />
@@ -582,7 +582,7 @@ const RecentProjectRow: React.FC<RecentProjectRowProps> = ({
                         e.stopPropagation();
                         onRemove();
                     }}
-                    className="p-1.5 text-[#8E918F] hover:text-[#F2B8B5] hover:bg-[#3C3C3C] rounded transition-colors"
+                    className="p-1.5 text-[var(--theme-text-tertiary)] hover:text-[var(--theme-error)] hover:bg-[var(--theme-surface-elevated)] rounded transition-colors"
                     title="Remove from recent"
                 >
                     <GoogleIcon path={ICONS.delete} className="w-4 h-4" />

@@ -66,7 +66,7 @@ export const VirtualizedFileList: React.FC<VirtualizedFileListProps> = memo(({ f
         <div
             ref={containerRef}
             onScroll={handleScroll}
-            className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-[#444746] scrollbar-track-transparent"
+            className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--theme-border)] scrollbar-track-transparent"
             style={{ contain: 'strict' }}
         >
             {/* Spacer for total scrollable area */}

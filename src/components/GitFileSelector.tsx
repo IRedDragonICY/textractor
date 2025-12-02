@@ -36,7 +36,7 @@ const TreeItemComponent = React.memo(({ node, level, onToggle, expandedFolders, 
         const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
         const parts = text.split(regex);
         return parts.map((part, i) => 
-            regex.test(part) ? <mark key={i} className="bg-[#A8C7FA]/30 text-[#A8C7FA] rounded px-0.5">{part}</mark> : part
+            regex.test(part) ? <mark key={i} className="bg-[var(--theme-primary)]/30 text-[var(--theme-primary)] rounded px-0.5">{part}</mark> : part
         );
     };
 
@@ -65,8 +65,8 @@ const TreeItemComponent = React.memo(({ node, level, onToggle, expandedFolders, 
             <div
                 className={`
                     flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer group
-                    hover:bg-[#333537] transition-colors duration-150
-                    ${node.selected && !node.indeterminate ? 'bg-[#1a3a5c]' : ''}
+                    hover:bg-[var(--theme-surface-hover)] transition-colors duration-150
+                    ${node.selected && !node.indeterminate ? 'bg-[var(--theme-primary)]/20' : ''}
                 `}
                 style={{ paddingLeft: `${level * 16 + 8}px` }}
             >
@@ -74,7 +74,7 @@ const TreeItemComponent = React.memo(({ node, level, onToggle, expandedFolders, 
                 {isFolder ? (
                     <button
                         onClick={(e) => { e.stopPropagation(); toggleExpand(node.path); }}
-                        className="w-5 h-5 flex items-center justify-center text-[#8E918F] hover:text-[#E3E3E3] transition-colors shrink-0"
+                        className="w-5 h-5 flex items-center justify-center text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] transition-colors shrink-0"
                     >
                         <motion.div
                             animate={{ rotate: isExpanded ? 90 : 0 }}
@@ -94,18 +94,18 @@ const TreeItemComponent = React.memo(({ node, level, onToggle, expandedFolders, 
                         w-5 h-5 rounded border-2 flex items-center justify-center shrink-0
                         transition-all duration-150
                         ${node.selected && !node.indeterminate
-                            ? 'bg-[#A8C7FA] border-[#A8C7FA]' 
+                            ? 'bg-[var(--theme-primary)] border-[var(--theme-primary)]' 
                             : node.indeterminate 
-                                ? 'bg-[#4A4A4A] border-[#A8C7FA]'
-                                : 'border-[#6e7072] hover:border-[#A8C7FA]'
+                                ? 'bg-[var(--theme-surface-hover)] border-[var(--theme-primary)]'
+                                : 'border-[var(--theme-text-tertiary)] hover:border-[var(--theme-primary)]'
                         }
                     `}
                 >
                     {node.selected && !node.indeterminate && (
-                        <GoogleIcon path={UI_ICONS.check} className="w-3.5 h-3.5 text-[#1E1E1E]" />
+                        <GoogleIcon path={UI_ICONS.check} className="w-3.5 h-3.5 text-[var(--theme-surface)]" />
                     )}
                     {node.indeterminate && (
-                        <div className="w-2.5 h-0.5 bg-[#A8C7FA] rounded" />
+                        <div className="w-2.5 h-0.5 bg-[var(--theme-primary)] rounded" />
                     )}
                 </button>
 
@@ -114,20 +114,20 @@ const TreeItemComponent = React.memo(({ node, level, onToggle, expandedFolders, 
                     {isFolder ? (
                         <GoogleIcon 
                             path={isExpanded ? ICONS_PATHS.folder_open : ICONS_PATHS.folder} 
-                            className="w-5 h-5 text-[#A8C7FA]" 
+                            className="w-5 h-5 text-[var(--theme-primary)]" 
                         />
                     ) : (
                         <GoogleIcon 
                             path={iconInfo?.path || ICONS_PATHS.default_file} 
                             className="w-5 h-5"
-                            style={{ color: iconInfo?.color || '#C4C7C5' }}
+                            style={{ color: iconInfo?.color || 'var(--theme-text-secondary)' }}
                         />
                     )}
                 </div>
 
                 {/* Name */}
                 <span 
-                    className="text-sm text-[#E3E3E3] truncate flex-1"
+                    className="text-sm text-[var(--theme-text-primary)] truncate flex-1"
                     onClick={() => isFolder ? toggleExpand(node.path) : onToggle(node.path)}
                 >
                     {highlightMatch(node.name)}
@@ -135,14 +135,14 @@ const TreeItemComponent = React.memo(({ node, level, onToggle, expandedFolders, 
 
                 {/* File count for folders */}
                 {isFolder && (
-                    <span className="text-xs text-[#6e7072] opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-xs text-[var(--theme-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity">
                         {node.children.filter(c => c.type === 'file').length} files
                     </span>
                 )}
 
                 {/* File size */}
                 {!isFolder && node.size !== undefined && (
-                    <span className="text-xs text-[#6e7072]">
+                    <span className="text-xs text-[var(--theme-text-tertiary)]">
                         {node.size > 1024 ? `${(node.size / 1024).toFixed(1)}KB` : `${node.size}B`}
                     </span>
                 )}
@@ -396,31 +396,31 @@ export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorPr
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 bg-[var(--theme-overlay)] backdrop-blur-sm flex items-center justify-center p-4"
             onClick={() => !loading && onClose()}
         >
             <motion.div
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
-                className="bg-[#1E1E1E] rounded-[28px] w-full max-w-3xl shadow-2xl border border-[#444746] overflow-hidden flex flex-col max-h-[85vh]"
+                className="bg-[var(--theme-surface)] rounded-[28px] w-full max-w-3xl shadow-2xl border border-[var(--theme-border)] overflow-hidden flex flex-col max-h-[85vh]"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex items-center gap-4 p-6 border-b border-[#444746]">
-                    <div className="w-12 h-12 rounded-2xl bg-[#333537] flex items-center justify-center shrink-0">
-                        <GoogleIcon path={UI_ICONS.github} className="w-7 h-7 text-[#E3E3E3]" />
+                <div className="flex items-center gap-4 p-6 border-b border-[var(--theme-border)]">
+                    <div className="w-12 h-12 rounded-2xl bg-[var(--theme-surface-elevated)] flex items-center justify-center shrink-0">
+                        <GoogleIcon path={UI_ICONS.github} className="w-7 h-7 text-[var(--theme-text-primary)]" />
                     </div>
                     <div className="flex-1 min-w-0">
-                        <h3 className="text-xl text-[#E3E3E3] font-medium">Import from GitHub</h3>
-                        <p className="text-sm text-[#8E918F] truncate">
+                        <h3 className="text-xl text-[var(--theme-text-primary)] font-medium">Import from GitHub</h3>
+                        <p className="text-sm text-[var(--theme-text-tertiary)] truncate">
                             {step === 'url' ? 'Enter repository URL' : `${metadata?.owner}/${metadata?.repo}`}
                         </p>
                     </div>
                     {step === 'select' && (
                         <button
                             onClick={() => { setStep('url'); setTree([]); setMetadata(null); }}
-                            className="text-sm text-[#A8C7FA] hover:underline"
+                            className="text-sm text-[var(--theme-primary)] hover:underline"
                         >
                             Change repo
                         </button>
@@ -432,38 +432,38 @@ export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorPr
                 {step === 'url' && (
                     <form onSubmit={handleFetchTree} className="p-6">
                         <div className="relative mb-4">
-                            <label className="text-xs text-[#A8C7FA] ml-4 mb-1 block font-medium">Repository URL</label>
+                            <label className="text-xs text-[var(--theme-primary)] ml-4 mb-1 block font-medium">Repository URL</label>
                             <div className="relative">
                                 <input
                                     type="text"
                                     value={gitUrl}
                                     onChange={(e) => setGitUrl(e.target.value)}
                                     placeholder="https://github.com/username/repo"
-                                    className="w-full bg-[#2B2930] border border-[#444746] rounded-xl pl-12 pr-4 py-3.5 text-[#E3E3E3] placeholder-[#8E918F] focus:outline-none focus:border-[#A8C7FA] focus:ring-1 focus:ring-[#A8C7FA] transition-all"
+                                    className="w-full bg-[var(--theme-surface-hover)] border border-[var(--theme-border)] rounded-xl pl-12 pr-4 py-3.5 text-[var(--theme-text-primary)] placeholder-[var(--theme-text-tertiary)] focus:outline-none focus:border-[var(--theme-primary)] focus:ring-1 focus:ring-[var(--theme-primary)] transition-all"
                                     disabled={loading}
                                     autoFocus
                                 />
-                                <div className="absolute left-4 top-3.5 text-[#C4C7C5]">
+                                <div className="absolute left-4 top-3.5 text-[var(--theme-text-secondary)]">
                                     <GoogleIcon path={UI_ICONS.search} className="w-5 h-5" />
                                 </div>
                                 {loading && (
                                     <div className="absolute right-4 top-3.5">
-                                        <div className="w-5 h-5 border-2 border-[#444746] border-t-[#A8C7FA] rounded-full animate-spin" />
+                                        <div className="w-5 h-5 border-2 border-[var(--theme-border)] border-t-[var(--theme-primary)] rounded-full animate-spin" />
                                     </div>
                                 )}
                             </div>
                         </div>
 
                         {loading && loadingText && (
-                            <div className="bg-[#004A77]/20 border border-[#004A77] rounded-xl p-4 mb-4 flex items-center gap-3">
-                                <div className="w-2 h-2 bg-[#A8C7FA] rounded-full animate-ping" />
-                                <p className="text-[#A8C7FA] text-sm font-mono">{loadingText}</p>
+                            <div className="bg-[var(--theme-primary)]/10 border border-[var(--theme-primary)]/30 rounded-xl p-4 mb-4 flex items-center gap-3">
+                                <div className="w-2 h-2 bg-[var(--theme-primary)] rounded-full animate-ping" />
+                                <p className="text-[var(--theme-primary)] text-sm font-mono">{loadingText}</p>
                             </div>
                         )}
 
                         {error && (
-                            <div className="bg-[#601410]/30 border border-[#8C1D18] rounded-xl p-4 mb-4">
-                                <p className="text-[#F2B8B5] text-sm">{error}</p>
+                            <div className="bg-[var(--theme-error)]/10 border border-[var(--theme-error)]/30 rounded-xl p-4 mb-4">
+                                <p className="text-[var(--theme-error)] text-sm">{error}</p>
                             </div>
                         )}
 
@@ -482,19 +482,19 @@ export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorPr
                 {step === 'select' && (
                     <>
                         {/* Toolbar */}
-                        <div className="px-6 py-3 border-b border-[#444746] flex flex-wrap items-center gap-3 bg-[#1a1a1a]">
+                        <div className="px-6 py-3 border-b border-[var(--theme-border)] flex flex-wrap items-center gap-3 bg-[var(--theme-bg)]">
                             {/* Search */}
-                            <div className="flex-1 min-w-[200px] flex items-center gap-2 bg-[#2B2930] rounded-full px-4 py-2 border border-[#444746] focus-within:border-[#A8C7FA] transition-all">
-                                <GoogleIcon path={UI_ICONS.search} className="text-[#8E918F] w-4 h-4" />
+                            <div className="flex-1 min-w-[200px] flex items-center gap-2 bg-[var(--theme-surface-hover)] rounded-full px-4 py-2 border border-[var(--theme-border)] focus-within:border-[var(--theme-primary)] transition-all">
+                                <GoogleIcon path={UI_ICONS.search} className="text-[var(--theme-text-tertiary)] w-4 h-4" />
                                 <input
                                     type="text"
                                     placeholder="Search files..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="bg-transparent border-none outline-none text-[#E3E3E3] text-sm w-full placeholder-[#8E918F]"
+                                    className="bg-transparent border-none outline-none text-[var(--theme-text-primary)] text-sm w-full placeholder-[var(--theme-text-tertiary)]"
                                 />
                                 {searchTerm && (
-                                    <button onClick={() => setSearchTerm('')} className="text-[#8E918F] hover:text-[#E3E3E3]">
+                                    <button onClick={() => setSearchTerm('')} className="text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)]">
                                         <GoogleIcon path={UI_ICONS.close} className="w-4 h-4" />
                                     </button>
                                 )}
@@ -508,7 +508,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorPr
                                 <GoogleButton variant="text" className="text-xs px-2 py-1" onClick={() => selectAll(false)}>
                                     None
                                 </GoogleButton>
-                                <div className="w-px h-4 bg-[#444746] mx-1" />
+                                <div className="w-px h-4 bg-[var(--theme-border)] mx-1" />
                                 <GoogleButton variant="text" className="text-xs px-2 py-1" onClick={expandAll}>
                                     Expand
                                 </GoogleButton>
@@ -519,32 +519,32 @@ export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorPr
                         </div>
 
                         {/* Quick Filters */}
-                        <div className="px-6 py-2 border-b border-[#444746] flex items-center gap-2 bg-[#1a1a1a] overflow-x-auto">
-                            <span className="text-xs text-[#8E918F] shrink-0">Quick select:</span>
+                        <div className="px-6 py-2 border-b border-[var(--theme-border)] flex items-center gap-2 bg-[var(--theme-bg)] overflow-x-auto">
+                            <span className="text-xs text-[var(--theme-text-tertiary)] shrink-0">Quick select:</span>
                             <button
                                 onClick={() => selectCommonPatterns('code')}
-                                className="text-xs bg-[#333537] hover:bg-[#444746] text-[#E3E3E3] px-3 py-1 rounded-full transition-colors shrink-0"
+                                className="text-xs bg-[var(--theme-surface-elevated)] hover:bg-[var(--theme-surface-hover)] text-[var(--theme-text-primary)] px-3 py-1 rounded-full transition-colors shrink-0"
                             >
                                 📄 Source Code
                             </button>
                             <button
                                 onClick={() => selectCommonPatterns('config')}
-                                className="text-xs bg-[#333537] hover:bg-[#444746] text-[#E3E3E3] px-3 py-1 rounded-full transition-colors shrink-0"
+                                className="text-xs bg-[var(--theme-surface-elevated)] hover:bg-[var(--theme-surface-hover)] text-[var(--theme-text-primary)] px-3 py-1 rounded-full transition-colors shrink-0"
                             >
                                 ⚙️ Config Files
                             </button>
                             <button
                                 onClick={() => selectCommonPatterns('docs')}
-                                className="text-xs bg-[#333537] hover:bg-[#444746] text-[#E3E3E3] px-3 py-1 rounded-full transition-colors shrink-0"
+                                className="text-xs bg-[var(--theme-surface-elevated)] hover:bg-[var(--theme-surface-hover)] text-[var(--theme-text-primary)] px-3 py-1 rounded-full transition-colors shrink-0"
                             >
                                 📝 Documentation
                             </button>
                         </div>
 
                         {/* Tree View */}
-                        <div className="flex-1 overflow-y-auto p-4 min-h-[300px] max-h-[400px] scrollbar-thin scrollbar-thumb-[#444746] scrollbar-track-transparent">
+                        <div className="flex-1 overflow-y-auto p-4 min-h-[300px] max-h-[400px] scrollbar-thin scrollbar-thumb-[var(--theme-border)] scrollbar-track-transparent">
                             {tree.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-full text-[#8E918F]">
+                                <div className="flex flex-col items-center justify-center h-full text-[var(--theme-text-tertiary)]">
                                     <GoogleIcon path={ICONS_PATHS.folder_open} className="w-16 h-16 mb-4 opacity-20" />
                                     <p className="text-sm">No files found</p>
                                 </div>
@@ -564,13 +564,13 @@ export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorPr
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-4 border-t border-[#444746] bg-[#1a1a1a] flex items-center justify-between gap-4">
+                        <div className="px-6 py-4 border-t border-[var(--theme-border)] bg-[var(--theme-bg)] flex items-center justify-between gap-4">
                             <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-2 bg-[#333537] rounded-full px-4 py-2">
-                                    <GoogleIcon path={ICONS_PATHS.check_circle} className="w-4 h-4 text-[#A8C7FA]" />
-                                    <span className="text-sm text-[#E3E3E3]">
+                                <div className="flex items-center gap-2 bg-[var(--theme-surface-elevated)] rounded-full px-4 py-2">
+                                    <GoogleIcon path={ICONS_PATHS.check_circle} className="w-4 h-4 text-[var(--theme-primary)]" />
+                                    <span className="text-sm text-[var(--theme-text-primary)]">
                                         <span className="font-medium">{selectedCount}</span>
-                                        <span className="text-[#8E918F]"> / {totalFiles} files</span>
+                                        <span className="text-[var(--theme-text-tertiary)]"> / {totalFiles} files</span>
                                     </span>
                                 </div>
                             </div>
@@ -578,14 +578,14 @@ export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorPr
                             {/* Progress or Actions */}
                             {importProgress ? (
                                 <div className="flex items-center gap-3">
-                                    <div className="flex-1 h-2 bg-[#333537] rounded-full overflow-hidden w-32">
+                                    <div className="flex-1 h-2 bg-[var(--theme-surface-elevated)] rounded-full overflow-hidden w-32">
                                         <motion.div
-                                            className="h-full bg-[#A8C7FA]"
+                                            className="h-full bg-[var(--theme-primary)]"
                                             initial={{ width: 0 }}
                                             animate={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
                                         />
                                     </div>
-                                    <span className="text-xs text-[#8E918F]">
+                                    <span className="text-xs text-[var(--theme-text-tertiary)]">
                                         {importProgress.current}/{importProgress.total}
                                     </span>
                                 </div>
@@ -607,10 +607,10 @@ export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorPr
 
                         {/* Loading Overlay */}
                         {loading && (
-                            <div className="absolute inset-0 bg-[#1E1E1E]/80 flex items-center justify-center">
+                            <div className="absolute inset-0 bg-[var(--theme-surface)]/80 flex items-center justify-center">
                                 <div className="flex flex-col items-center gap-4">
-                                    <div className="w-10 h-10 border-4 border-[#444746] border-t-[#A8C7FA] rounded-full animate-spin" />
-                                    <p className="text-[#A8C7FA] text-sm font-mono">{loadingText}</p>
+                                    <div className="w-10 h-10 border-4 border-[var(--theme-border)] border-t-[var(--theme-primary)] rounded-full animate-spin" />
+                                    <p className="text-[var(--theme-primary)] text-sm font-mono">{loadingText}</p>
                                 </div>
                             </div>
                         )}
@@ -622,7 +622,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorPr
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: 10 }}
-                                    className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-[#601410] text-[#F2B8B5] px-4 py-2 rounded-full text-sm"
+                                    className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-[var(--theme-error)] text-white px-4 py-2 rounded-full text-sm"
                                 >
                                     {error}
                                 </motion.div>

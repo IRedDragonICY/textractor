@@ -150,12 +150,12 @@ const SortableTab: React.FC<SortableTabProps> = ({
             onDoubleClick={() => onStartEdit(session.id, session.name)}
             className={`
                 group relative flex items-center gap-2 px-3 h-[35px] min-w-[120px] max-w-[200px] cursor-grab active:cursor-grabbing
-                border-r border-[#3C3C3C] transition-all duration-150
+                border-r border-[var(--theme-border-subtle)] transition-all duration-150
                 ${isActiveTab 
-                    ? 'bg-[#1E1E1E] text-[#E3E3E3]' 
-                    : 'bg-[#2D2D2D] text-[#969696] hover:text-[#E3E3E3] hover:bg-[#323232]'
+                    ? 'bg-[var(--theme-surface)] text-[var(--theme-text-primary)]' 
+                    : 'bg-[var(--theme-surface-elevated)] text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-surface-hover)]'
                 }
-                ${isDragging ? 'shadow-lg ring-2 ring-[#A8C7FA]/50' : ''}
+                ${isDragging ? 'shadow-lg ring-2 ring-[var(--theme-primary)]/50' : ''}
             `}
             style={{
                 transform: CSS.Transform.toString(transform),
@@ -169,7 +169,7 @@ const SortableTab: React.FC<SortableTabProps> = ({
             {session.isPinned && (
                 <GoogleIcon 
                     path={ICONS.pin} 
-                    className="w-3 h-3 text-[#A8C7FA] shrink-0" 
+                    className="w-3 h-3 text-[var(--theme-primary)] shrink-0" 
                 />
             )}
 
@@ -190,7 +190,7 @@ const SortableTab: React.FC<SortableTabProps> = ({
                     onChange={(e) => onEditChange(e.target.value)}
                     onBlur={onFinishEdit}
                     onKeyDown={onKeyDown}
-                    className="flex-1 bg-[#3C3C3C] text-[#E3E3E3] text-xs px-1 py-0.5 rounded outline-none border border-[#007ACC] min-w-0"
+                    className="flex-1 bg-[var(--theme-surface-hover)] text-[var(--theme-text-primary)] text-xs px-1 py-0.5 rounded outline-none border border-[var(--theme-primary)] min-w-0"
                     onClick={(e) => e.stopPropagation()}
                 />
             ) : (
@@ -199,14 +199,14 @@ const SortableTab: React.FC<SortableTabProps> = ({
 
             {/* File count badge */}
             {fileCount > 0 && editingTabId !== session.id && (
-                <span className="text-[10px] bg-[#3C3C3C] text-[#969696] px-1.5 rounded-full shrink-0">
+                <span className="text-[10px] bg-[var(--theme-surface-hover)] text-[var(--theme-text-tertiary)] px-1.5 rounded-full shrink-0">
                     {fileCount}
                 </span>
             )}
 
             {/* Unsaved indicator */}
             {hasUnsavedChanges && !session.isPinned && (
-                <div className="w-2 h-2 rounded-full bg-[#E3E3E3] shrink-0 group-hover:hidden" />
+                <div className="w-2 h-2 rounded-full bg-[var(--theme-text-primary)] shrink-0 group-hover:hidden" />
             )}
 
             {/* Close button */}
@@ -218,7 +218,7 @@ const SortableTab: React.FC<SortableTabProps> = ({
                 onPointerDown={(e) => e.stopPropagation()}
                 className={`
                     w-5 h-5 rounded flex items-center justify-center shrink-0
-                    text-[#969696] hover:text-[#E3E3E3] hover:bg-[#4A4A4A]
+                    text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-surface-hover)]
                     ${hasUnsavedChanges && !session.isPinned ? 'hidden group-hover:flex' : 'opacity-0 group-hover:opacity-100'}
                 `}
             >
@@ -235,11 +235,11 @@ const DragOverlayTab: React.FC<{ session: Session }> = ({ session }) => {
     return (
         <div
             className="flex items-center gap-2 px-3 h-[35px] min-w-[120px] max-w-[200px] cursor-grabbing
-                bg-[#1E1E1E] text-[#E3E3E3] border border-[#A8C7FA] rounded shadow-xl"
-            style={{ borderTop: `2px solid ${session.color || '#A8C7FA'}` }}
+                bg-[var(--theme-surface)] text-[var(--theme-text-primary)] border border-[var(--theme-primary)] rounded shadow-xl"
+            style={{ borderTop: `2px solid ${session.color || 'var(--theme-primary)'}` }}
         >
             {session.isPinned && (
-                <GoogleIcon path={ICONS.pin} className="w-3 h-3 text-[#A8C7FA] shrink-0" />
+                <GoogleIcon path={ICONS.pin} className="w-3 h-3 text-[var(--theme-primary)] shrink-0" />
             )}
             <div 
                 className="w-4 h-4 shrink-0 flex items-center justify-center rounded"
@@ -249,7 +249,7 @@ const DragOverlayTab: React.FC<{ session: Session }> = ({ session }) => {
             </div>
             <span className="text-xs truncate flex-1">{session.name}</span>
             {fileCount > 0 && (
-                <span className="text-[10px] bg-[#3C3C3C] text-[#969696] px-1.5 rounded-full shrink-0">
+                <span className="text-[10px] bg-[var(--theme-surface-hover)] text-[var(--theme-text-tertiary)] px-1.5 rounded-full shrink-0">
                     {fileCount}
                 </span>
             )}
@@ -365,15 +365,15 @@ export const TabBar: React.FC<TabBarProps> = ({
     const draggedSession = activeTabId ? sessions.find(s => s.id === activeTabId) : null;
 
     return (
-        <div className="bg-[#252526] border-b border-[#3C3C3C] flex items-center h-[35px] select-none overflow-hidden">
+        <div className="bg-[var(--theme-surface-elevated)] border-b border-[var(--theme-border-subtle)] flex items-center h-[35px] select-none overflow-hidden">
             {/* Home Tab */}
             <motion.button
                 whileHover={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => onToggleHomeView(true)}
                 className={`
-                    flex items-center gap-2 px-4 h-full border-r border-[#3C3C3C] transition-colors shrink-0
-                    ${showHomeView ? 'bg-[#1E1E1E] text-[#E3E3E3]' : 'text-[#969696] hover:text-[#E3E3E3]'}
+                    flex items-center gap-2 px-4 h-full border-r border-[var(--theme-border-subtle)] transition-colors shrink-0
+                    ${showHomeView ? 'bg-[var(--theme-surface)] text-[var(--theme-text-primary)]' : 'text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)]'}
                 `}
             >
                 <GoogleIcon path={ICONS.home} className="w-4 h-4" />
@@ -421,7 +421,7 @@ export const TabBar: React.FC<TabBarProps> = ({
                     whileHover={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
                     whileTap={{ scale: 0.95 }}
                     onClick={onCreateSession}
-                    className="flex items-center justify-center w-[35px] h-[35px] shrink-0 text-[#969696] hover:text-[#E3E3E3] transition-colors"
+                    className="flex items-center justify-center w-[35px] h-[35px] shrink-0 text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] transition-colors"
                     title="New Tab (Ctrl+T)"
                 >
                     <GoogleIcon path={ICONS.add} className="w-5 h-5" />
@@ -437,7 +437,7 @@ export const TabBar: React.FC<TabBarProps> = ({
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={{ duration: 0.1 }}
-                        className="fixed z-[100] bg-[#252526] border border-[#454545] rounded-md shadow-xl py-1 min-w-[180px]"
+                        className="fixed z-[100] bg-[var(--theme-menu-bg)] border border-[var(--theme-border)] rounded-md shadow-xl py-1 min-w-[180px]"
                         style={{ left: contextMenu.x, top: contextMenu.y }}
                     >
                         <ContextMenuItem
@@ -518,15 +518,15 @@ const ContextMenuItem: React.FC<ContextMenuItemProps> = ({
             w-full flex items-center gap-3 px-3 py-1.5 text-xs text-left
             transition-colors
             ${disabled 
-                ? 'text-[#5A5A5A] cursor-not-allowed' 
-                : 'text-[#CCCCCC] hover:bg-[#094771] hover:text-white'
+                ? 'text-[var(--theme-text-muted)] cursor-not-allowed' 
+                : 'text-[var(--theme-text-secondary)] hover:bg-[var(--theme-menu-hover)] hover:text-[var(--theme-text-primary)]'
             }
         `}
     >
         <GoogleIcon path={icon} className="w-4 h-4" />
         <span className="flex-1">{label}</span>
         {shortcut && (
-            <span className="text-[10px] text-[#6E6E6E]">{shortcut}</span>
+            <span className="text-[10px] text-[var(--theme-text-muted)]">{shortcut}</span>
         )}
     </button>
 );

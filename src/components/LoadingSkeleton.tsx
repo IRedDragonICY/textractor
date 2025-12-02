@@ -24,11 +24,11 @@ const shimmer = {
 // Base skeleton block with shimmer
 const SkeletonBlock = memo(({ className = '', style = {} }: { className?: string; style?: React.CSSProperties }) => (
     <div 
-        className={`relative overflow-hidden bg-[#2B2930] rounded ${className}`}
+        className={`relative overflow-hidden bg-[var(--theme-surface-hover)] rounded ${className}`}
         style={style}
     >
         <motion.div
-            className="absolute inset-0 bg-gradient-to-r from-transparent via-[#3C3C3C]/50 to-transparent"
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--theme-surface-elevated)]/50 to-transparent"
             variants={shimmer}
             initial="initial"
             animate="animate"
@@ -81,10 +81,10 @@ export const WorkspaceSkeleton = memo(() => (
             </div>
             
             {/* Code viewer skeleton */}
-            <div className="flex-1 rounded-2xl overflow-hidden border border-[#444746]">
+            <div className="flex-1 rounded-2xl overflow-hidden border border-[var(--theme-border)]">
                 <div className="flex h-full">
                     {/* Line numbers */}
-                    <div className="w-12 bg-[#1E1E1E] border-r border-[#444746] p-4 space-y-1">
+                    <div className="w-12 bg-[var(--theme-surface)] border-r border-[var(--theme-border)] p-4 space-y-1">
                         {Array.from({ length: 20 }).map((_, i) => (
                             <SkeletonBlock 
                                 key={i} 
@@ -119,7 +119,7 @@ WorkspaceSkeleton.displayName = 'WorkspaceSkeleton';
 export const CodeViewerSkeleton = memo(() => (
     <div className="h-full flex">
         {/* Line numbers */}
-        <div className="w-12 bg-[#1E1E1E] border-r border-[#444746] p-4 space-y-1">
+        <div className="w-12 bg-[var(--theme-surface)] border-r border-[var(--theme-border)] p-4 space-y-1">
             {Array.from({ length: 25 }).map((_, i) => (
                 <SkeletonBlock 
                     key={i} 
@@ -155,7 +155,7 @@ export const LoadingSpinner = memo(({ size = 24, className = '' }: { size?: numb
         animate={{ opacity: 1 }}
     >
         <motion.div
-            className="border-2 border-[#444746] border-t-[#A8C7FA] rounded-full"
+            className="border-2 border-[var(--theme-border)] border-t-[var(--theme-primary)] rounded-full"
             style={{ width: size, height: size }}
             animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
@@ -174,18 +174,18 @@ export const LoadingProgress = memo(({
     label?: string;
 }) => (
     <motion.div
-        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#1E1E1E] border border-[#444746] rounded-2xl p-4 shadow-2xl min-w-[300px]"
+        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-2xl p-4 shadow-2xl min-w-[300px]"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 20 }}
     >
         <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-[#C4C7C5]">{label}</span>
-            <span className="text-sm text-[#A8C7FA] font-mono">{Math.round(progress)}%</span>
+            <span className="text-sm text-[var(--theme-text-secondary)]">{label}</span>
+            <span className="text-sm text-[var(--theme-primary)] font-mono">{Math.round(progress)}%</span>
         </div>
-        <div className="h-2 bg-[#2B2930] rounded-full overflow-hidden">
+        <div className="h-2 bg-[var(--theme-surface-hover)] rounded-full overflow-hidden">
             <motion.div
-                className="h-full bg-gradient-to-r from-[#A8C7FA] to-[#7FCFB6]"
+                className="h-full bg-gradient-to-r from-[var(--theme-primary)] to-[var(--theme-success)]"
                 initial={{ width: 0 }}
                 animate={{ width: `${progress}%` }}
                 transition={{ duration: 0.3 }}

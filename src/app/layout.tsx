@@ -208,9 +208,26 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Script to prevent flash of wrong theme
+  const themeScript = `
+    (function() {
+      try {
+        var theme = localStorage.getItem('contextractor-theme') || 'system';
+        var resolved = theme;
+        if (theme === 'system') {
+          resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.classList.add(resolved);
+      } catch (e) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+  `;
+
   return (
-    <html lang="en" className="scroll-smooth" dir="ltr">
+    <html lang="en" className="scroll-smooth dark" dir="ltr" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://api.github.com" />
@@ -228,7 +245,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#131314] text-[#E3E3E3]`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-theme-bg text-theme-primary theme-transition`}
       >
         {children}
       </body>
