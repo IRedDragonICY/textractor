@@ -3,8 +3,25 @@
 
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent,
+    DragStartEvent,
+    DragOverlay,
+} from '@dnd-kit/core';
+import {
+    SortableContext,
+    horizontalListSortingStrategy,
+    useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Session } from '@/types/session';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
 
@@ -69,6 +86,177 @@ interface ContextMenuState {
     y: number;
 }
 
+// Sortable Tab Component
+interface SortableTabProps {
+    session: Session;
+    isActive: boolean;
+    showHomeView: boolean;
+    editingTabId: string | null;
+    editValue: string;
+    editInputRef: React.RefObject<HTMLInputElement | null>;
+    onContextMenu: (e: React.MouseEvent, sessionId: string) => void;
+    onSwitchSession: (id: string) => void;
+    onToggleHomeView: (show: boolean) => void;
+    onStartEdit: (sessionId: string, currentName: string) => void;
+    onEditChange: (value: string) => void;
+    onFinishEdit: () => void;
+    onKeyDown: (e: React.KeyboardEvent) => void;
+    onCloseSession: (id: string) => void;
+    isDragging?: boolean;
+}
+
+const SortableTab: React.FC<SortableTabProps> = ({
+    session,
+    isActive,
+    showHomeView,
+    editingTabId,
+    editValue,
+    editInputRef,
+    onContextMenu,
+    onSwitchSession,
+    onToggleHomeView,
+    onStartEdit,
+    onEditChange,
+    onFinishEdit,
+    onKeyDown,
+    onCloseSession,
+    isDragging = false,
+}) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging: isSortableDragging,
+    } = useSortable({ id: session.id });
+
+    const fileCount = session.files.length;
+    const hasUnsavedChanges = session.files.length > 0;
+    const isActiveTab = isActive && !showHomeView;
+
+    return (
+        <div
+            ref={setNodeRef}
+            {...attributes}
+            {...listeners}
+            onContextMenu={(e) => onContextMenu(e, session.id)}
+            onClick={() => {
+                if (editingTabId !== session.id) {
+                    onSwitchSession(session.id);
+                    onToggleHomeView(false);
+                }
+            }}
+            onDoubleClick={() => onStartEdit(session.id, session.name)}
+            className={`
+                group relative flex items-center gap-2 px-3 h-[35px] min-w-[120px] max-w-[200px] cursor-grab active:cursor-grabbing
+                border-r border-[#3C3C3C] transition-all duration-150
+                ${isActiveTab 
+                    ? 'bg-[#1E1E1E] text-[#E3E3E3]' 
+                    : 'bg-[#2D2D2D] text-[#969696] hover:text-[#E3E3E3] hover:bg-[#323232]'
+                }
+                ${isDragging ? 'shadow-lg ring-2 ring-[#A8C7FA]/50' : ''}
+            `}
+            style={{
+                transform: CSS.Transform.toString(transform),
+                transition,
+                opacity: isSortableDragging ? 0.5 : 1,
+                zIndex: isSortableDragging ? 100 : 1,
+                borderTop: isActiveTab ? `2px solid ${session.color || '#A8C7FA'}` : '2px solid transparent',
+            }}
+        >
+            {/* Pin indicator */}
+            {session.isPinned && (
+                <GoogleIcon 
+                    path={ICONS.pin} 
+                    className="w-3 h-3 text-[#A8C7FA] shrink-0" 
+                />
+            )}
+
+            {/* File icon with extension color */}
+            <div 
+                className="w-4 h-4 shrink-0 flex items-center justify-center rounded"
+                style={{ color: getExtensionColor(session.files) }}
+            >
+                <GoogleIcon path={ICONS.file} className="w-4 h-4" />
+            </div>
+
+            {/* Tab name or input */}
+            {editingTabId === session.id ? (
+                <input
+                    ref={editInputRef}
+                    type="text"
+                    value={editValue}
+                    onChange={(e) => onEditChange(e.target.value)}
+                    onBlur={onFinishEdit}
+                    onKeyDown={onKeyDown}
+                    className="flex-1 bg-[#3C3C3C] text-[#E3E3E3] text-xs px-1 py-0.5 rounded outline-none border border-[#007ACC] min-w-0"
+                    onClick={(e) => e.stopPropagation()}
+                />
+            ) : (
+                <span className="text-xs truncate flex-1">{session.name}</span>
+            )}
+
+            {/* File count badge */}
+            {fileCount > 0 && editingTabId !== session.id && (
+                <span className="text-[10px] bg-[#3C3C3C] text-[#969696] px-1.5 rounded-full shrink-0">
+                    {fileCount}
+                </span>
+            )}
+
+            {/* Unsaved indicator */}
+            {hasUnsavedChanges && !session.isPinned && (
+                <div className="w-2 h-2 rounded-full bg-[#E3E3E3] shrink-0 group-hover:hidden" />
+            )}
+
+            {/* Close button */}
+            <button
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onCloseSession(session.id);
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                className={`
+                    w-5 h-5 rounded flex items-center justify-center shrink-0
+                    text-[#969696] hover:text-[#E3E3E3] hover:bg-[#4A4A4A]
+                    ${hasUnsavedChanges && !session.isPinned ? 'hidden group-hover:flex' : 'opacity-0 group-hover:opacity-100'}
+                `}
+            >
+                <GoogleIcon path={ICONS.close} className="w-3.5 h-3.5" />
+            </button>
+        </div>
+    );
+};
+
+// Drag overlay tab (shown while dragging)
+const DragOverlayTab: React.FC<{ session: Session }> = ({ session }) => {
+    const fileCount = session.files.length;
+    
+    return (
+        <div
+            className="flex items-center gap-2 px-3 h-[35px] min-w-[120px] max-w-[200px] cursor-grabbing
+                bg-[#1E1E1E] text-[#E3E3E3] border border-[#A8C7FA] rounded shadow-xl"
+            style={{ borderTop: `2px solid ${session.color || '#A8C7FA'}` }}
+        >
+            {session.isPinned && (
+                <GoogleIcon path={ICONS.pin} className="w-3 h-3 text-[#A8C7FA] shrink-0" />
+            )}
+            <div 
+                className="w-4 h-4 shrink-0 flex items-center justify-center rounded"
+                style={{ color: getExtensionColor(session.files) }}
+            >
+                <GoogleIcon path={ICONS.file} className="w-4 h-4" />
+            </div>
+            <span className="text-xs truncate flex-1">{session.name}</span>
+            {fileCount > 0 && (
+                <span className="text-[10px] bg-[#3C3C3C] text-[#969696] px-1.5 rounded-full shrink-0">
+                    {fileCount}
+                </span>
+            )}
+        </div>
+    );
+};
+
 export const TabBar: React.FC<TabBarProps> = ({
     sessions,
     activeSessionId,
@@ -82,6 +270,7 @@ export const TabBar: React.FC<TabBarProps> = ({
     onCloseOtherSessions,
     onCloseAllSessions,
     onTogglePinSession,
+    onReorderSessions,
 }) => {
     const [contextMenu, setContextMenu] = useState<ContextMenuState>({
         isOpen: false,
@@ -91,8 +280,34 @@ export const TabBar: React.FC<TabBarProps> = ({
     });
     const [editingTabId, setEditingTabId] = useState<string | null>(null);
     const [editValue, setEditValue] = useState('');
+    const [activeTabId, setActiveTabId] = useState<string | null>(null);
     const editInputRef = useRef<HTMLInputElement>(null);
     const contextMenuRef = useRef<HTMLDivElement>(null);
+
+    // DnD sensors
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(KeyboardSensor)
+    );
+
+    // Handle drag start
+    const handleDragStart = useCallback((event: DragStartEvent) => {
+        setActiveTabId(String(event.active.id));
+    }, []);
+
+    // Handle drag end
+    const handleDragEnd = useCallback((event: DragEndEvent) => {
+        const { active, over } = event;
+        setActiveTabId(null);
+
+        if (over && active.id !== over.id) {
+            const oldIndex = sessions.findIndex(s => s.id === active.id);
+            const newIndex = sessions.findIndex(s => s.id === over.id);
+            if (oldIndex !== -1 && newIndex !== -1) {
+                onReorderSessions(oldIndex, newIndex);
+            }
+        }
+    }, [sessions, onReorderSessions]);
 
     // Close context menu on click outside
     useEffect(() => {
@@ -113,7 +328,7 @@ export const TabBar: React.FC<TabBarProps> = ({
         }
     }, [editingTabId]);
 
-    const handleContextMenu = (e: React.MouseEvent, sessionId: string) => {
+    const handleContextMenu = useCallback((e: React.MouseEvent, sessionId: string) => {
         e.preventDefault();
         setContextMenu({
             isOpen: true,
@@ -121,32 +336,33 @@ export const TabBar: React.FC<TabBarProps> = ({
             x: e.clientX,
             y: e.clientY,
         });
-    };
+    }, []);
 
-    const handleStartEdit = (sessionId: string, currentName: string) => {
+    const handleStartEdit = useCallback((sessionId: string, currentName: string) => {
         setEditingTabId(sessionId);
         setEditValue(currentName);
         setContextMenu(prev => ({ ...prev, isOpen: false }));
-    };
+    }, []);
 
-    const handleFinishEdit = () => {
+    const handleFinishEdit = useCallback(() => {
         if (editingTabId && editValue.trim()) {
             onRenameSession(editingTabId, editValue.trim());
         }
         setEditingTabId(null);
         setEditValue('');
-    };
+    }, [editingTabId, editValue, onRenameSession]);
 
-    const handleKeyDown = (e: React.KeyboardEvent) => {
+    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {
             handleFinishEdit();
         } else if (e.key === 'Escape') {
             setEditingTabId(null);
             setEditValue('');
         }
-    };
+    }, [handleFinishEdit]);
 
     const contextSession = sessions.find(s => s.id === contextMenu.sessionId);
+    const draggedSession = activeTabId ? sessions.find(s => s.id === activeTabId) : null;
 
     return (
         <div className="bg-[#252526] border-b border-[#3C3C3C] flex items-center h-[35px] select-none overflow-hidden">
@@ -156,7 +372,7 @@ export const TabBar: React.FC<TabBarProps> = ({
                 whileTap={{ scale: 0.98 }}
                 onClick={() => onToggleHomeView(true)}
                 className={`
-                    flex items-center gap-2 px-4 h-full border-r border-[#3C3C3C] transition-colors
+                    flex items-center gap-2 px-4 h-full border-r border-[#3C3C3C] transition-colors shrink-0
                     ${showHomeView ? 'bg-[#1E1E1E] text-[#E3E3E3]' : 'text-[#969696] hover:text-[#E3E3E3]'}
                 `}
             >
@@ -164,103 +380,43 @@ export const TabBar: React.FC<TabBarProps> = ({
                 <span className="text-xs font-medium">Home</span>
             </motion.button>
 
-            {/* Session Tabs + New Tab Button */}
+            {/* Session Tabs with DnD */}
             <div className="flex-1 flex items-center overflow-x-auto scrollbar-none h-full">
-                {sessions.map((session) => {
-                    const isActive = session.id === activeSessionId && !showHomeView;
-                    const fileCount = session.files.length;
-                    const hasUnsavedChanges = session.files.length > 0;
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                >
+                    <SortableContext items={sessions.map(s => s.id)} strategy={horizontalListSortingStrategy}>
+                        {sessions.map((session) => (
+                            <SortableTab
+                                key={session.id}
+                                session={session}
+                                isActive={session.id === activeSessionId}
+                                showHomeView={showHomeView}
+                                editingTabId={editingTabId}
+                                editValue={editValue}
+                                editInputRef={editInputRef}
+                                onContextMenu={handleContextMenu}
+                                onSwitchSession={onSwitchSession}
+                                onToggleHomeView={onToggleHomeView}
+                                onStartEdit={handleStartEdit}
+                                onEditChange={setEditValue}
+                                onFinishEdit={handleFinishEdit}
+                                onKeyDown={handleKeyDown}
+                                onCloseSession={onCloseSession}
+                            />
+                        ))}
+                    </SortableContext>
 
-                    return (
-                        <motion.div
-                            key={session.id}
-                            layout
-                            initial={false}
-                            onContextMenu={(e) => handleContextMenu(e, session.id)}
-                            onClick={() => {
-                                if (editingTabId !== session.id) {
-                                    onSwitchSession(session.id);
-                                    onToggleHomeView(false);
-                                }
-                            }}
-                            onDoubleClick={() => handleStartEdit(session.id, session.name)}
-                            className={`
-                                group relative flex items-center gap-2 px-3 h-[35px] min-w-[120px] max-w-[200px] cursor-pointer
-                                border-r border-[#3C3C3C] transition-all duration-150
-                                ${isActive 
-                                    ? 'bg-[#1E1E1E] text-[#E3E3E3]' 
-                                    : 'bg-[#2D2D2D] text-[#969696] hover:text-[#E3E3E3] hover:bg-[#323232]'
-                                }
-                            `}
-                            style={{
-                                borderTop: isActive ? `2px solid ${session.color || '#A8C7FA'}` : '2px solid transparent',
-                            }}
-                        >
-                            {/* Pin indicator */}
-                            {session.isPinned && (
-                                <GoogleIcon 
-                                    path={ICONS.pin} 
-                                    className="w-3 h-3 text-[#A8C7FA] shrink-0" 
-                                />
-                            )}
+                    {/* Drag overlay */}
+                    <DragOverlay>
+                        {draggedSession ? <DragOverlayTab session={draggedSession} /> : null}
+                    </DragOverlay>
+                </DndContext>
 
-                            {/* File icon with extension color */}
-                            <div 
-                                className="w-4 h-4 shrink-0 flex items-center justify-center rounded"
-                                style={{ color: getExtensionColor(session.files) }}
-                            >
-                                <GoogleIcon path={ICONS.file} className="w-4 h-4" />
-                            </div>
-
-                            {/* Tab name or input */}
-                            {editingTabId === session.id ? (
-                                <input
-                                    ref={editInputRef}
-                                    type="text"
-                                    value={editValue}
-                                    onChange={(e) => setEditValue(e.target.value)}
-                                    onBlur={handleFinishEdit}
-                                    onKeyDown={handleKeyDown}
-                                    className="flex-1 bg-[#3C3C3C] text-[#E3E3E3] text-xs px-1 py-0.5 rounded outline-none border border-[#007ACC] min-w-0"
-                                    onClick={(e) => e.stopPropagation()}
-                                />
-                            ) : (
-                                <span className="text-xs truncate flex-1">{session.name}</span>
-                            )}
-
-                            {/* File count badge */}
-                            {fileCount > 0 && editingTabId !== session.id && (
-                                <span className="text-[10px] bg-[#3C3C3C] text-[#969696] px-1.5 rounded-full shrink-0">
-                                    {fileCount}
-                                </span>
-                            )}
-
-                            {/* Unsaved indicator */}
-                            {hasUnsavedChanges && !session.isPinned && (
-                                <div className="w-2 h-2 rounded-full bg-[#E3E3E3] shrink-0 group-hover:hidden" />
-                            )}
-
-                            {/* Close button */}
-                            <motion.button
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onCloseSession(session.id);
-                                }}
-                                className={`
-                                    w-5 h-5 rounded flex items-center justify-center shrink-0
-                                    text-[#969696] hover:text-[#E3E3E3] hover:bg-[#4A4A4A]
-                                    ${hasUnsavedChanges && !session.isPinned ? 'hidden group-hover:flex' : 'opacity-0 group-hover:opacity-100'}
-                                `}
-                            >
-                                <GoogleIcon path={ICONS.close} className="w-3.5 h-3.5" />
-                            </motion.button>
-                        </motion.div>
-                    );
-                })}
-
-                {/* New Tab Button - Right after last tab */}
+                {/* New Tab Button */}
                 <motion.button
                     whileHover={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
                     whileTap={{ scale: 0.95 }}
