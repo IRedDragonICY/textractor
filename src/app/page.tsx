@@ -28,17 +28,17 @@ import { SortableItem } from '@/components/SortableItem';
 import { TreeItem } from '@/components/TreeItem';
 import { OutputStyleSelector } from '@/components/OutputStyleSelector';
 import { StatChip } from '@/components/StatChip';
+import { GitFileSelector } from '@/components/GitFileSelector';
 
 // Hooks
 import { useFileSystem } from '@/hooks/useFileSystem';
 import { useSearch } from '@/hooks/useSearch';
 
 // Services & Utils
-import { fetchGitFiles } from '@/lib/git-service';
 import { formatNumber } from '@/lib/format';
 
 // Types & Constants
-import { OutputStyle } from '@/types';
+import { OutputStyle, FileData } from '@/types';
 import { UI_ICONS, ICONS_PATHS } from '@/constants';
 
 export default function Contextractor() {
@@ -50,9 +50,6 @@ export default function Contextractor() {
     
     // Git Modal State
     const [gitModalOpen, setGitModalOpen] = useState(false);
-    const [gitUrl, setGitUrl] = useState("");
-    const [gitLoading, setGitLoading] = useState(false);
-    const [loadingText, setLoadingText] = useState("");
 
     // Refs
     const textAreaRef = useRef<HTMLTextAreaElement>(null);
@@ -93,25 +90,11 @@ export default function Contextractor() {
     );
 
     // Git Import Handler
-    const handleGitImport = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!gitUrl) return;
-        setGitLoading(true);
-        
-        try {
-            const newFiles = await fetchGitFiles(gitUrl, setLoadingText);
-            setFiles(prev => [...prev, ...newFiles]);
-            setGitModalOpen(false);
-            setGitUrl("");
-            setViewMode('tree');
-            setIsMobileSidebarOpen(false); // Close sidebar on mobile after import
-        } catch (error: unknown) {
-            const err = error as Error;
-            alert(err.message || "Import failed");
-        } finally {
-            setGitLoading(false);
-            setLoadingText("");
-        }
+    const handleGitImport = (newFiles: FileData[]) => {
+        setFiles(prev => [...prev, ...newFiles]);
+        setGitModalOpen(false);
+        setViewMode('tree');
+        setIsMobileSidebarOpen(false);
     };
 
     // Dropzone
@@ -500,66 +483,14 @@ export default function Contextractor() {
                 )}
             </AnimatePresence>
 
+            {/* Git File Selector Modal */}
             <AnimatePresence>
                 {gitModalOpen && (
-                    <motion.div
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
-                        onClick={() => !gitLoading && setGitModalOpen(false)}
-                    >
-                        <motion.div
-                            initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-                            className="bg-[#1E1E1E] rounded-[28px] p-8 w-full max-w-lg shadow-2xl border border-[#444746]"
-                            onClick={e => e.stopPropagation()}
-                        >
-                            <form onSubmit={handleGitImport}>
-                                <div className="flex items-center gap-4 mb-6 border-b border-[#444746] pb-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-[#333537] flex items-center justify-center shrink-0">
-                                        <GoogleIcon path={UI_ICONS.github} className="w-7 h-7 text-[#E3E3E3]" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-xl text-[#E3E3E3] font-medium">Import Repository</h3>
-                                        <p className="text-sm text-[#8E918F]">Supports GitHub & GitLab</p>
-                                    </div>
-                                </div>
-                                <div className="relative mb-6">
-                                    <label className="text-xs text-[#A8C7FA] ml-4 mb-1 block font-medium">Repository URL</label>
-                                    <div className="relative">
-                                        <input
-                                            type="text"
-                                            value={gitUrl}
-                                            onChange={(e) => setGitUrl(e.target.value)}
-                                            placeholder="https://github.com/username/repo"
-                                            className="w-full bg-[#2B2930] border border-[#444746] rounded-xl pl-12 pr-4 py-3.5 text-[#E3E3E3] placeholder-[#8E918F] focus:outline-none focus:border-[#A8C7FA] focus:ring-1 focus:ring-[#A8C7FA] transition-all"
-                                            disabled={gitLoading}
-                                        />
-                                        <div className="absolute left-4 top-3.5 text-[#C4C7C5]">
-                                            <GoogleIcon path={UI_ICONS.search} className="w-5 h-5" />
-                                        </div>
-                                        {gitLoading && (
-                                            <div className="absolute right-4 top-3.5">
-                                                <div className="w-5 h-5 border-2 border-[#444746] border-t-[#A8C7FA] rounded-full animate-spin"></div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                {gitLoading && (
-                                    <div className="bg-[#004A77]/20 border border-[#004A77] rounded-xl p-4 mb-6 flex items-center gap-3">
-                                        <div className="w-2 h-2 bg-[#A8C7FA] rounded-full animate-ping"></div>
-                                        <p className="text-[#A8C7FA] text-sm font-mono">{loadingText}</p>
-                                    </div>
-                                )}
-                                <div className="flex justify-end gap-3 mt-8">
-                                    <GoogleButton variant="text" onClick={() => setGitModalOpen(false)} disabled={gitLoading}>
-                                        Cancel
-                                    </GoogleButton>
-                                    <GoogleButton variant="filled" type="submit" disabled={!gitUrl || gitLoading}>
-                                        Import Files
-                                    </GoogleButton>
-                                </div>
-                            </form>
-                        </motion.div>
-                    </motion.div>
+                    <GitFileSelector
+                        isOpen={gitModalOpen}
+                        onClose={() => setGitModalOpen(false)}
+                        onImport={handleGitImport}
+                    />
                 )}
             </AnimatePresence>
         </div>

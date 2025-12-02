@@ -56,5 +56,25 @@ export interface GitLabTreeItem {
     mode: string;
 }
 
+export interface GitTreeNode {
+    id: string;
+    name: string;
+    path: string;
+    type: 'file' | 'folder';
+    size?: number;
+    children: GitTreeNode[];
+    selected: boolean;
+    indeterminate: boolean;
+    url?: string;
+}
+
+export interface GitRepoMetadata {
+    owner: string;
+    repo: string;
+    branch: string;
+    baseUrl: string;
+    provider: 'github' | 'gitlab';
+}
+
 export type OutputStyle = 'standard' | 'hash' | 'minimal' | 'xml' | 'markdown';
 export type ViewMode = 'list' | 'tree';
