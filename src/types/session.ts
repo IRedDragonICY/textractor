@@ -36,6 +36,8 @@ export interface RecentProject {
     thumbnail?: string; // Base64 preview image or icon type
     primaryLanguage?: string; // Most common file extension
     sessionSnapshot: Session;
+    // Track which open sessions came from this recent project
+    openSessionIds?: string[];
 }
 
 export interface SessionManagerState {

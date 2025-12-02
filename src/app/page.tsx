@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect, useDeferredValue } from 'react';
 import { useDropzone } from 'react-dropzone';
 import {
     DndContext,
@@ -31,10 +31,13 @@ import { GitFileSelector } from '@/components/GitFileSelector';
 import { TabBar } from '@/components/TabBar';
 import { HomeView } from '@/components/HomeView';
 import { MenuBar, AboutModal, ShortcutsModal } from '@/components/MenuBar';
+import { VirtualizedCodeViewer } from '@/components/VirtualizedCodeViewer';
+import { WorkspaceSkeleton, LoadingProgress } from '@/components/LoadingSkeleton';
+import { VirtualizedFileList } from '@/components/VirtualizedFileList';
 
 // Hooks
 import { useSearch } from '@/hooks/useSearch';
-import { useSessionManager, fileDataToSessionFile, sessionFileToFileData } from '@/hooks/useSessionManager';
+import { useSessionManager, fileDataToSessionFile, convertSessionFiles } from '@/hooks/useSessionManager';
 import { useHistory } from '@/hooks/useHistory';
 
 // Services & Utils
@@ -56,6 +59,7 @@ export default function Contextractor() {
         recentProjects,
         showHomeView,
         isLoading: isLoadingSession,
+        loadingProgress,
         createSession,
         closeSession,
         closeOtherSessions,
@@ -73,11 +77,12 @@ export default function Contextractor() {
         toggleHomeView,
     } = useSessionManager();
 
-    // Derived state from active session
+    // Derived state from active session - uses cached batch conversion
+    // Cache is maintained per-session in useSessionManager
     const files = useMemo(() => {
         if (!activeSession) return [];
-        return activeSession.files.map(sessionFileToFileData);
-    }, [activeSession]);
+        return convertSessionFiles(activeSession.id, activeSession.files);
+    }, [activeSession?.id, activeSession?.files]);
 
     const outputStyle = activeSession?.outputStyle || 'standard';
     const viewMode = activeSession?.viewMode || 'tree';
@@ -97,7 +102,6 @@ export default function Contextractor() {
 
     // Refs
     const textAreaRef = useRef<HTMLTextAreaElement>(null);
-    const lineNumbersRef = useRef<HTMLDivElement>(null);
 
     // Update session files
     const setFiles = useCallback((updater: FileData[] | ((prev: FileData[]) => FileData[])) => {
@@ -187,8 +191,8 @@ export default function Contextractor() {
         setFiles([]);
     }, [setFiles]);
 
-    // Derived State (Computed Text)
-    const combinedText = useMemo(() => {
+    // Derived State (Computed Text) - Using useDeferredValue for non-blocking UI
+    const rawCombinedText = useMemo(() => {
         return files.filter(f => f.isText).map(f => {
             const pathLabel = f.path || f.name;
             const ext = f.name.split('.').pop() || 'txt';
@@ -201,6 +205,10 @@ export default function Contextractor() {
             }
         }).join('\n\n');
     }, [files, outputStyle]);
+    
+    // Defer the expensive text so it doesn't block UI
+    const combinedText = useDeferredValue(rawCombinedText);
+    const isTextPending = rawCombinedText !== combinedText;
 
     // Search Hook
     const { 
@@ -366,12 +374,6 @@ export default function Contextractor() {
         }).join('\n\n');
     }, [files, outputStyle]);
 
-    const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
-        if (lineNumbersRef.current) {
-            lineNumbersRef.current.scrollTop = e.currentTarget.scrollTop;
-        }
-    };
-
     const copyToClipboard = () => {
         if (!combinedText) return;
         navigator.clipboard.writeText(combinedText)
@@ -446,9 +448,29 @@ export default function Contextractor() {
                 onReorderSessions={reorderSessions}
             />
 
-            {/* Main Content - Conditionally show HomeView or Workspace */}
+            {/* Loading Progress Indicator */}
+            <AnimatePresence>
+                {isLoadingSession && loadingProgress < 100 && (
+                    <LoadingProgress 
+                        progress={loadingProgress} 
+                        label="Loading workspace..." 
+                    />
+                )}
+            </AnimatePresence>
+
+            {/* Main Content - Conditionally show HomeView, Loading, or Workspace */}
             <AnimatePresence mode="wait">
-                {showHomeView ? (
+                {isLoadingSession ? (
+                    <motion.div
+                        key="loading"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="flex-1 overflow-hidden"
+                    >
+                        <WorkspaceSkeleton />
+                    </motion.div>
+                ) : showHomeView ? (
                     <motion.div
                         key="home"
                         initial={{ opacity: 0 }}
@@ -601,25 +623,28 @@ export default function Contextractor() {
                                     <span className="text-sm">Restoring session...</span>
                                 </div>
                             ) : viewMode === 'list' ? (
-                                <DndContext
-                                    sensors={sensors}
-                                    collisionDetection={closestCenter}
-                                    onDragStart={handleDragStart}
-                                    onDragEnd={handleDragEnd}
-                                >
-                                    <SortableContext items={files.map(f => f.id)} strategy={verticalListSortingStrategy}>
-                                        <ul className="flex flex-col p-2">
-                                            <AnimatePresence initial={false}>
+                                // Use virtualized list for large file sets (50+), regular DnD for small sets
+                                files.length > 50 ? (
+                                    <VirtualizedFileList files={files} onRemove={removeFile} />
+                                ) : (
+                                    <DndContext
+                                        sensors={sensors}
+                                        collisionDetection={closestCenter}
+                                        onDragStart={handleDragStart}
+                                        onDragEnd={handleDragEnd}
+                                    >
+                                        <SortableContext items={files.map(f => f.id)} strategy={verticalListSortingStrategy}>
+                                            <ul className="flex flex-col p-2">
                                                 {files.map(file => (
                                                     <SortableItem key={file.id} file={file} onRemove={removeFile} isDragging={activeId === file.id} />
                                                 ))}
-                                            </AnimatePresence>
-                                        </ul>
-                                    </SortableContext>
-                                    <DragOverlay dropAnimation={{ sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.5' } } }) }}>
-                                        {activeFile ? <FileCard file={activeFile} isDragging /> : null}
-                                    </DragOverlay>
-                                </DndContext>
+                                            </ul>
+                                        </SortableContext>
+                                        <DragOverlay dropAnimation={{ sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.5' } } }) }}>
+                                            {activeFile ? <FileCard file={activeFile} isDragging /> : null}
+                                        </DragOverlay>
+                                    </DndContext>
+                                )
                             ) : (
                                 <div className="p-2">
                                     {fileTree.map(node => (
@@ -675,32 +700,40 @@ export default function Contextractor() {
                                     onClick={copyToClipboard}
                                     variant="filled"
                                     icon={isCopied ? UI_ICONS.check : UI_ICONS.copy}
-                                    disabled={!combinedText}
+                                    disabled={!combinedText || isTextPending}
                                 >
-                                    {isCopied ? 'Copied' : 'Copy'}
+                                    {isCopied ? 'Copied' : isTextPending ? 'Processing...' : 'Copy'}
                                 </GoogleButton>
                             </div>
                         </div>
 
-                        <div className="relative flex-1 min-h-0 flex bg-[#1A1A1A] group overflow-hidden">
-                            <div
-                                ref={lineNumbersRef}
-                                className="h-full flex-shrink-0 w-12 bg-[#1E1E1E] border-r border-[#444746] text-right pr-3 pt-8 pb-8 overflow-hidden select-none"
-                                aria-hidden="true"
-                            >
-                                <pre className="text-[13px] leading-[1.6] font-mono text-[#6e7072]" style={{ fontFamily: '"JetBrains Mono", "Fira Code", "Roboto Mono", monospace' }}>
-                                    {lineNumbers}
-                                </pre>
-                            </div>
-
+                        {/* High-Performance Virtualized Code Viewer */}
+                        <div className="relative flex-1 min-h-0 bg-[#1A1A1A] overflow-hidden">
+                            {/* Hidden textarea for copy and select all functionality */}
                             <textarea
                                 ref={textAreaRef}
                                 value={combinedText}
-                                onScroll={handleScroll}
                                 readOnly
-                                className="flex-1 h-full p-8 resize-none focus:outline-none font-mono text-[13px] leading-[1.6] text-[#C4C7C5] bg-transparent scrollbar-thin scrollbar-thumb-[#444746] scrollbar-track-transparent selection:bg-[#004A77] selection:text-[#C2E7FF] whitespace-pre"
-                                placeholder="// Output preview..."
-                                style={{ fontFamily: '"JetBrains Mono", "Fira Code", "Roboto Mono", monospace' }}
+                                className="absolute opacity-0 pointer-events-none"
+                                tabIndex={-1}
+                                aria-hidden="true"
+                            />
+                            
+                            {/* Processing indicator */}
+                            {isTextPending && (
+                                <div className="absolute top-2 right-2 z-10 bg-[#1E1E1E]/90 backdrop-blur-sm px-3 py-1.5 rounded-full border border-[#444746] flex items-center gap-2">
+                                    <div className="w-3 h-3 border-2 border-[#A8C7FA] border-t-transparent rounded-full animate-spin" />
+                                    <span className="text-xs text-[#A8C7FA]">Processing...</span>
+                                </div>
+                            )}
+                            
+                            {/* Virtualized Code Display - Only renders visible lines */}
+                            <VirtualizedCodeViewer
+                                content={combinedText}
+                                lineNumbers={lineNumbers}
+                                searchTerm={searchTerm}
+                                currentMatchIdx={currentMatchIdx}
+                                searchMatches={searchMatches}
                             />
                         </div>
                     </div>

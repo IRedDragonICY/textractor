@@ -1,7 +1,7 @@
 // Session Manager Hook - Enterprise-grade session management
 // Inspired by VS Code tabs and Adobe Acrobat recent files
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { 
     Session, 
     SessionFile, 
@@ -9,12 +9,14 @@ import {
     SessionManagerState,
     OutputStyleType,
     ViewModeType,
-    SESSION_STORAGE_KEY,
-    RECENT_PROJECTS_KEY,
-    SESSION_STATE_KEY,
     TAB_COLORS
 } from '@/types/session';
 import { FileData } from '@/types';
+import { 
+    loadSessionManagerState, 
+    saveSessionManagerState, 
+    clearOldLocalStorage 
+} from '@/lib/db';
 
 const MAX_RECENT_PROJECTS = 20;
 
@@ -47,11 +49,63 @@ export const fileDataToSessionFile = (file: FileData): SessionFile => ({
     path: file.path,
 });
 
-// Convert SessionFile to FileData
+// Global cache for converted FileData per session
+// Key: sessionId, Value: Map of fileId -> FileData
+const fileDataCache = new Map<string, Map<string, FileData>>();
+
+// Lazy blob - only created when actually needed
+const createLazyBlob = (content: string): Blob => {
+    return new Blob([content], { type: 'text/plain' });
+};
+
+// Convert SessionFile to FileData - with per-session caching
 export const sessionFileToFileData = (file: SessionFile): FileData => ({
     ...file,
-    fileObject: new Blob([file.content], { type: 'text/plain' }),
-});
+    // Lazy blob creation - most operations don't need this
+    get fileObject() {
+        return createLazyBlob(file.content);
+    }
+} as FileData);
+
+// Batch convert with caching - much faster for large file sets
+export const convertSessionFiles = (sessionId: string, files: SessionFile[]): FileData[] => {
+    // Check if we have this session cached
+    let sessionCache = fileDataCache.get(sessionId);
+    
+    // If cache exists and has same file count, return cached version
+    if (sessionCache && sessionCache.size === files.length) {
+        // Quick check - if first and last file IDs match, use cache
+        const cachedIds = Array.from(sessionCache.keys());
+        if (cachedIds[0] === files[0]?.id && cachedIds[cachedIds.length - 1] === files[files.length - 1]?.id) {
+            return Array.from(sessionCache.values());
+        }
+    }
+    
+    // Create new cache for this session
+    sessionCache = new Map();
+    const result: FileData[] = [];
+    
+    for (const file of files) {
+        const fileData: FileData = {
+            ...file,
+            get fileObject() {
+                return createLazyBlob(file.content);
+            }
+        } as FileData;
+        sessionCache.set(file.id, fileData);
+        result.push(fileData);
+    }
+    
+    fileDataCache.set(sessionId, sessionCache);
+    
+    // Limit cache size to prevent memory issues (keep last 10 sessions)
+    if (fileDataCache.size > 10) {
+        const firstKey = fileDataCache.keys().next().value;
+        if (firstKey) fileDataCache.delete(firstKey);
+    }
+    
+    return result;
+};
 
 // Create empty session
 const createEmptySession = (name?: string): Session => ({
@@ -67,58 +121,6 @@ const createEmptySession = (name?: string): Session => ({
     color: getRandomColor(),
 });
 
-// Load state from localStorage
-const loadStateFromStorage = (): SessionManagerState => {
-    if (typeof window === 'undefined') {
-        return {
-            sessions: [],
-            activeSessionId: null,
-            recentProjects: [],
-            showHomeView: true,
-        };
-    }
-
-    try {
-        const stateStr = localStorage.getItem(SESSION_STATE_KEY);
-        const sessionsStr = localStorage.getItem(SESSION_STORAGE_KEY);
-        const recentStr = localStorage.getItem(RECENT_PROJECTS_KEY);
-
-        const sessions: Session[] = sessionsStr ? JSON.parse(sessionsStr) : [];
-        const recentProjects: RecentProject[] = recentStr ? JSON.parse(recentStr) : [];
-        const savedState = stateStr ? JSON.parse(stateStr) : {};
-
-        return {
-            sessions,
-            activeSessionId: savedState.activeSessionId || null,
-            recentProjects,
-            showHomeView: sessions.length === 0,
-        };
-    } catch (e) {
-        console.error('Failed to load session state:', e);
-        return {
-            sessions: [],
-            activeSessionId: null,
-            recentProjects: [],
-            showHomeView: true,
-        };
-    }
-};
-
-// Save state to localStorage
-const saveStateToStorage = (state: SessionManagerState) => {
-    if (typeof window === 'undefined') return;
-
-    try {
-        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(state.sessions));
-        localStorage.setItem(RECENT_PROJECTS_KEY, JSON.stringify(state.recentProjects));
-        localStorage.setItem(SESSION_STATE_KEY, JSON.stringify({
-            activeSessionId: state.activeSessionId,
-        }));
-    } catch (e) {
-        console.error('Failed to save session state:', e);
-    }
-};
-
 export const useSessionManager = () => {
     const [state, setState] = useState<SessionManagerState>({
         sessions: [],
@@ -127,22 +129,61 @@ export const useSessionManager = () => {
         showHomeView: true,
     });
     const [isLoading, setIsLoading] = useState(true);
+    const [loadingProgress, setLoadingProgress] = useState(0);
+    const isSaving = useRef(false);
+    const isInitialized = useRef(false);
 
-    // Load initial state
+    // Load initial state from IndexedDB - INSTANT, non-blocking
     useEffect(() => {
-        const loaded = loadStateFromStorage();
-        setState(loaded);
-        setIsLoading(false);
+        if (isInitialized.current) return;
+        isInitialized.current = true;
+
+        // Immediate async load - no requestIdleCallback delay
+        (async () => {
+            try {
+                clearOldLocalStorage();
+                setLoadingProgress(50);
+                
+                const loaded = await loadSessionManagerState();
+                
+                // Immediate state update - no transitions or delays
+                setState(loaded);
+                setLoadingProgress(100);
+                setIsLoading(false);
+            } catch (e) {
+                console.error('Failed to load session state:', e);
+                setIsLoading(false);
+            }
+        })();
     }, []);
 
-    // Save state on change (debounced)
+    // Save state on change (debounced, using IndexedDB) - Non-blocking
     useEffect(() => {
-        if (!isLoading) {
-            const timeout = setTimeout(() => {
-                saveStateToStorage(state);
-            }, 300);
-            return () => clearTimeout(timeout);
-        }
+        if (isLoading || isSaving.current) return;
+        
+        const timeout = setTimeout(() => {
+            // Use requestIdleCallback for non-blocking save
+            const saveData = async () => {
+                isSaving.current = true;
+                try {
+                    await saveSessionManagerState(state);
+                } catch (e) {
+                    console.error('Failed to save session state:', e);
+                } finally {
+                    isSaving.current = false;
+                }
+            };
+
+            if ('requestIdleCallback' in window) {
+                (window as Window).requestIdleCallback(() => {
+                    saveData();
+                }, { timeout: 2000 });
+            } else {
+                saveData();
+            }
+        }, 500); // Increased debounce for better batching
+        
+        return () => clearTimeout(timeout);
     }, [state, isLoading]);
 
     // Active session
@@ -178,18 +219,49 @@ export const useSessionManager = () => {
             // Save to recent if has files
             let newRecentProjects = prev.recentProjects;
             if (sessionToClose && sessionToClose.files.length > 0) {
-                const recentProject: RecentProject = {
-                    id: generateId(),
-                    name: sessionToClose.name,
-                    fileCount: sessionToClose.files.length,
-                    totalTokens: sessionToClose.files.reduce((a, b) => a + b.tokenCount, 0),
-                    totalLines: sessionToClose.files.reduce((a, b) => a + b.linesOfCode, 0),
-                    lastOpened: Date.now(),
-                    createdAt: sessionToClose.createdAt,
-                    primaryLanguage: detectPrimaryLanguage(sessionToClose.files),
-                    sessionSnapshot: sessionToClose,
-                };
-                newRecentProjects = [recentProject, ...prev.recentProjects].slice(0, MAX_RECENT_PROJECTS);
+                // Check if this session came from a recent project
+                const existingRecent = prev.recentProjects.find(p => 
+                    p.openSessionIds?.includes(id)
+                );
+
+                if (existingRecent) {
+                    // Update existing recent project with latest snapshot and remove from openSessionIds
+                    newRecentProjects = prev.recentProjects.map(p => 
+                        p.id === existingRecent.id 
+                            ? {
+                                ...p,
+                                sessionSnapshot: sessionToClose,
+                                fileCount: sessionToClose.files.length,
+                                totalTokens: sessionToClose.files.reduce((a, b) => a + b.tokenCount, 0),
+                                totalLines: sessionToClose.files.reduce((a, b) => a + b.linesOfCode, 0),
+                                lastOpened: Date.now(),
+                                name: sessionToClose.name,
+                                openSessionIds: p.openSessionIds?.filter(sid => sid !== id) || [],
+                            }
+                            : p
+                    );
+                } else {
+                    // Create new recent project
+                    const recentProject: RecentProject = {
+                        id: generateId(),
+                        name: sessionToClose.name,
+                        fileCount: sessionToClose.files.length,
+                        totalTokens: sessionToClose.files.reduce((a, b) => a + b.tokenCount, 0),
+                        totalLines: sessionToClose.files.reduce((a, b) => a + b.linesOfCode, 0),
+                        lastOpened: Date.now(),
+                        createdAt: sessionToClose.createdAt,
+                        primaryLanguage: detectPrimaryLanguage(sessionToClose.files),
+                        sessionSnapshot: sessionToClose,
+                        openSessionIds: [],
+                    };
+                    newRecentProjects = [recentProject, ...prev.recentProjects].slice(0, MAX_RECENT_PROJECTS);
+                }
+            } else {
+                // Remove this session ID from any recent project's openSessionIds
+                newRecentProjects = prev.recentProjects.map(p => ({
+                    ...p,
+                    openSessionIds: p.openSessionIds?.filter(sid => sid !== id) || [],
+                }));
             }
 
             // Determine new active session
@@ -214,21 +286,46 @@ export const useSessionManager = () => {
     const closeOtherSessions = useCallback((keepId: string) => {
         setState(prev => {
             const sessionsToClose = prev.sessions.filter(s => s.id !== keepId && s.files.length > 0);
-            const newRecentProjects = [...prev.recentProjects];
+            let newRecentProjects = [...prev.recentProjects];
 
             sessionsToClose.forEach(session => {
-                const recentProject: RecentProject = {
-                    id: generateId(),
-                    name: session.name,
-                    fileCount: session.files.length,
-                    totalTokens: session.files.reduce((a, b) => a + b.tokenCount, 0),
-                    totalLines: session.files.reduce((a, b) => a + b.linesOfCode, 0),
-                    lastOpened: Date.now(),
-                    createdAt: session.createdAt,
-                    primaryLanguage: detectPrimaryLanguage(session.files),
-                    sessionSnapshot: session,
-                };
-                newRecentProjects.unshift(recentProject);
+                // Check if this session came from a recent project
+                const existingRecent = newRecentProjects.find(p => 
+                    p.openSessionIds?.includes(session.id)
+                );
+
+                if (existingRecent) {
+                    // Update existing recent project
+                    newRecentProjects = newRecentProjects.map(p => 
+                        p.id === existingRecent.id 
+                            ? {
+                                ...p,
+                                sessionSnapshot: session,
+                                fileCount: session.files.length,
+                                totalTokens: session.files.reduce((a, b) => a + b.tokenCount, 0),
+                                totalLines: session.files.reduce((a, b) => a + b.linesOfCode, 0),
+                                lastOpened: Date.now(),
+                                name: session.name,
+                                openSessionIds: p.openSessionIds?.filter(sid => sid !== session.id) || [],
+                            }
+                            : p
+                    );
+                } else {
+                    // Create new recent project
+                    const recentProject: RecentProject = {
+                        id: generateId(),
+                        name: session.name,
+                        fileCount: session.files.length,
+                        totalTokens: session.files.reduce((a, b) => a + b.tokenCount, 0),
+                        totalLines: session.files.reduce((a, b) => a + b.linesOfCode, 0),
+                        lastOpened: Date.now(),
+                        createdAt: session.createdAt,
+                        primaryLanguage: detectPrimaryLanguage(session.files),
+                        sessionSnapshot: session,
+                        openSessionIds: [],
+                    };
+                    newRecentProjects.unshift(recentProject);
+                }
             });
 
             return {
@@ -243,21 +340,46 @@ export const useSessionManager = () => {
     // Close all sessions
     const closeAllSessions = useCallback(() => {
         setState(prev => {
-            const newRecentProjects = [...prev.recentProjects];
+            let newRecentProjects = [...prev.recentProjects];
 
             prev.sessions.filter(s => s.files.length > 0).forEach(session => {
-                const recentProject: RecentProject = {
-                    id: generateId(),
-                    name: session.name,
-                    fileCount: session.files.length,
-                    totalTokens: session.files.reduce((a, b) => a + b.tokenCount, 0),
-                    totalLines: session.files.reduce((a, b) => a + b.linesOfCode, 0),
-                    lastOpened: Date.now(),
-                    createdAt: session.createdAt,
-                    primaryLanguage: detectPrimaryLanguage(session.files),
-                    sessionSnapshot: session,
-                };
-                newRecentProjects.unshift(recentProject);
+                // Check if this session came from a recent project
+                const existingRecent = newRecentProjects.find(p => 
+                    p.openSessionIds?.includes(session.id)
+                );
+
+                if (existingRecent) {
+                    // Update existing recent project
+                    newRecentProjects = newRecentProjects.map(p => 
+                        p.id === existingRecent.id 
+                            ? {
+                                ...p,
+                                sessionSnapshot: session,
+                                fileCount: session.files.length,
+                                totalTokens: session.files.reduce((a, b) => a + b.tokenCount, 0),
+                                totalLines: session.files.reduce((a, b) => a + b.linesOfCode, 0),
+                                lastOpened: Date.now(),
+                                name: session.name,
+                                openSessionIds: [],
+                            }
+                            : p
+                    );
+                } else {
+                    // Create new recent project
+                    const recentProject: RecentProject = {
+                        id: generateId(),
+                        name: session.name,
+                        fileCount: session.files.length,
+                        totalTokens: session.files.reduce((a, b) => a + b.tokenCount, 0),
+                        totalLines: session.files.reduce((a, b) => a + b.linesOfCode, 0),
+                        lastOpened: Date.now(),
+                        createdAt: session.createdAt,
+                        primaryLanguage: detectPrimaryLanguage(session.files),
+                        sessionSnapshot: session,
+                        openSessionIds: [],
+                    };
+                    newRecentProjects.unshift(recentProject);
+                }
             });
 
             return {
@@ -270,7 +392,7 @@ export const useSessionManager = () => {
         });
     }, []);
 
-    // Switch session
+    // Switch session - INSTANT, no transition needed with proper caching
     const switchSession = useCallback((id: string) => {
         setState(prev => ({
             ...prev,
@@ -350,28 +472,58 @@ export const useSessionManager = () => {
         }));
     }, []);
 
-    // Open recent project
+    // Open recent project - INSTANT with proper caching
+    // If session from this recent project is already open, switch to it instead
     const openRecentProject = useCallback((projectId: string) => {
         setState(prev => {
             const project = prev.recentProjects.find(p => p.id === projectId);
             if (!project) return prev;
 
+            // Check if any session from this recent project is already open
+            const existingSessionId = project.openSessionIds?.find(sid => 
+                prev.sessions.some(s => s.id === sid)
+            );
+
+            if (existingSessionId) {
+                // Session already open - just switch to it
+                return {
+                    ...prev,
+                    sessions: prev.sessions.map(s => ({
+                        ...s,
+                        isActive: s.id === existingSessionId,
+                    })),
+                    activeSessionId: existingSessionId,
+                    showHomeView: false,
+                    recentProjects: prev.recentProjects.map(p =>
+                        p.id === projectId ? { ...p, lastOpened: Date.now() } : p
+                    ),
+                };
+            }
+
+            // Create new session from snapshot
+            const newSessionId = generateId();
             const restoredSession: Session = {
                 ...project.sessionSnapshot,
-                id: generateId(),
+                id: newSessionId,
                 isActive: true,
                 updatedAt: Date.now(),
             };
 
-            // Update recent project's last opened
+            // Update recent project's last opened and track the new session ID
             const updatedRecent = prev.recentProjects.map(p =>
-                p.id === projectId ? { ...p, lastOpened: Date.now() } : p
+                p.id === projectId 
+                    ? { 
+                        ...p, 
+                        lastOpened: Date.now(),
+                        openSessionIds: [...(p.openSessionIds || []), newSessionId]
+                    } 
+                    : p
             );
 
             return {
                 ...prev,
                 sessions: [...prev.sessions.map(s => ({ ...s, isActive: false })), restoredSession],
-                activeSessionId: restoredSession.id,
+                activeSessionId: newSessionId,
                 recentProjects: updatedRecent,
                 showHomeView: false,
             };
@@ -420,6 +572,7 @@ export const useSessionManager = () => {
         recentProjects: state.recentProjects,
         showHomeView: state.showHomeView,
         isLoading,
+        loadingProgress,
 
         // Session actions
         createSession,
