@@ -237,77 +237,106 @@ interface AboutModalProps {
 export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
     if (!isOpen) return null;
 
+    const socialLinks = [
+        { name: 'GitHub', url: 'https://github.com/IRedDragonICY', icon: 'M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z' },
+        { name: 'Ko-fi', url: 'https://ko-fi.com/ireddragonicy', icon: 'M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z' },
+        { name: 'PayPal', url: 'https://paypal.com/paypalme/IRedDragonICY', icon: 'M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944 3.72a.771.771 0 0 1 .761-.652h6.658c2.205 0 3.97.673 5.055 1.947.925 1.088 1.28 2.574.997 4.174-.015.076-.035.151-.054.227-.653 3.336-2.86 5.482-6.083 5.893-.409.052-.83.078-1.262.078H8.907a.776.776 0 0 0-.765.655l-.934 4.953a.64.64 0 0 1-.632.543z' },
+        { name: 'Saweria', url: 'https://saweria.co/IRedDragonICY', icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.16-1.46-3.27-3.4h1.96c.1 1.05.82 1.87 2.65 1.87 1.96 0 2.4-.98 2.4-1.59 0-.83-.44-1.61-2.67-2.14-2.48-.6-4.18-1.62-4.18-3.67 0-1.72 1.39-2.84 3.11-3.21V4h2.67v1.95c1.86.45 2.79 1.86 2.85 3.39H14.3c-.05-1.11-.64-1.87-2.22-1.87-1.5 0-2.4.68-2.4 1.64 0 .84.65 1.39 2.67 1.91s4.18 1.39 4.18 3.91c-.01 1.83-1.38 2.83-3.12 3.16z' },
+    ];
+
     return (
         <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-[var(--theme-overlay)] backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-md flex items-center justify-center p-6"
             onClick={onClose}
         >
             <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.95, opacity: 0 }}
-                className="bg-[var(--theme-surface-elevated)] rounded-2xl p-8 w-full max-w-md shadow-2xl border border-[var(--theme-border)]"
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                transition={{ type: "spring", duration: 0.5, bounce: 0.3 }}
+                className="bg-[var(--theme-surface-elevated)] rounded-[28px] w-full max-w-sm shadow-2xl overflow-hidden"
                 onClick={e => e.stopPropagation()}
             >
-                {/* Logo & Title */}
-                <div className="text-center mb-6">
-                    <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-[var(--theme-primary)] to-[var(--theme-accent)] rounded-2xl flex items-center justify-center shadow-lg">
-                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                            <path d="M12 8L24 4L36 8V20C36 28 30 35 24 38C18 35 12 28 12 20V8Z" fill="white" fillOpacity="0.9"/>
-                            <path d="M20 22L23 25L28 18" stroke="#1E1E1E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                {/* Hero Header with Gradient */}
+                <div className="relative bg-gradient-to-br from-[var(--theme-primary)] via-[#6366f1] to-[var(--theme-accent)] p-6 pb-12">
+                    {/* Decorative circles */}
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                    <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+                    
+                    {/* Close button */}
+                    <button
+                        onClick={onClose}
+                        className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+                    >
+                        <GoogleIcon path={ICONS.close} className="w-5 h-5 text-white" />
+                    </button>
+
+                    {/* App Icon */}
+                    <div className="relative w-16 h-16 mx-auto mb-3 bg-white rounded-2xl flex items-center justify-center shadow-lg">
+                        <svg width="36" height="36" viewBox="0 0 48 48" fill="none">
+                            <path d="M12 8L24 4L36 8V20C36 28 30 35 24 38C18 35 12 28 12 20V8Z" fill="url(#gradient1)"/>
+                            <path d="M20 22L23 25L28 18" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            <defs>
+                                <linearGradient id="gradient1" x1="12" y1="4" x2="36" y2="38" gradientUnits="userSpaceOnUse">
+                                    <stop stopColor="#3b82f6"/>
+                                    <stop offset="1" stopColor="#8b5cf6"/>
+                                </linearGradient>
+                            </defs>
                         </svg>
                     </div>
-                    <h2 className="text-2xl font-semibold text-[var(--theme-text-primary)] mb-1">Contextractor</h2>
-                    <p className="text-[var(--theme-text-tertiary)] text-sm">Version 1.0.0 PRO</p>
+                    
+                    <h2 className="text-xl font-semibold text-white text-center">Contextractor</h2>
+                    <p className="text-white/70 text-xs text-center mt-1">Version 1.0.0 PRO</p>
                 </div>
 
-                {/* Description */}
-                <div className="text-center mb-6">
-                    <p className="text-[var(--theme-text-secondary)] text-sm leading-relaxed">
-                        Extract clean, formatted context from your code for AI & LLMs. 
-                        Built for developers who need to share code context efficiently.
+                {/* Content */}
+                <div className="p-5 -mt-6 relative">
+                    {/* Description Card */}
+                    <div className="bg-[var(--theme-surface)] rounded-2xl p-4 shadow-sm border border-[var(--theme-border)]">
+                        <p className="text-[var(--theme-text-secondary)] text-sm text-center leading-relaxed">
+                            Extract clean, formatted context from your code for AI & LLMs.
+                        </p>
+                    </div>
+
+                    {/* Developer Section */}
+                    <div className="mt-4 flex items-center gap-3 p-3 rounded-2xl bg-[var(--theme-surface)] border border-[var(--theme-border)]">
+                        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[var(--theme-primary)] to-[var(--theme-accent)] flex items-center justify-center text-white font-bold text-sm shadow-md">
+                            MF
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-[var(--theme-text-primary)] truncate">Mohammad Farid Hendianto</p>
+                            <p className="text-xs text-[var(--theme-text-tertiary)]">Developer • Indonesia 🇮🇩</p>
+                        </div>
+                    </div>
+
+                    {/* Social Links - Compact Pill Style */}
+                    <div className="mt-4 flex flex-wrap gap-2 justify-center">
+                        {socialLinks.map((link) => (
+                            <motion.a
+                                key={link.name}
+                                href={link.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--theme-surface)] hover:bg-[var(--theme-primary)]/10 border border-[var(--theme-border)] rounded-full transition-colors group"
+                            >
+                                <svg className="w-3.5 h-3.5 text-[var(--theme-text-tertiary)] group-hover:text-[var(--theme-primary)]" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d={link.icon} />
+                                </svg>
+                                <span className="text-xs font-medium text-[var(--theme-text-secondary)] group-hover:text-[var(--theme-primary)]">{link.name}</span>
+                            </motion.a>
+                        ))}
+                    </div>
+
+                    {/* Footer */}
+                    <p className="text-center text-[10px] text-[var(--theme-text-muted)] mt-4">
+                        © 2025 Contextractor • Made with ❤️
                     </p>
                 </div>
-
-                {/* Features */}
-                <div className="bg-[var(--theme-surface)] rounded-xl p-4 mb-6">
-                    <h3 className="text-xs font-medium text-[var(--theme-text-tertiary)] uppercase tracking-wide mb-3">Features</h3>
-                    <ul className="space-y-2 text-sm text-[var(--theme-text-secondary)]">
-                        <li className="flex items-center gap-2">
-                            <GoogleIcon path={ICONS.check} className="w-4 h-4 text-[var(--theme-accent)]" />
-                            Multi-file context extraction
-                        </li>
-                        <li className="flex items-center gap-2">
-                            <GoogleIcon path={ICONS.check} className="w-4 h-4 text-[var(--theme-accent)]" />
-                            Multiple output formats
-                        </li>
-                        <li className="flex items-center gap-2">
-                            <GoogleIcon path={ICONS.check} className="w-4 h-4 text-[var(--theme-accent)]" />
-                            GitHub/GitLab integration
-                        </li>
-                        <li className="flex items-center gap-2">
-                            <GoogleIcon path={ICONS.check} className="w-4 h-4 text-[var(--theme-accent)]" />
-                            Session management & history
-                        </li>
-                    </ul>
-                </div>
-
-                {/* Credits */}
-                <div className="text-center text-xs text-[var(--theme-text-muted)] mb-6">
-                    <p>Made with ❤️ by Top Agency Developers</p>
-                    <p className="mt-1">© 2025 Contextractor. All rights reserved.</p>
-                </div>
-
-                {/* Close Button */}
-                <button
-                    onClick={onClose}
-                    className="w-full py-2.5 bg-[var(--theme-button-filled)] hover:bg-[var(--theme-button-filled-hover)] text-white rounded-lg transition-colors font-medium"
-                >
-                    Close
-                </button>
             </motion.div>
         </motion.div>
     );

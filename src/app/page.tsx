@@ -94,7 +94,7 @@ function Contextractor() {
     const files = useMemo(() => {
         if (!activeSession) return [];
         return convertSessionFiles(activeSession.id, activeSession.files);
-    }, [activeSession?.id, activeSession?.files]);
+    }, [activeSession]);
 
     const outputStyle = activeSession?.outputStyle || 'standard';
     const viewMode = activeSession?.viewMode || 'tree';
@@ -628,11 +628,16 @@ function Contextractor() {
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-[var(--theme-border)] scrollbar-track-transparent">
+                        <div className={`flex-1 p-2 scrollbar-thin scrollbar-thumb-[var(--theme-border)] scrollbar-track-transparent ${files.length > 0 ? 'overflow-y-auto' : 'overflow-hidden'}`}>
                             {isLoadingSession ? (
                                 <div className="flex items-center justify-center h-full text-[var(--theme-text-tertiary)] gap-2">
                                     <div className="w-4 h-4 border-2 border-[var(--theme-border)] border-t-[var(--theme-primary)] rounded-full animate-spin"></div>
                                     <span className="text-sm">Restoring session...</span>
+                                </div>
+                            ) : files.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-full text-[var(--theme-text-tertiary)] py-10 opacity-60">
+                                    <GoogleIcon path={ICONS_PATHS.folder_open} className="w-16 h-16 mb-4 opacity-20" />
+                                    <p className="text-sm">Workspace empty</p>
                                 </div>
                             ) : viewMode === 'list' ? (
                                 // Use virtualized list for large file sets (50+), regular DnD for small sets
@@ -662,13 +667,6 @@ function Contextractor() {
                                     {fileTree.map(node => (
                                         <TreeItem key={node.id} node={node} level={0} onRemove={removeNode} />
                                     ))}
-                                </div>
-                            )}
-
-                            {!isLoadingSession && files.length === 0 && (
-                                <div className="flex flex-col items-center justify-center h-full text-[var(--theme-text-tertiary)] py-10 opacity-60">
-                                    <GoogleIcon path={ICONS_PATHS.folder_open} className="w-16 h-16 mb-4 opacity-20" />
-                                    <p className="text-sm">Workspace empty</p>
                                 </div>
                             )}
                         </div>
