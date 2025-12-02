@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import {
     DndContext,
@@ -22,45 +22,170 @@ import { motion, AnimatePresence } from 'framer-motion';
 // Components
 import { GoogleButton } from '@/components/ui/GoogleButton';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
-import { AnimatedLogo } from '@/components/ui/AnimatedLogo';
 import { FileCard } from '@/components/FileCard';
 import { SortableItem } from '@/components/SortableItem';
 import { TreeItem } from '@/components/TreeItem';
 import { OutputStyleSelector } from '@/components/OutputStyleSelector';
 import { StatChip } from '@/components/StatChip';
 import { GitFileSelector } from '@/components/GitFileSelector';
+import { TabBar } from '@/components/TabBar';
+import { HomeView } from '@/components/HomeView';
+import { MenuBar, AboutModal, ShortcutsModal } from '@/components/MenuBar';
 
 // Hooks
-import { useFileSystem } from '@/hooks/useFileSystem';
 import { useSearch } from '@/hooks/useSearch';
+import { useSessionManager, fileDataToSessionFile, sessionFileToFileData } from '@/hooks/useSessionManager';
+import { useHistory } from '@/hooks/useHistory';
 
 // Services & Utils
 import { formatNumber } from '@/lib/format';
+import { processFileObject, unzipAndProcess } from '@/lib/file-processing';
+import { buildFileTree } from '@/lib/file-tree';
 
 // Types & Constants
-import { OutputStyle, FileData } from '@/types';
+import { OutputStyle, FileData, ViewMode, TreeNode } from '@/types';
 import { UI_ICONS, ICONS_PATHS } from '@/constants';
+import { OutputStyleType, ViewModeType } from '@/types/session';
 
 export default function Contextractor() {
-    // State for UI specific features
+    // Session Manager
+    const {
+        sessions,
+        activeSession,
+        activeSessionId,
+        recentProjects,
+        showHomeView,
+        isLoading: isLoadingSession,
+        createSession,
+        closeSession,
+        closeOtherSessions,
+        closeAllSessions,
+        switchSession,
+        renameSession,
+        togglePinSession,
+        duplicateSession,
+        updateSessionFiles,
+        updateSessionSettings,
+        reorderSessions,
+        openRecentProject,
+        removeRecentProject,
+        clearRecentProjects,
+        toggleHomeView,
+    } = useSessionManager();
+
+    // Derived state from active session
+    const files = useMemo(() => {
+        if (!activeSession) return [];
+        return activeSession.files.map(sessionFileToFileData);
+    }, [activeSession]);
+
+    const outputStyle = activeSession?.outputStyle || 'standard';
+    const viewMode = activeSession?.viewMode || 'tree';
+
+    // Local UI State
     const [isCopied, setIsCopied] = useState(false);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-    const [outputStyle, setOutputStyle] = useState<OutputStyle>('standard');
-    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false); // New State for Mobile Sidebar
-    
-    // Git Modal State
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [gitModalOpen, setGitModalOpen] = useState(false);
+    const [processing, setProcessing] = useState(false);
+    const [activeId, setActiveId] = useState<string | null>(null);
+    const [aboutModalOpen, setAboutModalOpen] = useState(false);
+    const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
+
+    // History for undo/redo
+    const { canUndo, canRedo, undo, redo, recordState } = useHistory();
 
     // Refs
     const textAreaRef = useRef<HTMLTextAreaElement>(null);
     const lineNumbersRef = useRef<HTMLDivElement>(null);
 
-    // Custom Hooks
-    const { 
-        files, setFiles, activeId, processing, isLoadingSession, 
-        viewMode, setViewMode, addFiles, removeFile, removeNode, clearWorkspace, 
-        handleDragStart, handleDragEnd, activeFile, fileTree, stats 
-    } = useFileSystem();
+    // Update session files
+    const setFiles = useCallback((updater: FileData[] | ((prev: FileData[]) => FileData[])) => {
+        if (!activeSessionId) return;
+        
+        const newFiles = typeof updater === 'function' 
+            ? updater(files)
+            : updater;
+        
+        // Record state for undo/redo
+        recordState(newFiles);
+        
+        updateSessionFiles(activeSessionId, newFiles.map(fileDataToSessionFile));
+    }, [activeSessionId, files, updateSessionFiles, recordState]);
+
+    // Undo handler
+    const handleUndo = useCallback(() => {
+        const previousFiles = undo();
+        if (previousFiles !== null && activeSessionId) {
+            updateSessionFiles(activeSessionId, previousFiles.map(fileDataToSessionFile));
+        }
+    }, [undo, activeSessionId, updateSessionFiles]);
+
+    // Redo handler
+    const handleRedo = useCallback(() => {
+        const nextFiles = redo();
+        if (nextFiles !== null && activeSessionId) {
+            updateSessionFiles(activeSessionId, nextFiles.map(fileDataToSessionFile));
+        }
+    }, [redo, activeSessionId, updateSessionFiles]);
+
+    // Update session settings
+    const setOutputStyle = useCallback((style: OutputStyle) => {
+        if (!activeSessionId) return;
+        updateSessionSettings(activeSessionId, { outputStyle: style as OutputStyleType });
+    }, [activeSessionId, updateSessionSettings]);
+
+    const setViewMode = useCallback((mode: ViewMode) => {
+        if (!activeSessionId) return;
+        updateSessionSettings(activeSessionId, { viewMode: mode as ViewModeType });
+    }, [activeSessionId, updateSessionSettings]);
+
+    // File processing
+    const addFiles = useCallback(async (incomingFiles: File[]) => {
+        // Create session if none exists
+        if (!activeSessionId) {
+            createSession();
+        }
+
+        setProcessing(true);
+        let newFiles: FileData[] = [];
+
+        for (const file of incomingFiles) {
+            const ext = file.name.split('.').pop()?.toLowerCase();
+            if (ext === 'zip' || file.type === 'application/zip' || file.type === 'application/x-zip-compressed') {
+                const extracted = await unzipAndProcess(file);
+                newFiles = [...newFiles, ...extracted];
+            } else if (ext !== 'rar') {
+                const processed = await processFileObject(file);
+                newFiles.push(processed);
+            }
+        }
+
+        setFiles(prev => [...prev, ...newFiles]);
+        setProcessing(false);
+        
+        const hasFolders = newFiles.some(f => f.path.includes('/'));
+        if (hasFolders) setViewMode('tree');
+    }, [activeSessionId, createSession, setFiles, setViewMode]);
+
+    const removeFile = useCallback((id: string) => {
+        setFiles(prev => prev.filter(f => f.id !== id));
+    }, [setFiles]);
+
+    const removeNode = useCallback((node: TreeNode) => {
+        if (node.type === 'folder') {
+            setFiles(prev => prev.filter(f => {
+                const isMatch = f.path === node.path || f.path.startsWith(node.path + '/');
+                return !isMatch;
+            }));
+        } else {
+            removeFile(node.id);
+        }
+    }, [removeFile, setFiles]);
+
+    const clearWorkspace = useCallback(() => {
+        setFiles([]);
+    }, [setFiles]);
 
     // Derived State (Computed Text)
     const combinedText = useMemo(() => {
@@ -89,8 +214,44 @@ export default function Contextractor() {
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
+    // DnD Handlers
+    const handleDragStart = useCallback((e: { active: { id: string | number } }) => {
+        setActiveId(String(e.active.id));
+    }, []);
+
+    const handleDragEnd = useCallback((e: { active: { id: string | number }; over: { id: string | number } | null }) => {
+        const { active, over } = e;
+        setActiveId(null);
+        if (over && active.id !== over.id) {
+            setFiles(items => {
+                const oldIdx = items.findIndex(i => i.id === active.id);
+                const newIdx = items.findIndex(i => i.id === over.id);
+                const newItems = [...items];
+                const [removed] = newItems.splice(oldIdx, 1);
+                newItems.splice(newIdx, 0, removed);
+                return newItems;
+            });
+        }
+    }, [setFiles]);
+
+    const activeFile = useMemo(() => files.find(f => f.id === activeId), [activeId, files]);
+    const fileTree = useMemo(() => buildFileTree(files), [files]);
+    
+    const stats = useMemo(() => {
+        const target = files.filter(f => f.isText);
+        return {
+            count: target.length,
+            lines: target.reduce((a, b) => a + b.linesOfCode, 0),
+            tokens: target.reduce((a, b) => a + b.tokenCount, 0)
+        };
+    }, [files]);
+
     // Git Import Handler
     const handleGitImport = (newFiles: FileData[]) => {
+        // Create session if none exists
+        if (!activeSessionId) {
+            createSession();
+        }
         setFiles(prev => [...prev, ...newFiles]);
         setGitModalOpen(false);
         setViewMode('tree');
@@ -99,34 +260,95 @@ export default function Contextractor() {
 
     // Dropzone
     const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
-        onDrop: (files) => {
-            addFiles(files).catch(console.error);
-            setIsMobileSidebarOpen(false); // Close sidebar on mobile after drop
+        onDrop: (droppedFiles) => {
+            if (showHomeView) {
+                createSession();
+                toggleHomeView(false);
+            }
+            addFiles(droppedFiles).catch(console.error);
+            setIsMobileSidebarOpen(false);
         },
         noClick: true,
         noKeyboard: true
     });
 
-    // Paste Handler (Effect)
-    React.useEffect(() => {
+    // Paste Handler
+    useEffect(() => {
         const handlePaste = (e: ClipboardEvent) => {
             const target = e.target as HTMLElement;
             if (['INPUT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable) return;
             if (e.clipboardData?.files?.length) {
                 e.preventDefault();
+                if (showHomeView) {
+                    createSession();
+                    toggleHomeView(false);
+                }
                 addFiles(Array.from(e.clipboardData.files)).catch(console.error);
             } else {
                 const text = e.clipboardData?.getData('text');
                 if (text) {
-                   const blob = new Blob([text], { type: 'text/plain' });
-                   const file = new File([blob], `pasted_text_${Date.now()}.txt`, { type: 'text/plain' });
-                   addFiles([file]).catch(console.error);
+                    if (showHomeView) {
+                        createSession();
+                        toggleHomeView(false);
+                    }
+                    const blob = new Blob([text], { type: 'text/plain' });
+                    const file = new File([blob], `pasted_text_${Date.now()}.txt`, { type: 'text/plain' });
+                    addFiles([file]).catch(console.error);
                 }
             }
         };
         document.addEventListener('paste', handlePaste);
         return () => document.removeEventListener('paste', handlePaste);
-    }, [addFiles]);
+    }, [addFiles, showHomeView, createSession, toggleHomeView]);
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ctrl+T: New Tab
+            if (e.ctrlKey && e.key === 't') {
+                e.preventDefault();
+                createSession();
+            }
+            // Ctrl+W: Close Tab
+            if (e.ctrlKey && e.key === 'w' && activeSessionId) {
+                e.preventDefault();
+                closeSession(activeSessionId);
+            }
+            // Ctrl+Tab: Next Tab
+            if (e.ctrlKey && e.key === 'Tab') {
+                e.preventDefault();
+                const currentIndex = sessions.findIndex(s => s.id === activeSessionId);
+                const nextIndex = (currentIndex + 1) % sessions.length;
+                if (sessions[nextIndex]) {
+                    switchSession(sessions[nextIndex].id);
+                    toggleHomeView(false);
+                }
+            }
+            // Ctrl+Z: Undo
+            if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+                const target = e.target as HTMLElement;
+                if (!['INPUT', 'TEXTAREA'].includes(target.tagName)) {
+                    e.preventDefault();
+                    handleUndo();
+                }
+            }
+            // Ctrl+Shift+Z: Redo
+            if (e.ctrlKey && e.shiftKey && e.key === 'Z') {
+                const target = e.target as HTMLElement;
+                if (!['INPUT', 'TEXTAREA'].includes(target.tagName)) {
+                    e.preventDefault();
+                    handleRedo();
+                }
+            }
+            // Ctrl+/: Show shortcuts
+            if (e.ctrlKey && e.key === '/') {
+                e.preventDefault();
+                setShortcutsModalOpen(true);
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [activeSessionId, sessions, createSession, closeSession, switchSession, toggleHomeView, handleUndo, handleRedo]);
 
     // Text Area Utils
     const lineNumbers = useMemo(() => {
@@ -159,39 +381,99 @@ export default function Contextractor() {
             });
     };
 
+    // Handler for HomeView actions
+    const handleOpenFilePicker = () => {
+        open();
+    };
+
+    const handleOpenGitImport = () => {
+        setGitModalOpen(true);
+    };
+
+    const handleCreateSessionFromHome = () => {
+        createSession();
+        toggleHomeView(false);
+    };
+
     return (
         <div {...getRootProps()} className="h-screen bg-[#131314] text-[#E3E3E3] font-sans flex flex-col selection:bg-[#004A77] selection:text-[#C2E7FF] outline-none overflow-hidden">
             <input {...getInputProps()} />
 
-            <header className="bg-[#1E1E1E] px-6 py-3 flex items-center justify-between shrink-0 border-b border-[#444746] z-20">
-                <div className="flex items-center gap-3">
-                    {/* Mobile Menu Button - Use explicit toggle to improve responsiveness */}
-                    <div className="lg:hidden">
-                        <GoogleButton
-                            variant="icon"
-                            onClick={() => setIsMobileSidebarOpen(prev => !prev)}
-                            icon={UI_ICONS.menu}
-                        />
-                    </div>
-
-                    <div className="hidden sm:block">
-                        <AnimatedLogo />
-                    </div>
-                    <span className="text-[22px] font-normal text-[#C4C7C5] tracking-tight hidden sm:inline">Contextractor <span className="text-xs align-top bg-[#333537] text-[#A8C7FA] px-2 py-0.5 rounded-full ml-1 font-medium">PRO</span></span>
-                    <span className="text-[22px] font-normal text-[#C4C7C5] tracking-tight sm:hidden">Contextractor</span>
+            {/* Modern Menu Bar - VS Code Style */}
+            <div className="flex items-center bg-[#1E1E1E] border-b border-[#3C3C3C]">
+                {/* Mobile Menu Button */}
+                <div className="lg:hidden px-2">
+                    <GoogleButton
+                        variant="icon"
+                        onClick={() => setIsMobileSidebarOpen(prev => !prev)}
+                        icon={UI_ICONS.menu}
+                        className="w-8 h-8"
+                    />
                 </div>
+                
+                <div className="flex-1">
+                    <MenuBar
+                        onNewSession={() => createSession()}
+                        onOpenFiles={open}
+                        onImportRepo={() => setGitModalOpen(true)}
+                        onUndo={handleUndo}
+                        onRedo={handleRedo}
+                        canUndo={canUndo}
+                        canRedo={canRedo}
+                        onCopyOutput={copyToClipboard}
+                        onSelectAll={() => textAreaRef.current?.select()}
+                        onShowAbout={() => setAboutModalOpen(true)}
+                        onShowShortcuts={() => setShortcutsModalOpen(true)}
+                        hasContent={!!combinedText}
+                    />
+                </div>
+            </div>
 
-                <GoogleButton
-                    variant="tonal"
-                    onClick={() => setDeleteConfirmOpen(true)}
-                    disabled={files.length === 0}
-                    icon={UI_ICONS.delete}
-                >
-                    <span className="hidden sm:inline">Reset</span>
-                </GoogleButton>
-            </header>
+            {/* Tab Bar - VS Code Style */}
+            <TabBar
+                sessions={sessions}
+                activeSessionId={activeSessionId}
+                showHomeView={showHomeView}
+                onSwitchSession={switchSession}
+                onCloseSession={closeSession}
+                onCreateSession={createSession}
+                onToggleHomeView={toggleHomeView}
+                onRenameSession={renameSession}
+                onDuplicateSession={duplicateSession}
+                onCloseOtherSessions={closeOtherSessions}
+                onCloseAllSessions={closeAllSessions}
+                onTogglePinSession={togglePinSession}
+                onReorderSessions={reorderSessions}
+            />
 
-            <main className="flex-1 flex flex-col lg:flex-row lg:gap-6 lg:p-6 overflow-hidden relative z-10 max-w-[1800px] w-full mx-auto">
+            {/* Main Content - Conditionally show HomeView or Workspace */}
+            <AnimatePresence mode="wait">
+                {showHomeView ? (
+                    <motion.div
+                        key="home"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="flex-1 overflow-hidden"
+                    >
+                        <HomeView
+                            recentProjects={recentProjects}
+                            onOpenRecent={openRecentProject}
+                            onRemoveRecent={removeRecentProject}
+                            onClearRecentProjects={clearRecentProjects}
+                            onCreateSession={handleCreateSessionFromHome}
+                            onOpenFilePicker={handleOpenFilePicker}
+                            onOpenGitImport={handleOpenGitImport}
+                        />
+                    </motion.div>
+                ) : (
+                    <motion.main
+                        key="workspace"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="flex-1 flex flex-col lg:flex-row lg:gap-6 lg:p-6 overflow-hidden relative z-10 max-w-[1800px] w-full mx-auto"
+                    >
 
                 {/* Mobile Sidebar Overlay */}
                 <AnimatePresence>
@@ -281,21 +563,34 @@ export default function Contextractor() {
                         <div className="px-4 py-3 border-b border-[#444746] bg-[#1E1E1E] sticky top-0 z-10 shrink-0 flex items-center justify-between">
                             <h3 className="text-[#C4C7C5] font-medium text-sm uppercase tracking-wide pl-2">Explorer</h3>
 
-                            <div className="flex bg-[#333537] rounded-full p-1">
-                                <GoogleButton
-                                    variant="icon"
-                                    icon={UI_ICONS.view_tree}
-                                    active={viewMode === 'tree'}
-                                    onClick={() => setViewMode('tree')}
-                                    className="w-8 h-8"
-                                />
-                                <GoogleButton
-                                    variant="icon"
-                                    icon={UI_ICONS.view_list}
-                                    active={viewMode === 'list'}
-                                    onClick={() => setViewMode('list')}
-                                    className="w-8 h-8"
-                                />
+                            <div className="flex items-center gap-2">
+                                {/* Reset Button */}
+                                {files.length > 0 && (
+                                    <GoogleButton
+                                        variant="icon"
+                                        onClick={() => setDeleteConfirmOpen(true)}
+                                        icon={UI_ICONS.delete}
+                                        className="w-8 h-8 text-[#8E918F] hover:text-[#F2B8B5]"
+                                    />
+                                )}
+
+                                {/* View Toggle */}
+                                <div className="flex bg-[#333537] rounded-full p-1">
+                                    <GoogleButton
+                                        variant="icon"
+                                        icon={UI_ICONS.view_tree}
+                                        active={viewMode === 'tree'}
+                                        onClick={() => setViewMode('tree')}
+                                        className="w-8 h-8"
+                                    />
+                                    <GoogleButton
+                                        variant="icon"
+                                        icon={UI_ICONS.view_list}
+                                        active={viewMode === 'list'}
+                                        onClick={() => setViewMode('list')}
+                                        className="w-8 h-8"
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -410,7 +705,9 @@ export default function Contextractor() {
                         </div>
                     </div>
                 </section>
-            </main>
+                    </motion.main>
+                )}
+            </AnimatePresence>
 
             <AnimatePresence>
                 {isDragActive && (
@@ -490,6 +787,26 @@ export default function Contextractor() {
                         isOpen={gitModalOpen}
                         onClose={() => setGitModalOpen(false)}
                         onImport={handleGitImport}
+                    />
+                )}
+            </AnimatePresence>
+
+            {/* About Modal */}
+            <AnimatePresence>
+                {aboutModalOpen && (
+                    <AboutModal
+                        isOpen={aboutModalOpen}
+                        onClose={() => setAboutModalOpen(false)}
+                    />
+                )}
+            </AnimatePresence>
+
+            {/* Shortcuts Modal */}
+            <AnimatePresence>
+                {shortcutsModalOpen && (
+                    <ShortcutsModal
+                        isOpen={shortcutsModalOpen}
+                        onClose={() => setShortcutsModalOpen(false)}
                     />
                 )}
             </AnimatePresence>
