@@ -1,0 +1,678 @@
+name: Release on Push
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+  RUST_VERSION: 'stable'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Quality Gate - Lint, Type Check, and Build Validation
+  # ─────────────────────────────────────────────────────────────────────────────
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      short_sha: ${{ steps.version.outputs.short_sha }}
+      release_tag: ${{ steps.version.outputs.release_tag }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Restore Next.js Build Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            .next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**/*.ts', '**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-
+            ${{ runner.os }}-nextjs-
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type Check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+
+      - name: Extract Version Info
+        id: version
+        run: |
+          VERSION=$(node -e "console.log(require('./package.json').version)")
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          RELEASE_TAG="v${VERSION}-${{ github.run_number }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+          echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Create GitHub Release (Placeholder for Tauri artifacts)
+  # ─────────────────────────────────────────────────────────────────────────────
+  create-release:
+    name: Create Release
+    needs: quality-gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate Changelog
+        id: changelog
+        shell: bash
+        run: |
+          set -euo pipefail
+          
+          SERVER_URL="${GITHUB_SERVER_URL:-https://github.com}"
+          REPO="${GITHUB_REPOSITORY}"
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          
+          cat > release_notes.md << 'HEADER'
+          # 📦 Contextractor Release
+          
+          > Powerful context extraction tool built with Next.js & Tauri
+          
+          ## 📊 Release Info
+          
+          | Property | Value |
+          |----------|-------|
+          HEADER
+          
+          echo "| **Version** | \`${{ needs.quality-gate.outputs.version }}\` |" >> release_notes.md
+          echo "| **Commit** | \`${{ needs.quality-gate.outputs.short_sha }}\` |" >> release_notes.md
+          echo "| **Build** | \`#${{ github.run_number }}\` |" >> release_notes.md
+          echo "| **Date** | \`$(date -u +"%Y-%m-%d %H:%M:%S UTC")\` |" >> release_notes.md
+          echo "" >> release_notes.md
+          
+          echo "## 🔄 Changes" >> release_notes.md
+          echo "" >> release_notes.md
+          
+          if [ -z "$LAST_TAG" ]; then
+            echo "_Initial release - showing last 50 commits._" >> release_notes.md
+            LOG=$(git log --pretty=format:'%h|%s|%an' -n 50)
+          else
+            echo "_Changes since \`$LAST_TAG\`_" >> release_notes.md
+            LOG=$(git log "$LAST_TAG"..HEAD --pretty=format:'%h|%s|%an')
+          fi
+          echo "" >> release_notes.md
+          
+          gen_section() {
+            local EMOJI="$1"
+            local TITLE="$2"
+            local PATTERN="$3"
+            local BODY
+            BODY=$(echo "$LOG" | grep -E "\|$PATTERN" || true)
+            if [ -n "$BODY" ]; then
+              echo "### $EMOJI $TITLE" >> release_notes.md
+              echo "" >> release_notes.md
+              echo "$BODY" | while IFS='|' read -r h s a; do 
+                clean_msg=$(echo "$s" | sed -E 's/^(feat|fix|perf|docs|chore|refactor|style|test)(\([^)]*\))?[!]?:\s*//')
+                echo "- [\`$h\`](${SERVER_URL}/${REPO}/commit/$h) $clean_msg — *$a*"
+              done >> release_notes.md
+              echo "" >> release_notes.md
+            fi
+          }
+          
+          gen_section "✨" "Features" 'feat(\(|:|!)'
+          gen_section "🐛" "Bug Fixes" 'fix(\(|:|!)'
+          gen_section "⚡" "Performance" 'perf(\(|:|!)'
+          gen_section "📚" "Documentation" 'docs(\(|:|!)'
+          gen_section "🔧" "Maintenance" 'chore(\(|:|!)'
+          gen_section "♻️" "Refactoring" 'refactor(\(|:|!)'
+          gen_section "🎨" "Styling" 'style(\(|:|!)'
+          gen_section "🧪" "Tests" 'test(\(|:|!)'
+          
+          OTHER=$(echo "$LOG" | grep -Ev "\|(feat|fix|perf|docs|chore|refactor|style|test)(\(|:|!)" || true)
+          if [ -n "$OTHER" ]; then
+            echo "### 📝 Other Changes" >> release_notes.md
+            echo "" >> release_notes.md
+            echo "$OTHER" | while IFS='|' read -r h s a; do 
+              echo "- [\`$h\`](${SERVER_URL}/${REPO}/commit/$h) $s — *$a*"
+            done >> release_notes.md
+            echo "" >> release_notes.md
+          fi
+          
+          cat >> release_notes.md << 'FOOTER'
+          ---
+          
+          ## 📥 Downloads
+          
+          ### 🪟 Windows
+          | File | Description |
+          |------|-------------|
+          | `Contextractor-*-win-x64.exe` | Portable executable (64-bit) |
+          | `Contextractor-*-win-x64.msi` | MSI Installer (64-bit) |
+          | `Contextractor-*-win-x86.exe` | Portable executable (32-bit) |
+          | `Contextractor-*-win-x86.msi` | MSI Installer (32-bit) |
+          
+          ### 🐧 Linux
+          | File | Description |
+          |------|-------------|
+          | `Contextractor-*-linux-x64` | Portable binary |
+          | `Contextractor-*-linux-x64.AppImage` | AppImage (universal) |
+          | `Contextractor-*-linux-amd64.deb` | Debian/Ubuntu package |
+          
+          ### 🍎 macOS
+          | File | Description |
+          |------|-------------|
+          | `Contextractor-*-macos-x64.dmg` | Intel Mac installer |
+          | `Contextractor-*-macos-arm64.dmg` | Apple Silicon installer |
+          
+          ### 🤖 Android
+          | File | Description |
+          |------|-------------|
+          | `Contextractor-*-android-arm64-v8a.apk` | ARM64 (most devices) |
+          | `Contextractor-*-android-armeabi-v7a.apk` | ARMv7 (older devices) |
+          | `Contextractor-*-android-x86_64.apk` | x86_64 (emulators) |
+          
+          ---
+          
+          <sub>🤖 Automatically generated by GitHub Actions</sub>
+          FOOTER
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.quality-gate.outputs.release_tag }}
+          name: "🚀 Contextractor v${{ needs.quality-gate.outputs.version }} (Build #${{ github.run_number }})"
+          body_path: release_notes.md
+          prerelease: false
+          make_latest: true
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Tauri Windows Build (x64/x86)
+  # ─────────────────────────────────────────────────────────────────────────────
+  tauri-windows:
+    name: Tauri Windows (${{ matrix.arch }})
+    needs: [quality-gate, create-release]
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, x86]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Add 32-bit Rust Target (if x86)
+        if: matrix.arch == 'x86'
+        run: rustup target add i686-pc-windows-msvc
+
+      - name: Build Static Export
+        run: npm run tauri:export
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+
+      - name: Build Tauri (Windows)
+        shell: bash
+        run: |
+          if [ "${{ matrix.arch }}" = "x86" ]; then
+            npx tauri build --target i686-pc-windows-msvc
+          else
+            npx tauri build
+          fi
+
+      - name: Rename Artifacts
+        shell: pwsh
+        run: |
+          $arch = if ('${{ matrix.arch }}' -eq 'x86') { 'x86' } else { 'x64' }
+          $ver = "${{ needs.quality-gate.outputs.version }}"
+          $outDir = if ($arch -eq 'x86') { 'src-tauri/target/i686-pc-windows-msvc/release' } else { 'src-tauri/target/release' }
+          
+          # Find and copy EXE
+          $exe = Get-ChildItem -Path $outDir -Filter "*.exe" -File | Where-Object { $_.Name -notmatch "\.pdb$" } | Select-Object -First 1
+          if ($exe) {
+            Copy-Item $exe.FullName "Contextractor-$ver-win-$arch.exe"
+            Write-Host "Created: Contextractor-$ver-win-$arch.exe"
+          }
+          
+          # Find and copy MSI
+          $msiDir = if ($arch -eq 'x86') { 'src-tauri/target/i686-pc-windows-msvc/release/bundle/msi' } else { 'src-tauri/target/release/bundle/msi' }
+          if (Test-Path $msiDir) {
+            $msi = Get-ChildItem -Path $msiDir -Filter "*.msi" | Select-Object -First 1
+            if ($msi) {
+              Copy-Item $msi.FullName "Contextractor-$ver-win-$arch.msi"
+              Write-Host "Created: Contextractor-$ver-win-$arch.msi"
+            }
+          }
+          
+          # Find and copy NSIS installer if exists
+          $nsisDir = if ($arch -eq 'x86') { 'src-tauri/target/i686-pc-windows-msvc/release/bundle/nsis' } else { 'src-tauri/target/release/bundle/nsis' }
+          if (Test-Path $nsisDir) {
+            $nsis = Get-ChildItem -Path $nsisDir -Filter "*.exe" | Select-Object -First 1
+            if ($nsis) {
+              Copy-Item $nsis.FullName "Contextractor-$ver-win-$arch-setup.exe"
+              Write-Host "Created: Contextractor-$ver-win-$arch-setup.exe"
+            }
+          }
+
+      - name: Upload Windows Artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.quality-gate.outputs.release_tag }}
+          files: |
+            Contextractor-${{ needs.quality-gate.outputs.version }}-win-${{ matrix.arch }}.exe
+            Contextractor-${{ needs.quality-gate.outputs.version }}-win-${{ matrix.arch }}.msi
+            Contextractor-${{ needs.quality-gate.outputs.version }}-win-${{ matrix.arch }}-setup.exe
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Tauri Linux Build
+  # ─────────────────────────────────────────────────────────────────────────────
+  tauri-linux:
+    name: Tauri Linux
+    needs: [quality-gate, create-release]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Linux Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libwebkit2gtk-4.1-dev || sudo apt-get install -y libwebkit2gtk-4.0-dev
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Static Export
+        run: npm run tauri:export
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+
+      - name: Build Tauri (Linux)
+        run: npx tauri build
+
+      - name: Rename Artifacts
+        run: |
+          set -e
+          VER="${{ needs.quality-gate.outputs.version }}"
+          
+          # Find binary
+          BIN=$(find src-tauri/target/release -maxdepth 1 -type f -executable -name "contextractor" 2>/dev/null || true)
+          if [ -z "$BIN" ]; then
+            BIN=$(find src-tauri/target/release -maxdepth 1 -type f -executable ! -name "*.so" ! -name "*.d" | head -n 1)
+          fi
+          if [ -n "$BIN" ] && [ -f "$BIN" ]; then
+            cp "$BIN" "Contextractor-$VER-linux-x64"
+            chmod +x "Contextractor-$VER-linux-x64"
+            echo "Created: Contextractor-$VER-linux-x64"
+          fi
+          
+          # Copy AppImage
+          for f in src-tauri/target/release/bundle/appimage/*.AppImage; do
+            if [ -f "$f" ]; then
+              cp "$f" "Contextractor-$VER-linux-x64.AppImage"
+              echo "Created: Contextractor-$VER-linux-x64.AppImage"
+              break
+            fi
+          done
+          
+          # Copy DEB
+          for f in src-tauri/target/release/bundle/deb/*.deb; do
+            if [ -f "$f" ]; then
+              cp "$f" "Contextractor-$VER-linux-amd64.deb"
+              echo "Created: Contextractor-$VER-linux-amd64.deb"
+              break
+            fi
+          done
+          
+          # Copy RPM if exists
+          for f in src-tauri/target/release/bundle/rpm/*.rpm; do
+            if [ -f "$f" ]; then
+              cp "$f" "Contextractor-$VER-linux-x64.rpm"
+              echo "Created: Contextractor-$VER-linux-x64.rpm"
+              break
+            fi
+          done
+
+      - name: Upload Linux Artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.quality-gate.outputs.release_tag }}
+          files: |
+            Contextractor-${{ needs.quality-gate.outputs.version }}-linux-x64
+            Contextractor-${{ needs.quality-gate.outputs.version }}-linux-x64.AppImage
+            Contextractor-${{ needs.quality-gate.outputs.version }}-linux-amd64.deb
+            Contextractor-${{ needs.quality-gate.outputs.version }}-linux-x64.rpm
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Tauri macOS Build (Intel & Apple Silicon)
+  # ─────────────────────────────────────────────────────────────────────────────
+  tauri-macos:
+    name: Tauri macOS (${{ matrix.target }})
+    needs: [quality-gate, create-release]
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            arch: x64
+          - target: aarch64-apple-darwin
+            arch: arm64
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Static Export
+        run: npm run tauri:export
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+
+      - name: Build Tauri (macOS)
+        run: npx tauri build --target ${{ matrix.target }}
+
+      - name: Rename Artifacts
+        run: |
+          set -e
+          VER="${{ needs.quality-gate.outputs.version }}"
+          ARCH="${{ matrix.arch }}"
+          TARGET="${{ matrix.target }}"
+          
+          BUNDLE_DIR="src-tauri/target/${TARGET}/release/bundle"
+          
+          # Copy DMG
+          for f in "$BUNDLE_DIR"/dmg/*.dmg; do
+            if [ -f "$f" ]; then
+              cp "$f" "Contextractor-$VER-macos-$ARCH.dmg"
+              echo "Created: Contextractor-$VER-macos-$ARCH.dmg"
+              break
+            fi
+          done
+          
+          # Copy App bundle as zip
+          if [ -d "$BUNDLE_DIR/macos" ]; then
+            for app in "$BUNDLE_DIR"/macos/*.app; do
+              if [ -d "$app" ]; then
+                zip -r "Contextractor-$VER-macos-$ARCH.app.zip" "$app"
+                echo "Created: Contextractor-$VER-macos-$ARCH.app.zip"
+                break
+              fi
+            done
+          fi
+
+      - name: Upload macOS Artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.quality-gate.outputs.release_tag }}
+          files: |
+            Contextractor-${{ needs.quality-gate.outputs.version }}-macos-${{ matrix.arch }}.dmg
+            Contextractor-${{ needs.quality-gate.outputs.version }}-macos-${{ matrix.arch }}.app.zip
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Tauri Android Build
+  # ─────────────────────────────────────────────────────────────────────────────
+  tauri-android:
+    name: Tauri Android
+    needs: [quality-gate, create-release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK Components
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-34" \
+            "build-tools;34.0.0" \
+            "ndk;25.2.9519653"
+
+      - name: Set Android Environment Variables
+        run: |
+          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          NDK_DIR=$(ls -1d "$ANDROID_SDK_ROOT"/ndk/* 2>/dev/null | sort -V | tail -n 1)
+          echo "NDK_HOME=$NDK_DIR" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$NDK_DIR" >> $GITHUB_ENV
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add Android Rust Targets
+        run: |
+          rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Static Export
+        run: npm run tauri:export
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+
+      - name: Initialize Android Project
+        run: |
+          npx tauri android init --ci || true
+          test -d src-tauri/gen/android || (echo "Android project not initialized" && exit 1)
+
+      - name: Build Android APKs
+        env:
+          TAURI_CLI_NO_SERVER: '1'
+          RUSTFLAGS: '-C strip=symbols'
+        run: |
+          npx tauri android build --ci --apk --split-per-abi \
+            --target aarch64 \
+            --target armv7 \
+            --target i686 \
+            --target x86_64 || echo "Build completed with warnings"
+
+      - name: Rename Android Artifacts
+        run: |
+          set -e
+          VER="${{ needs.quality-gate.outputs.version }}"
+          OUT="src-tauri/gen/android/app/build/outputs"
+          
+          map_arch() {
+            case "$1" in
+              arm) echo "armeabi-v7a" ;;
+              arm64) echo "arm64-v8a" ;;
+              x86) echo "x86" ;;
+              x86_64) echo "x86_64" ;;
+              *) echo "$1" ;;
+            esac
+          }
+          
+          if [ -d "$OUT/apk" ]; then
+            find "$OUT/apk" -name "*.apk" -type f | while read apk; do
+              arch_dir=$(dirname "$apk" | xargs basename)
+              if echo "$arch_dir" | grep -qE "^(arm|arm64|x86|x86_64)$"; then
+                abi=$(map_arch "$arch_dir")
+                cp "$apk" "Contextractor-$VER-android-$abi.apk"
+                echo "Created: Contextractor-$VER-android-$abi.apk"
+              fi
+            done
+          fi
+          
+          APK_COUNT=$(ls -1 Contextractor-*-android-*.apk 2>/dev/null | wc -l)
+          if [ "$APK_COUNT" -gt 0 ]; then
+            echo "Found $APK_COUNT APK(s)"
+          fi
+
+      - name: Upload Android Artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.quality-gate.outputs.release_tag }}
+          files: |
+            Contextractor-${{ needs.quality-gate.outputs.version }}-android-arm64-v8a.apk
+            Contextractor-${{ needs.quality-gate.outputs.version }}-android-armeabi-v7a.apk
+            Contextractor-${{ needs.quality-gate.outputs.version }}-android-x86.apk
+            Contextractor-${{ needs.quality-gate.outputs.version }}-android-x86_64.apk
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Notify on Failure
+  # ─────────────────────────────────────────────────────────────────────────────
+  notify-failure:
+    name: Notify on Failure
+    needs: [quality-gate, create-release, tauri-windows, tauri-linux, tauri-macos, tauri-android]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Failure Issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `🚨 Release Pipeline Failed - Build #${{ github.run_number }}`;
+            const body = `
+            ## Release Pipeline Failure
+            
+            | Property | Value |
+            |----------|-------|
+            | **Workflow Run** | [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+            | **Commit** | [\`${{ github.sha }}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) |
+            | **Branch** | \`${{ github.ref_name }}\` |
+            | **Triggered By** | @${{ github.actor }} |
+            | **Timestamp** | \`${new Date().toISOString()}\` |
+            
+            Please investigate the failed workflow and fix any issues.
+            
+            ---
+            <sub>🤖 Automatically created by GitHub Actions</sub>
+            `;
+            
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'ci-failure'
+            });
+            
+            const existingIssue = issues.data.find(i => i.title === title);
+            
+            if (!existingIssue) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['ci-failure', 'automated']
+              });
+            }

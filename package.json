@@ -6,7 +6,11 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "tauri:export": "next build"
   },
   "dependencies": {
     "gpt-tokenizer": "^3.0.0",
@@ -22,6 +26,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+    "@tauri-apps/cli": "^2.9.5",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
