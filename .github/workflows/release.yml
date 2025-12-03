@@ -95,27 +95,61 @@ jobs:
           
           SERVER_URL="${GITHUB_SERVER_URL:-https://github.com}"
           REPO="${GITHUB_REPOSITORY}"
+          VERSION="${{ needs.quality-gate.outputs.version }}"
+          RELEASE_TAG="${{ needs.quality-gate.outputs.release_tag }}"
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           
-          cat > release_notes.md << 'HEADER'
-          # 📦 Contextractor Release
+          cat > release_notes.md << HEADER
+          # Contextractor Release
           
-          > Powerful context extraction tool built with Next.js & Tauri
+          Powerful context extraction tool built with Next.js & Tauri.
           
-          ## 📊 Release Info
+          ## Release Info
           
           | Property | Value |
           |----------|-------|
+          | **Version** | \`${VERSION}\` |
+          | **Commit** | \`${{ needs.quality-gate.outputs.short_sha }}\` |
+          | **Build** | \`#${{ github.run_number }}\` |
+          | **Date** | \`$(date -u +"%Y-%m-%d %H:%M:%S UTC")\` |
+          
+          ---
+          
+          ## Downloads
+          
+          ### Windows
+          | File | Description |
+          |------|-------------|
+          | [Contextractor-${VERSION}-win-x64.exe](${SERVER_URL}/${REPO}/releases/download/${RELEASE_TAG}/Contextractor-${VERSION}-win-x64.exe) | Portable executable (64-bit) |
+          | [Contextractor-${VERSION}-win-x64.msi](${SERVER_URL}/${REPO}/releases/download/${RELEASE_TAG}/Contextractor-${VERSION}-win-x64.msi) | MSI Installer (64-bit) |
+          | [Contextractor-${VERSION}-win-x86.exe](${SERVER_URL}/${REPO}/releases/download/${RELEASE_TAG}/Contextractor-${VERSION}-win-x86.exe) | Portable executable (32-bit) |
+          | [Contextractor-${VERSION}-win-x86.msi](${SERVER_URL}/${REPO}/releases/download/${RELEASE_TAG}/Contextractor-${VERSION}-win-x86.msi) | MSI Installer (32-bit) |
+          
+          ### Linux
+          | File | Description |
+          |------|-------------|
+          | [Contextractor-${VERSION}-linux-x64](${SERVER_URL}/${REPO}/releases/download/${RELEASE_TAG}/Contextractor-${VERSION}-linux-x64) | Portable binary |
+          | [Contextractor-${VERSION}-linux-x64.AppImage](${SERVER_URL}/${REPO}/releases/download/${RELEASE_TAG}/Contextractor-${VERSION}-linux-x64.AppImage) | AppImage (universal) |
+          | [Contextractor-${VERSION}-linux-amd64.deb](${SERVER_URL}/${REPO}/releases/download/${RELEASE_TAG}/Contextractor-${VERSION}-linux-amd64.deb) | Debian/Ubuntu package |
+          
+          ### macOS
+          | File | Description |
+          |------|-------------|
+          | [Contextractor-${VERSION}-macos-x64.dmg](${SERVER_URL}/${REPO}/releases/download/${RELEASE_TAG}/Contextractor-${VERSION}-macos-x64.dmg) | Intel Mac installer |
+          | [Contextractor-${VERSION}-macos-arm64.dmg](${SERVER_URL}/${REPO}/releases/download/${RELEASE_TAG}/Contextractor-${VERSION}-macos-arm64.dmg) | Apple Silicon installer |
+          
+          ### Android
+          | File | Description |
+          |------|-------------|
+          | [Contextractor-${VERSION}-android-arm64-v8a.apk](${SERVER_URL}/${REPO}/releases/download/${RELEASE_TAG}/Contextractor-${VERSION}-android-arm64-v8a.apk) | ARM64 (most devices) |
+          | [Contextractor-${VERSION}-android-armeabi-v7a.apk](${SERVER_URL}/${REPO}/releases/download/${RELEASE_TAG}/Contextractor-${VERSION}-android-armeabi-v7a.apk) | ARMv7 (older devices) |
+          | [Contextractor-${VERSION}-android-x86_64.apk](${SERVER_URL}/${REPO}/releases/download/${RELEASE_TAG}/Contextractor-${VERSION}-android-x86_64.apk) | x86_64 (emulators) |
+          
+          ---
+          
+          ## Changelog
+          
           HEADER
-          
-          echo "| **Version** | \`${{ needs.quality-gate.outputs.version }}\` |" >> release_notes.md
-          echo "| **Commit** | \`${{ needs.quality-gate.outputs.short_sha }}\` |" >> release_notes.md
-          echo "| **Build** | \`#${{ github.run_number }}\` |" >> release_notes.md
-          echo "| **Date** | \`$(date -u +"%Y-%m-%d %H:%M:%S UTC")\` |" >> release_notes.md
-          echo "" >> release_notes.md
-          
-          echo "## 🔄 Changes" >> release_notes.md
-          echo "" >> release_notes.md
           
           if [ -z "$LAST_TAG" ]; then
             echo "_Initial release - showing last 50 commits._" >> release_notes.md
@@ -127,13 +161,12 @@ jobs:
           echo "" >> release_notes.md
           
           gen_section() {
-            local EMOJI="$1"
-            local TITLE="$2"
-            local PATTERN="$3"
+            local TITLE="$1"
+            local PATTERN="$2"
             local BODY
             BODY=$(echo "$LOG" | grep -E "\|$PATTERN" || true)
             if [ -n "$BODY" ]; then
-              echo "### $EMOJI $TITLE" >> release_notes.md
+              echo "### $TITLE" >> release_notes.md
               echo "" >> release_notes.md
               echo "$BODY" | while IFS='|' read -r h s a; do 
                 clean_msg=$(echo "$s" | sed -E 's/^(feat|fix|perf|docs|chore|refactor|style|test)(\([^)]*\))?[!]?:\s*//')
@@ -143,18 +176,18 @@ jobs:
             fi
           }
           
-          gen_section "✨" "Features" 'feat(\(|:|!)'
-          gen_section "🐛" "Bug Fixes" 'fix(\(|:|!)'
-          gen_section "⚡" "Performance" 'perf(\(|:|!)'
-          gen_section "📚" "Documentation" 'docs(\(|:|!)'
-          gen_section "🔧" "Maintenance" 'chore(\(|:|!)'
-          gen_section "♻️" "Refactoring" 'refactor(\(|:|!)'
-          gen_section "🎨" "Styling" 'style(\(|:|!)'
-          gen_section "🧪" "Tests" 'test(\(|:|!)'
+          gen_section "Features" 'feat(\(|:|!)'
+          gen_section "Bug Fixes" 'fix(\(|:|!)'
+          gen_section "Performance" 'perf(\(|:|!)'
+          gen_section "Documentation" 'docs(\(|:|!)'
+          gen_section "Maintenance" 'chore(\(|:|!)'
+          gen_section "Refactoring" 'refactor(\(|:|!)'
+          gen_section "Styling" 'style(\(|:|!)'
+          gen_section "Tests" 'test(\(|:|!)'
           
           OTHER=$(echo "$LOG" | grep -Ev "\|(feat|fix|perf|docs|chore|refactor|style|test)(\(|:|!)" || true)
           if [ -n "$OTHER" ]; then
-            echo "### 📝 Other Changes" >> release_notes.md
+            echo "### Other Changes" >> release_notes.md
             echo "" >> release_notes.md
             echo "$OTHER" | while IFS='|' read -r h s a; do 
               echo "- [\`$h\`](${SERVER_URL}/${REPO}/commit/$h) $s — *$a*"
@@ -162,49 +195,15 @@ jobs:
             echo "" >> release_notes.md
           fi
           
-          cat >> release_notes.md << 'FOOTER'
-          ---
-          
-          ## 📥 Downloads
-          
-          ### 🪟 Windows
-          | File | Description |
-          |------|-------------|
-          | `Contextractor-*-win-x64.exe` | Portable executable (64-bit) |
-          | `Contextractor-*-win-x64.msi` | MSI Installer (64-bit) |
-          | `Contextractor-*-win-x86.exe` | Portable executable (32-bit) |
-          | `Contextractor-*-win-x86.msi` | MSI Installer (32-bit) |
-          
-          ### 🐧 Linux
-          | File | Description |
-          |------|-------------|
-          | `Contextractor-*-linux-x64` | Portable binary |
-          | `Contextractor-*-linux-x64.AppImage` | AppImage (universal) |
-          | `Contextractor-*-linux-amd64.deb` | Debian/Ubuntu package |
-          
-          ### 🍎 macOS
-          | File | Description |
-          |------|-------------|
-          | `Contextractor-*-macos-x64.dmg` | Intel Mac installer |
-          | `Contextractor-*-macos-arm64.dmg` | Apple Silicon installer |
-          
-          ### 🤖 Android
-          | File | Description |
-          |------|-------------|
-          | `Contextractor-*-android-arm64-v8a.apk` | ARM64 (most devices) |
-          | `Contextractor-*-android-armeabi-v7a.apk` | ARMv7 (older devices) |
-          | `Contextractor-*-android-x86_64.apk` | x86_64 (emulators) |
-          
-          ---
-          
-          <sub>🤖 Automatically generated by GitHub Actions</sub>
-          FOOTER
+          echo "---" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "*Automatically generated by GitHub Actions*" >> release_notes.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.quality-gate.outputs.release_tag }}
-          name: "🚀 Contextractor v${{ needs.quality-gate.outputs.version }} (Build #${{ github.run_number }})"
+          name: "Contextractor v${{ needs.quality-gate.outputs.version }} (Build #${{ github.run_number }})"
           body_path: release_notes.md
           prerelease: false
           make_latest: true
@@ -640,7 +639,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const title = `🚨 Release Pipeline Failed - Build #${{ github.run_number }}`;
+            const title = `Release Pipeline Failed - Build #${{ github.run_number }}`;
             const body = `
             ## Release Pipeline Failure
             
@@ -655,7 +654,7 @@ jobs:
             Please investigate the failed workflow and fix any issues.
             
             ---
-            <sub>🤖 Automatically created by GitHub Actions</sub>
+            *Automatically created by GitHub Actions*
             `;
             
             const issues = await github.rest.issues.listForRepo({
