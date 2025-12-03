@@ -31,7 +31,7 @@ export interface GoogleButtonProps {
     children?: React.ReactNode;
     onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
     variant?: 'filled' | 'tonal' | 'text' | 'fab' | 'outlined' | 'icon';
-    icon?: string | IconType;
+    icon?: IconType;
     disabled?: boolean;
     className?: string;
     type?: 'button' | 'submit' | 'reset';

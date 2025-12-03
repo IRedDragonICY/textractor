@@ -7,7 +7,7 @@ import { GoogleIcon } from './GoogleIcon';
 import { IconType } from 'react-icons';
 
 interface AnimatedIconProps {
-    icon: IconType | string;
+    icon: IconType;
     className?: string;
     style?: React.CSSProperties;
 }
