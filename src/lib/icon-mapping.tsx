@@ -19,7 +19,7 @@ import {
     MdChevronRight, MdViewList, MdAccountTree, MdArrowUpward, MdArrowDownward, 
     MdTune, MdCode, MdExpandMore, MdMenu, MdWarning, MdMinimize, MdNetworkCheck, 
     MdDownload, MdTimer, MdSpeed, MdUpload, MdCheckCircle, MdLock, MdDescription, 
-    MdGridOn, MdImage, MdTerminal
+    MdGridOn, MdImage, MdTerminal, MdPieChart, MdRefresh
 } from 'react-icons/md';
 import { VscRegex } from 'react-icons/vsc';
 import { TbFileTypeSql } from 'react-icons/tb';
@@ -316,6 +316,8 @@ export const UI_ICONS_MAP = {
     github: SiGithub,
     readme: SiMarkdown,
     lock: MdLock,
+    chart: MdPieChart,
+    refresh: MdRefresh,
 };
 
 export const getIconForExtension = (ext: string): IconType => {

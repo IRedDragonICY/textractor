@@ -1,17 +1,20 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
 import nextPlugin from "@next/eslint-plugin-next";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
+import js from "@eslint/js";
+import tseslint from "typescript-eslint";
 
 const eslintConfig = [
-  ...compat.extends("eslint:recommended"),
+  {
+    ignores: [
+      "out/**",
+      ".next/**",
+      "node_modules/**",
+      "src-tauri/target/**",
+      "src-tauri/gen/**",
+      "public/**"
+    ]
+  },
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
   {
     plugins: {
       "@next/next": nextPlugin,
@@ -21,7 +24,6 @@ const eslintConfig = [
       ...nextPlugin.configs["core-web-vitals"].rules,
     },
   },
-  ...compat.extends("plugin:@typescript-eslint/recommended"),
   {
     ignores: [".next/**", "node_modules/**", "src-tauri/**"],
   },

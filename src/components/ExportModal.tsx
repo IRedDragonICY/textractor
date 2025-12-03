@@ -91,12 +91,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             case 'txt':
                 return content;
             
-            case 'md':
+            case 'md': {
                 // Already markdown-like, but ensure proper formatting
                 const mdHeader = `# ${sessionName}\n\n> Exported from Contextractor on ${new Date().toLocaleDateString()}\n\n---\n\n`;
                 return mdHeader + content;
+            }
             
-            case 'json':
+            case 'json': {
                 const jsonData = {
                     exportedAt: new Date().toISOString(),
                     sessionName,
@@ -115,8 +116,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                     })),
                 };
                 return JSON.stringify(jsonData, null, 2);
+            }
             
-            case 'html':
+            case 'html': {
                 // Generate rich HTML for Notion/Confluence
                 const htmlFiles = files.filter(f => f.isText).map(f => {
                     const ext = f.name.split('.').pop() || 'txt';
@@ -153,6 +155,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     ${htmlFiles}
 </body>
 </html>`;
+            }
             
             default:
                 return content;
@@ -205,7 +208,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 setExportStatus('idle');
                 setStatusMessage('');
             }, 3000);
-        } catch (err) {
+        } catch {
             // Fallback: copy as plain text
             const htmlContent = generateContent('html');
             await navigator.clipboard.writeText(htmlContent);

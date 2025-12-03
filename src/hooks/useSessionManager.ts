@@ -651,6 +651,22 @@ export const useSessionManager = () => {
         });
     }, []);
 
+    // Toggle pin recent project
+    const togglePinRecentProject = useCallback((projectId: string) => {
+        setState(prev => {
+            const recentProjects = prev.recentProjects.map(p =>
+                p.id === projectId ? { ...p, isPinned: !p.isPinned } : p
+            );
+            // Sort: pinned first, then by lastOpened (default)
+            // Note: HomeView has its own sorting, but we keep the underlying list somewhat ordered
+            recentProjects.sort((a, b) => {
+                if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+                return b.lastOpened - a.lastOpened;
+            });
+            return { ...prev, recentProjects };
+        });
+    }, []);
+
     return {
         // State
         sessions: state.sessions,
@@ -678,6 +694,7 @@ export const useSessionManager = () => {
         openRecentProject,
         removeRecentProject,
         clearRecentProjects,
+        togglePinRecentProject,
 
         // UI actions
         toggleHomeView,

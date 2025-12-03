@@ -1,4 +1,4 @@
-// Report Issue View Component - Material You Design
+// Report Issue View Component - VS Code Inspired Design
 // Professional issue reporting with GitHub integration
 
 'use client';
@@ -25,6 +25,7 @@ const ICONS = {
     critical: "M7.41 18.41L12 13.83l4.59 4.58L18 17l-6-6-6 6z",
     close: "M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z",
     openInNew: "M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z",
+    chevronRight: "M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z",
 };
 
 const GITHUB_REPO = 'https://github.com/IRedDragonICY/contextractor';
@@ -159,247 +160,255 @@ _This issue was created using the Contextractor in-app issue reporter._
     const isFormValid = title.trim().length > 0;
 
     return (
-        <div className="h-full flex flex-col bg-[var(--theme-bg)]">
-            {/* Header */}
-            <div className="flex-shrink-0 p-6 border-b border-[var(--theme-border)]">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-[var(--theme-primary)]/10 flex items-center justify-center">
-                            <GoogleIcon path={ICONS.bug} className="w-5 h-5 text-[var(--theme-primary)]" />
-                        </div>
-                        <div>
-                            <h1 className="text-lg font-semibold text-[var(--theme-text-primary)]">Report an Issue</h1>
-                            <p className="text-sm text-[var(--theme-text-tertiary)]">Help us improve Contextractor</p>
-                        </div>
-                    </div>
-                    {onClose && (
-                        <button
-                            onClick={onClose}
-                            className="w-8 h-8 rounded-full hover:bg-[var(--theme-surface-hover)] flex items-center justify-center transition-colors"
-                        >
-                            <GoogleIcon path={ICONS.close} className="w-4 h-4 text-[var(--theme-text-tertiary)]" />
-                        </button>
-                    )}
+        <div className="h-full flex flex-col bg-[var(--theme-bg)] text-[var(--theme-text-primary)] font-sans">
+            {/* Header - VS Code Style */}
+            <div className="flex-shrink-0 h-12 px-4 border-b border-[var(--theme-border)] flex items-center justify-between bg-[var(--theme-bg-secondary)]">
+                <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium uppercase tracking-wider text-[var(--theme-text-tertiary)]">ISSUE REPORTER</span>
                 </div>
+                {onClose && (
+                    <button
+                        onClick={onClose}
+                        className="p-1.5 rounded hover:bg-[var(--theme-surface-hover)] text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] transition-colors"
+                    >
+                        <GoogleIcon path={ICONS.close} className="w-4 h-4" />
+                    </button>
+                )}
             </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
-                <div className="max-w-2xl mx-auto space-y-6">
-                    {/* Issue Type Selection */}
-                    <div>
-                        <label className="block text-sm font-medium text-[var(--theme-text-secondary)] mb-3">
-                            Issue Type
-                        </label>
-                        <div className="grid grid-cols-2 gap-3">
-                            {ISSUE_TYPES.map((type) => (
-                                <motion.button
-                                    key={type.id}
-                                    onClick={() => setIssueType(type.id)}
-                                    whileHover={{ scale: 1.01 }}
-                                    whileTap={{ scale: 0.99 }}
-                                    className={`
-                                        p-4 rounded-2xl border-2 transition-all text-left
-                                        ${issueType === type.id 
-                                            ? 'border-[var(--theme-primary)] bg-[var(--theme-primary)]/5' 
-                                            : 'border-[var(--theme-border)] bg-[var(--theme-surface)] hover:border-[var(--theme-border-hover)]'
-                                        }
-                                    `}
-                                >
-                                    <div className="flex items-start gap-3">
-                                        <div 
-                                            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                                            style={{ backgroundColor: `${type.color}15` }}
+            {/* Content - Split View Layout */}
+            <div className="flex-1 overflow-hidden flex">
+                {/* Form Section */}
+                <div className="flex-1 overflow-y-auto scrollbar-thin">
+                    <div className="p-6 max-w-3xl mx-auto space-y-8">
+                        
+                        {/* Issue Type - Segmented Control Style */}
+                        <div className="space-y-3">
+                            <label className="text-xs font-semibold text-[var(--theme-text-secondary)] uppercase tracking-wide">
+                                Issue Type
+                            </label>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                {ISSUE_TYPES.map((type) => (
+                                    <button
+                                        key={type.id}
+                                        onClick={() => setIssueType(type.id)}
+                                        className={`
+                                            flex flex-col items-center justify-center p-3 rounded-md border transition-all
+                                            ${issueType === type.id 
+                                                ? 'bg-[var(--theme-primary)]/10 border-[var(--theme-primary)] text-[var(--theme-primary)]' 
+                                                : 'bg-[var(--theme-surface)] border-[var(--theme-border)] text-[var(--theme-text-secondary)] hover:bg-[var(--theme-surface-hover)] hover:border-[var(--theme-border-subtle)]'
+                                            }
+                                        `}
+                                    >
+                                        <GoogleIcon path={type.icon} className="w-5 h-5 mb-2" />
+                                        <span className="text-xs font-medium">{type.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Title Input - Minimalist */}
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold text-[var(--theme-text-secondary)] uppercase tracking-wide">
+                                Title <span className="text-red-400">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                placeholder="e.g., Application crashes when opening large files"
+                                className="w-full px-3 py-2 bg-[var(--theme-input-bg)] border border-[var(--theme-input-border)] rounded-sm text-sm text-[var(--theme-text-primary)] placeholder-[var(--theme-text-muted)] focus:outline-none focus:border-[var(--theme-primary)] focus:ring-1 focus:ring-[var(--theme-primary)] transition-colors"
+                            />
+                        </div>
+
+                        {/* Description - Code Editor Style */}
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold text-[var(--theme-text-secondary)] uppercase tracking-wide">
+                                Description
+                            </label>
+                            <div className="relative">
+                                <textarea
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
+                                    placeholder="Describe the issue in detail..."
+                                    rows={8}
+                                    className="w-full px-3 py-2 bg-[var(--theme-input-bg)] border border-[var(--theme-input-border)] rounded-sm text-sm font-mono text-[var(--theme-text-primary)] placeholder-[var(--theme-text-muted)] focus:outline-none focus:border-[var(--theme-primary)] focus:ring-1 focus:ring-[var(--theme-primary)] transition-colors resize-y"
+                                />
+                                <div className="absolute bottom-2 right-2 text-[10px] text-[var(--theme-text-tertiary)]">
+                                    Markdown supported
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Metadata Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Priority */}
+                            <div className="space-y-3">
+                                <label className="text-xs font-semibold text-[var(--theme-text-secondary)] uppercase tracking-wide">
+                                    Priority
+                                </label>
+                                <div className="flex flex-col gap-1">
+                                    {PRIORITIES.map((p) => (
+                                        <button
+                                            key={p.id}
+                                            onClick={() => setPriority(p.id)}
+                                            className={`
+                                                flex items-center px-3 py-2 rounded-sm text-sm transition-colors
+                                                ${priority === p.id 
+                                                    ? 'bg-[var(--theme-surface-hover)] text-[var(--theme-text-primary)] font-medium' 
+                                                    : 'text-[var(--theme-text-secondary)] hover:bg-[var(--theme-surface-hover)]'
+                                                }
+                                            `}
                                         >
-                                            <GoogleIcon path={type.icon} className="w-5 h-5" style={{ color: type.color }} />
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="font-medium text-[var(--theme-text-primary)] text-sm">{type.label}</p>
-                                            <p className="text-xs text-[var(--theme-text-tertiary)] mt-0.5">{type.description}</p>
+                                            <div 
+                                                className="w-2 h-2 rounded-full mr-3"
+                                                style={{ backgroundColor: p.color }}
+                                            />
+                                            {p.label}
+                                            {priority === p.id && (
+                                                <GoogleIcon path={ICONS.check} className="w-4 h-4 ml-auto text-[var(--theme-primary)]" />
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Labels */}
+                            <div className="space-y-3">
+                                <label className="text-xs font-semibold text-[var(--theme-text-secondary)] uppercase tracking-wide">
+                                    Labels
+                                </label>
+                                <div className="flex flex-wrap gap-2">
+                                    {LABEL_OPTIONS.map((label) => (
+                                        <button
+                                            key={label}
+                                            onClick={() => handleToggleLabel(label)}
+                                            className={`
+                                                px-2.5 py-1 rounded-full text-xs border transition-all
+                                                ${selectedLabels.includes(label)
+                                                    ? 'bg-[var(--theme-primary)]/10 border-[var(--theme-primary)] text-[var(--theme-primary)]'
+                                                    : 'bg-[var(--theme-surface)] border-[var(--theme-border)] text-[var(--theme-text-secondary)] hover:border-[var(--theme-text-secondary)]'
+                                                }
+                                            `}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Preview Sidebar - VS Code Minimap/Sidebar Style */}
+                <div className="hidden lg:block w-80 border-l border-[var(--theme-border)] bg-[var(--theme-bg-secondary)] p-4 overflow-y-auto">
+                    <div className="sticky top-0">
+                        <h3 className="text-xs font-semibold text-[var(--theme-text-secondary)] uppercase tracking-wide mb-4">
+                            Preview
+                        </h3>
+                        
+                        <div className="space-y-4">
+                            {/* Preview Card */}
+                            <div className="bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-md p-4 shadow-sm">
+                                <div className="flex items-center gap-2 mb-3 pb-3 border-b border-[var(--theme-border-subtle)]">
+                                    <GoogleIcon path={ICONS.github} className="w-4 h-4 text-[var(--theme-text-primary)]" />
+                                    <span className="text-xs text-[var(--theme-text-secondary)]">New Issue</span>
+                                </div>
+                                
+                                <div className="space-y-3">
+                                    <div>
+                                        <div className="text-xs text-[var(--theme-text-tertiary)] mb-1">Title</div>
+                                        <div className="text-sm font-medium text-[var(--theme-text-primary)] break-words">
+                                            {title || <span className="text-[var(--theme-text-muted)] italic">No title...</span>}
                                         </div>
                                     </div>
-                                </motion.button>
-                            ))}
-                        </div>
-                    </div>
 
-                    {/* Title Input */}
-                    <div>
-                        <label className="block text-sm font-medium text-[var(--theme-text-secondary)] mb-2">
-                            Title <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                            type="text"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            placeholder="Brief description of the issue..."
-                            className="w-full px-4 py-3 bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-xl text-[var(--theme-text-primary)] placeholder-[var(--theme-text-muted)] focus:outline-none focus:border-[var(--theme-primary)] focus:ring-2 focus:ring-[var(--theme-primary)]/20 transition-all"
-                        />
-                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span 
+                                            className="px-2 py-0.5 rounded text-[10px] font-medium border"
+                                            style={{ 
+                                                borderColor: `${selectedType?.color}40`,
+                                                color: selectedType?.color,
+                                                backgroundColor: `${selectedType?.color}10`
+                                            }}
+                                        >
+                                            {selectedType?.label}
+                                        </span>
+                                        <span 
+                                            className="px-2 py-0.5 rounded text-[10px] font-medium border"
+                                            style={{ 
+                                                borderColor: `${selectedPriority?.color}40`,
+                                                color: selectedPriority?.color,
+                                                backgroundColor: `${selectedPriority?.color}10`
+                                            }}
+                                        >
+                                            {selectedPriority?.label}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
 
-                    {/* Description */}
-                    <div>
-                        <label className="block text-sm font-medium text-[var(--theme-text-secondary)] mb-2">
-                            Description
-                        </label>
-                        <textarea
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            placeholder="Provide more details about the issue. Include steps to reproduce if it's a bug..."
-                            rows={5}
-                            className="w-full px-4 py-3 bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-xl text-[var(--theme-text-primary)] placeholder-[var(--theme-text-muted)] focus:outline-none focus:border-[var(--theme-primary)] focus:ring-2 focus:ring-[var(--theme-primary)]/20 transition-all resize-none"
-                        />
-                    </div>
-
-                    {/* Priority Selection */}
-                    <div>
-                        <label className="block text-sm font-medium text-[var(--theme-text-secondary)] mb-2">
-                            Priority
-                        </label>
-                        <div className="flex gap-2">
-                            {PRIORITIES.map((p) => (
-                                <motion.button
-                                    key={p.id}
-                                    onClick={() => setPriority(p.id)}
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    className={`
-                                        flex items-center gap-2 px-4 py-2 rounded-full border transition-all
-                                        ${priority === p.id 
-                                            ? 'border-[var(--theme-primary)] bg-[var(--theme-primary)]/10' 
-                                            : 'border-[var(--theme-border)] bg-[var(--theme-surface)] hover:border-[var(--theme-border-hover)]'
-                                        }
-                                    `}
-                                >
-                                    <div 
-                                        className="w-2 h-2 rounded-full"
-                                        style={{ backgroundColor: p.color }}
-                                    />
-                                    <span className="text-sm text-[var(--theme-text-secondary)]">{p.label}</span>
-                                </motion.button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Labels */}
-                    <div>
-                        <label className="block text-sm font-medium text-[var(--theme-text-secondary)] mb-2">
-                            Labels (optional)
-                        </label>
-                        <div className="flex flex-wrap gap-2">
-                            {LABEL_OPTIONS.map((label) => (
-                                <motion.button
-                                    key={label}
-                                    onClick={() => handleToggleLabel(label)}
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    className={`
-                                        flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all
-                                        ${selectedLabels.includes(label)
-                                            ? 'bg-[var(--theme-primary)] text-white'
-                                            : 'bg-[var(--theme-surface)] text-[var(--theme-text-secondary)] border border-[var(--theme-border)] hover:border-[var(--theme-primary)]/30'
-                                        }
-                                    `}
-                                >
-                                    {selectedLabels.includes(label) && (
-                                        <GoogleIcon path={ICONS.check} className="w-3 h-3" />
-                                    )}
-                                    {label}
-                                </motion.button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Preview Card */}
-                    <div className="p-4 bg-[var(--theme-surface)] rounded-2xl border border-[var(--theme-border)]">
-                        <div className="flex items-center gap-2 mb-3">
-                            <GoogleIcon path={ICONS.github} className="w-4 h-4 text-[var(--theme-text-tertiary)]" />
-                            <span className="text-xs font-medium text-[var(--theme-text-tertiary)]">Issue Preview</span>
-                        </div>
-                        <div className="space-y-2">
-                            <p className="text-sm font-medium text-[var(--theme-text-primary)]">
-                                {title || 'Issue title will appear here...'}
-                            </p>
-                            <div className="flex flex-wrap gap-1.5">
-                                <span 
-                                    className="px-2 py-0.5 rounded-full text-[10px] font-medium"
-                                    style={{ 
-                                        backgroundColor: `${selectedType?.color}20`,
-                                        color: selectedType?.color 
-                                    }}
-                                >
-                                    {selectedType?.label}
-                                </span>
-                                {selectedLabels.map(label => (
-                                    <span 
-                                        key={label}
-                                        className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[var(--theme-surface-hover)] text-[var(--theme-text-secondary)]"
-                                    >
-                                        {label}
-                                    </span>
-                                ))}
+                            {/* Info Box */}
+                            <div className="p-3 rounded bg-[var(--theme-surface-hover)] border border-[var(--theme-border-subtle)]">
+                                <div className="flex gap-2">
+                                    <GoogleIcon path={ICONS.info} className="w-4 h-4 text-[var(--theme-primary)] flex-shrink-0 mt-0.5" />
+                                    <p className="text-xs text-[var(--theme-text-secondary)] leading-relaxed">
+                                        Submitting this form will open a new issue in the GitHub repository. You'll be able to review and edit before finalizing.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Footer */}
-            <div className="flex-shrink-0 p-4 border-t border-[var(--theme-border)] bg-[var(--theme-surface)]">
-                <div className="max-w-2xl mx-auto flex items-center justify-between">
-                    <p className="text-xs text-[var(--theme-text-muted)] flex items-center gap-1.5">
-                        <GoogleIcon path={ICONS.info} className="w-3.5 h-3.5" />
-                        This will open GitHub to submit your issue
-                    </p>
-                    
-                    <div className="flex items-center gap-3">
-                        <AnimatePresence mode="wait">
-                            {submitStatus === 'success' && (
-                                <motion.span
-                                    initial={{ opacity: 0, x: 10 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0 }}
-                                    className="text-sm text-green-500 flex items-center gap-1"
-                                >
-                                    <GoogleIcon path={ICONS.check} className="w-4 h-4" />
-                                    GitHub opened!
-                                </motion.span>
-                            )}
-                        </AnimatePresence>
+            {/* Footer - Status Bar Style */}
+            <div className="flex-shrink-0 h-14 px-6 border-t border-[var(--theme-border)] bg-[var(--theme-bg)] flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                    <a 
+                        href={`${GITHUB_REPO}/issues`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-[var(--theme-text-secondary)] hover:text-[var(--theme-primary)] flex items-center gap-1.5 transition-colors"
+                    >
+                        <GoogleIcon path={ICONS.github} className="w-3.5 h-3.5" />
+                        View existing issues
+                    </a>
+                </div>
 
-                        <motion.a
-                            href={`${GITHUB_REPO}/issues`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium text-[var(--theme-text-secondary)] bg-[var(--theme-surface-hover)] hover:bg-[var(--theme-surface)] border border-[var(--theme-border)] transition-colors"
-                        >
-                            <GoogleIcon path={ICONS.openInNew} className="w-4 h-4" />
-                            View Issues
-                        </motion.a>
+                <div className="flex items-center gap-3">
+                    <AnimatePresence>
+                        {submitStatus === 'success' && (
+                            <motion.span
+                                initial={{ opacity: 0, x: 10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0 }}
+                                className="text-xs text-[var(--theme-success)] flex items-center gap-1.5 mr-2"
+                            >
+                                <GoogleIcon path={ICONS.check} className="w-3.5 h-3.5" />
+                                Opened in GitHub
+                            </motion.span>
+                        )}
+                    </AnimatePresence>
 
-                        <motion.button
-                            onClick={handleSubmit}
-                            disabled={!isFormValid || isSubmitting}
-                            whileHover={{ scale: isFormValid ? 1.02 : 1 }}
-                            whileTap={{ scale: isFormValid ? 0.98 : 1 }}
-                            className={`
-                                flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-all
-                                ${isFormValid 
-                                    ? 'bg-[var(--theme-primary)] text-white hover:bg-[var(--theme-primary-hover)] shadow-lg shadow-[var(--theme-primary)]/20' 
-                                    : 'bg-[var(--theme-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed'
-                                }
-                            `}
-                        >
-                            {isSubmitting ? (
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            ) : (
-                                <GoogleIcon path={ICONS.send} className="w-4 h-4" />
-                            )}
-                            Submit to GitHub
-                        </motion.button>
-                    </div>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={!isFormValid || isSubmitting}
+                        className={`
+                            flex items-center gap-2 px-4 py-1.5 rounded-sm text-sm font-medium transition-all
+                            ${isFormValid 
+                                ? 'bg-[var(--theme-button-filled)] text-white hover:bg-[var(--theme-button-filled-hover)]' 
+                                : 'bg-[var(--theme-surface-hover)] text-[var(--theme-text-muted)] cursor-not-allowed'
+                            }
+                        `}
+                    >
+                        {isSubmitting ? (
+                            <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : (
+                            <GoogleIcon path={ICONS.send} className="w-3.5 h-3.5" />
+                        )}
+                        Submit Issue
+                    </button>
                 </div>
             </div>
         </div>

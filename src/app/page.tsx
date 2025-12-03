@@ -26,7 +26,6 @@ import { FileCard } from '@/components/FileCard';
 import { SortableItem } from '@/components/SortableItem';
 import { TreeItem } from '@/components/TreeItem';
 import { OutputStyleSelector } from '@/components/OutputStyleSelector';
-import { StatChip } from '@/components/StatChip';
 import { GitFileSelector } from '@/components/GitFileSelector';
 import { GlobalImportIndicator } from '@/components/GlobalImportIndicator';
 import { TabBar } from '@/components/TabBar';
@@ -39,6 +38,7 @@ import { ExportModal } from '@/components/ExportModal';
 import { VirtualizedCodeViewer } from '@/components/VirtualizedCodeViewer';
 import { WorkspaceSkeleton, LoadingProgress } from '@/components/LoadingSkeleton';
 import { VirtualizedFileList } from '@/components/VirtualizedFileList';
+import { StatsView } from '@/components/StatsView';
 
 // Hooks
 import { useSearch } from '@/hooks/useSearch';
@@ -48,7 +48,6 @@ import { ThemeProvider, useThemeProvider } from '@/hooks/useTheme';
 import { useSettings } from '@/hooks/useSettings';
 
 // Services & Utils
-import { formatNumber } from '@/lib/format';
 import { processFileObject, unzipAndProcess } from '@/lib/file-processing';
 import { buildFileTree } from '@/lib/file-tree';
 import { scanForSecrets, SecurityIssue } from '@/lib/security';
@@ -93,6 +92,7 @@ function Contextractor() {
         openRecentProject,
         removeRecentProject,
         clearRecentProjects,
+        togglePinRecentProject,
         toggleHomeView,
         openSettingsTab,
         openReportIssueTab,
@@ -122,6 +122,10 @@ function Contextractor() {
     const [exportModalOpen, setExportModalOpen] = useState(false);
     const [securityWarningOpen, setSecurityWarningOpen] = useState(false);
     const [securityIssues, setSecurityIssues] = useState<SecurityIssue[]>([]);
+    const [activeSideView, setActiveSideView] = useState<'explorer' | 'stats'>('explorer');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [sidebarWidth, setSidebarWidth] = useState(320);
+    const isResizing = useRef(false);
 
     // Settings
     const { 
@@ -179,10 +183,16 @@ function Contextractor() {
     }, [activeSessionId, updateSessionSettings]);
 
     // File processing
-    const addFiles = useCallback(async (incomingFiles: File[]) => {
+    const addFiles = useCallback(async (incomingFiles: File[], targetId?: string) => {
+        let targetSessionId = targetId || activeSessionId;
+        // If targeting a new session (not active), assume empty initial files
+        let currentFiles = (targetId && targetId !== activeSessionId) ? [] : files;
+
         // Create session if none exists
-        if (!activeSessionId) {
-            createSession();
+        if (!targetSessionId) {
+            const newSession = createSession();
+            targetSessionId = newSession.id;
+            currentFiles = [];
         }
 
         setProcessing(true);
@@ -199,12 +209,17 @@ function Contextractor() {
             }
         }
 
-        setFiles(prev => [...prev, ...newFiles]);
+        // Update session files directly
+        const allFiles = [...currentFiles, ...newFiles];
+        updateSessionFiles(targetSessionId, allFiles.map(fileDataToSessionFile));
+        
         setProcessing(false);
         
         const hasFolders = newFiles.some(f => f.path.includes('/'));
-        if (hasFolders) setViewMode('tree');
-    }, [activeSessionId, createSession, setFiles, setViewMode]);
+        if (hasFolders) {
+            updateSessionSettings(targetSessionId, { viewMode: 'tree' });
+        }
+    }, [activeSessionId, createSession, files, updateSessionFiles, updateSessionSettings]);
 
     const removeFile = useCallback((id: string) => {
         setFiles(prev => prev.filter(f => f.id !== id));
@@ -308,11 +323,13 @@ function Contextractor() {
     // Dropzone
     const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
         onDrop: (droppedFiles) => {
+            let sessionId: string | undefined;
             if (showHomeView) {
-                createSession();
+                const newSession = createSession();
+                sessionId = newSession.id;
                 toggleHomeView(false);
             }
-            addFiles(droppedFiles).catch(console.error);
+            addFiles(droppedFiles, sessionId).catch(console.error);
             setIsMobileSidebarOpen(false);
         },
         noClick: true,
@@ -326,21 +343,25 @@ function Contextractor() {
             if (['INPUT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable) return;
             if (e.clipboardData?.files?.length) {
                 e.preventDefault();
+                let sessionId: string | undefined;
                 if (showHomeView) {
-                    createSession();
+                    const newSession = createSession();
+                    sessionId = newSession.id;
                     toggleHomeView(false);
                 }
-                addFiles(Array.from(e.clipboardData.files)).catch(console.error);
+                addFiles(Array.from(e.clipboardData.files), sessionId).catch(console.error);
             } else {
                 const text = e.clipboardData?.getData('text');
                 if (text) {
+                    let sessionId: string | undefined;
                     if (showHomeView) {
-                        createSession();
+                        const newSession = createSession();
+                        sessionId = newSession.id;
                         toggleHomeView(false);
                     }
                     const blob = new Blob([text], { type: 'text/plain' });
                     const file = new File([blob], `pasted_text_${Date.now()}.txt`, { type: 'text/plain' });
-                    addFiles([file]).catch(console.error);
+                    addFiles([file], sessionId).catch(console.error);
                 }
             }
         };
@@ -556,6 +577,7 @@ function Contextractor() {
                             recentProjects={recentProjects}
                             onOpenRecent={openRecentProject}
                             onRemoveRecent={removeRecentProject}
+                            onTogglePinRecent={togglePinRecentProject}
                             onClearRecentProjects={clearRecentProjects}
                             onCreateSession={handleCreateSessionFromHome}
                             onOpenFilePicker={handleOpenFilePicker}
@@ -599,7 +621,7 @@ function Contextractor() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="flex-1 flex flex-col lg:flex-row lg:gap-6 lg:p-6 overflow-hidden relative z-10 max-w-[1800px] w-full mx-auto"
+                        className="flex-1 flex flex-row overflow-hidden relative z-10"
                     >
 
                 {/* Mobile Sidebar Overlay */}
@@ -615,167 +637,300 @@ function Contextractor() {
                     )}
                 </AnimatePresence>
 
-                {/* Explorer Section - Responsive Sidebar */}
+                {/* Activity Bar - VS Code Style */}
+                <div className="hidden lg:flex w-12 flex-col items-center py-2 gap-1 bg-[var(--theme-surface)] border-r border-[var(--theme-border)] shrink-0">
+                    <button
+                        onClick={() => {
+                            if (activeSideView === 'explorer' && isSidebarOpen) {
+                                setIsSidebarOpen(false);
+                            } else {
+                                setActiveSideView('explorer');
+                                setIsSidebarOpen(true);
+                            }
+                        }}
+                        className={`p-2.5 rounded-lg transition-all relative ${activeSideView === 'explorer' && isSidebarOpen ? 'text-[var(--theme-text-primary)]' : 'text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)]'}`}
+                        title="Explorer (Ctrl+Shift+E)"
+                    >
+                        {activeSideView === 'explorer' && isSidebarOpen && (
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-[var(--theme-primary)] rounded-r" />
+                        )}
+                        <GoogleIcon icon={UI_ICONS_MAP.folder_open} className="w-6 h-6" />
+                    </button>
+                    <button
+                        onClick={() => {
+                            if (activeSideView === 'stats' && isSidebarOpen) {
+                                setIsSidebarOpen(false);
+                            } else {
+                                setActiveSideView('stats');
+                                setIsSidebarOpen(true);
+                            }
+                        }}
+                        className={`p-2.5 rounded-lg transition-all relative ${activeSideView === 'stats' && isSidebarOpen ? 'text-[var(--theme-text-primary)]' : 'text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)]'}`}
+                        title="Statistics (Ctrl+Shift+S)"
+                    >
+                        {activeSideView === 'stats' && isSidebarOpen && (
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-[var(--theme-primary)] rounded-r" />
+                        )}
+                        <GoogleIcon icon={UI_ICONS_MAP.chart} className="w-6 h-6" />
+                    </button>
+                </div>
+
+                {/* Sidebar Panel - Resizable */}
+                <AnimatePresence initial={false}>
+                    {isSidebarOpen && (
+                        <motion.aside 
+                            initial={{ width: 0, opacity: 0 }}
+                            animate={{ width: sidebarWidth, opacity: 1 }}
+                            exit={{ width: 0, opacity: 0 }}
+                            transition={{ duration: 0.2, ease: 'easeInOut' }}
+                            className="hidden lg:flex flex-col h-full bg-[var(--theme-surface)] border-r border-[var(--theme-border)] overflow-hidden shrink-0 relative"
+                            style={{ minWidth: 200, maxWidth: 600 }}
+                        >
+                            {/* Sidebar Header */}
+                            <div className="px-4 py-3 border-b border-[var(--theme-border)] flex items-center justify-between shrink-0">
+                                <span className="text-xs font-semibold text-[var(--theme-text-secondary)] uppercase tracking-wider">
+                                    {activeSideView === 'explorer' ? 'Explorer' : 'Statistics'}
+                                </span>
+                                <button
+                                    onClick={() => setIsSidebarOpen(false)}
+                                    className="p-1 rounded hover:bg-[var(--theme-surface-hover)] text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)]"
+                                    title="Close Sidebar"
+                                >
+                                    <GoogleIcon icon={UI_ICONS_MAP.close} className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            {/* Sidebar Content */}
+                            <div className="flex-1 overflow-y-auto overflow-x-hidden">
+                                {activeSideView === 'explorer' ? (
+                                    <div className="flex flex-col h-full">
+                                        {/* Upload Area */}
+                                        <div className="p-3 border-b border-[var(--theme-border)]">
+                                            <motion.div
+                                                onClick={open}
+                                                whileHover={{ scale: 1.01 }}
+                                                whileTap={{ scale: 0.99 }}
+                                                className={`
+                                                    rounded-xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-bg)] p-4 cursor-pointer
+                                                    transition-colors duration-200 flex flex-col items-center text-center gap-2
+                                                    hover:bg-[var(--theme-surface-hover)] hover:border-[var(--theme-text-tertiary)] group
+                                                    ${processing ? 'opacity-50 pointer-events-none' : ''}
+                                                `}
+                                            >
+                                                {processing ? (
+                                                    <div className="w-8 h-8 border-2 border-[var(--theme-surface-elevated)] border-t-[var(--theme-primary)] rounded-full animate-spin"></div>
+                                                ) : (
+                                                    <div className="w-8 h-8 rounded-lg bg-[var(--theme-surface-elevated)] flex items-center justify-center text-[var(--theme-text-tertiary)] group-hover:text-[var(--theme-primary)] transition-colors">
+                                                        <GoogleIcon icon={UI_ICONS_MAP.upload} className="w-4 h-4" />
+                                                    </div>
+                                                )}
+                                                <div>
+                                                    <p className="text-[var(--theme-text-primary)] font-medium text-xs">Drop files or click</p>
+                                                    <p className="text-[10px] text-[var(--theme-text-tertiary)] mt-0.5">ZIP, Folders, Code</p>
+                                                </div>
+                                            </motion.div>
+
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setGitModalOpen(true); }}
+                                                className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium rounded-lg border border-[var(--theme-border)] bg-[var(--theme-bg)] hover:bg-[var(--theme-surface-hover)] text-[var(--theme-text-secondary)] transition-colors"
+                                            >
+                                                <GoogleIcon icon={UI_ICONS_MAP.github} className="w-4 h-4" />
+                                                Import Repository
+                                            </button>
+                                        </div>
+
+                                        {/* File Explorer */}
+                                        <div className="flex-1 flex flex-col min-h-0">
+                                            <div className="px-3 py-2 flex items-center justify-between border-b border-[var(--theme-border)]">
+                                                <span className="text-[10px] font-semibold text-[var(--theme-text-tertiary)] uppercase tracking-wider">Files</span>
+                                                <div className="flex items-center gap-1">
+                                                    {files.length > 0 && (
+                                                        <button
+                                                            onClick={() => setDeleteConfirmOpen(true)}
+                                                            className="p-1 rounded hover:bg-[var(--theme-surface-hover)] text-[var(--theme-text-tertiary)] hover:text-[var(--theme-error)]"
+                                                            title="Clear all files"
+                                                        >
+                                                            <GoogleIcon icon={UI_ICONS_MAP.delete} className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => setViewMode('tree')}
+                                                        className={`p-1 rounded hover:bg-[var(--theme-surface-hover)] ${viewMode === 'tree' ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-text-tertiary)]'}`}
+                                                        title="Tree view"
+                                                    >
+                                                        <GoogleIcon icon={UI_ICONS_MAP.view_tree} className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setViewMode('list')}
+                                                        className={`p-1 rounded hover:bg-[var(--theme-surface-hover)] ${viewMode === 'list' ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-text-tertiary)]'}`}
+                                                        title="List view"
+                                                    >
+                                                        <GoogleIcon icon={UI_ICONS_MAP.view_list} className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className={`flex-1 p-1 scrollbar-thin scrollbar-thumb-[var(--theme-border)] scrollbar-track-transparent ${files.length > 0 ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+                                                {isLoadingSession ? (
+                                                    <div className="flex items-center justify-center h-full text-[var(--theme-text-tertiary)] gap-2">
+                                                        <div className="w-4 h-4 border-2 border-[var(--theme-border)] border-t-[var(--theme-primary)] rounded-full animate-spin"></div>
+                                                        <span className="text-xs">Loading...</span>
+                                                    </div>
+                                                ) : files.length === 0 ? (
+                                                    <div className="flex flex-col items-center justify-center h-full text-[var(--theme-text-tertiary)] py-8 opacity-60">
+                                                        <GoogleIcon icon={UI_ICONS_MAP.folder_open} className="w-12 h-12 mb-2 opacity-30" />
+                                                        <p className="text-xs">No files loaded</p>
+                                                    </div>
+                                                ) : viewMode === 'list' ? (
+                                                    files.length > 50 ? (
+                                                        <VirtualizedFileList files={files} onRemove={removeFile} />
+                                                    ) : (
+                                                        <DndContext
+                                                            sensors={sensors}
+                                                            collisionDetection={closestCenter}
+                                                            onDragStart={handleDragStart}
+                                                            onDragEnd={handleDragEnd}
+                                                        >
+                                                            <SortableContext items={files.map(f => f.id)} strategy={verticalListSortingStrategy}>
+                                                                <ul className="flex flex-col">
+                                                                    {files.map(file => (
+                                                                        <SortableItem key={file.id} file={file} onRemove={removeFile} isDragging={activeId === file.id} />
+                                                                    ))}
+                                                                </ul>
+                                                            </SortableContext>
+                                                            <DragOverlay dropAnimation={{ sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.5' } } }) }}>
+                                                                {activeFile ? <FileCard file={activeFile} isDragging /> : null}
+                                                            </DragOverlay>
+                                                        </DndContext>
+                                                    )
+                                                ) : (
+                                                    <div className="py-1">
+                                                        {fileTree.map(node => (
+                                                            <TreeItem key={node.id} node={node} level={0} onRemove={removeNode} />
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <StatsView files={files} stats={stats} />
+                                )}
+                            </div>
+
+                            {/* Resize Handle */}
+                            <div
+                                className="absolute right-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-[var(--theme-primary)] transition-colors group z-10"
+                                onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    isResizing.current = true;
+                                    const startX = e.clientX;
+                                    const startWidth = sidebarWidth;
+                                    
+                                    const handleMouseMove = (e: MouseEvent) => {
+                                        if (!isResizing.current) return;
+                                        const delta = e.clientX - startX;
+                                        const newWidth = Math.min(600, Math.max(200, startWidth + delta));
+                                        setSidebarWidth(newWidth);
+                                    };
+                                    
+                                    const handleMouseUp = () => {
+                                        isResizing.current = false;
+                                        document.removeEventListener('mousemove', handleMouseMove);
+                                        document.removeEventListener('mouseup', handleMouseUp);
+                                    };
+                                    
+                                    document.addEventListener('mousemove', handleMouseMove);
+                                    document.addEventListener('mouseup', handleMouseUp);
+                                }}
+                            >
+                                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-[var(--theme-border)] rounded opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                        </motion.aside>
+                    )}
+                </AnimatePresence>
+
+                {/* Mobile Sidebar */}
                 <aside 
                     id="mobile-sidebar"
                     role="complementary"
                     aria-label="File explorer"
                     className={`
-                    flex flex-col gap-4 h-full shrink-0
-                    fixed inset-y-0 left-0 z-40 w-[320px] bg-[var(--theme-surface)] p-4 border-r border-[var(--theme-border)] shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.2,0,0,1)]
-                    lg:relative lg:inset-auto lg:z-auto lg:w-[460px] lg:bg-transparent lg:p-0 lg:border-none lg:shadow-none lg:translate-x-0
+                    lg:hidden flex flex-col h-full shrink-0
+                    fixed inset-y-0 left-0 z-40 w-[300px] bg-[var(--theme-surface)] border-r border-[var(--theme-border)] shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.2,0,0,1)]
                     ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
                 `}>
-                    {/* Mobile Sidebar Header */}
-                    <div className="flex items-center justify-between mb-2 lg:hidden">
-                        <h2 className="text-lg font-medium text-[var(--theme-text-primary)] flex items-center gap-2">
-                            <GoogleIcon icon={UI_ICONS_MAP.folder_open} className="w-5 h-5 text-[var(--theme-primary)]" />
-                            Files
-                        </h2>
-                        <GoogleButton variant="icon" icon={UI_ICONS_MAP.close} onClick={() => setIsMobileSidebarOpen(false)} />
-                    </div>
-
-                    {/* Mobile-Only Output Style Selector - Added here as requested */}
-                    <div className="lg:hidden mb-4">
-                        <div className="relative group z-50">
-                            <OutputStyleSelector 
-                                value={outputStyle} 
-                                onChange={setOutputStyle} 
-                            />
-                        </div>
-                    </div>
-
-                    <div className="relative shrink-0">
-                        <motion.div
-                            onClick={open}
-                            whileHover={{ scale: 1.01 }}
-                            whileTap={{ scale: 0.98 }}
-                            className={`
-                                rounded-3xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-surface)] p-6 cursor-pointer
-                                transition-colors duration-200 flex flex-col items-center text-center gap-3
-                                hover:bg-[var(--theme-surface-hover)] hover:border-[var(--theme-text-tertiary)] group relative overflow-hidden
-                                ${processing ? 'opacity-50 pointer-events-none' : ''}
-                            `}
+                    {/* Mobile Activity Bar */}
+                    <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--theme-border)]">
+                        <button
+                            onClick={() => setActiveSideView('explorer')}
+                            className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-colors ${activeSideView === 'explorer' ? 'bg-[var(--theme-surface-elevated)] text-[var(--theme-primary)]' : 'text-[var(--theme-text-tertiary)]'}`}
                         >
-                            {processing ? (
-                                <div className="w-12 h-12 border-4 border-[var(--theme-surface-elevated)] border-t-[var(--theme-primary)] rounded-full animate-spin mb-1"></div>
-                            ) : (
-                                <div className="w-12 h-12 bg-[var(--theme-surface-elevated)] rounded-full flex items-center justify-center text-[var(--theme-text-secondary)] group-hover:text-[var(--theme-primary)] transition-colors shadow-md">
-                                    <GoogleIcon icon={UI_ICONS_MAP.upload} className="w-6 h-6" />
-                                </div>
-                            )}
-                            <div>
-                                <p className="text-[var(--theme-text-primary)] font-medium text-sm">Click to upload or drop</p>
-                                <p className="text-xs text-[var(--theme-text-tertiary)] mt-1">ZIPs, Folders, Code & Clipboard</p>
-                            </div>
-                        </motion.div>
-
-                        <div className="mt-3">
-                            <GoogleButton
-                                variant="outlined"
-                                icon={UI_ICONS_MAP.github}
-                                className="w-full justify-center border-[var(--theme-border)] bg-[var(--theme-surface)]"
-                                onClick={(e) => { if(e) e.stopPropagation(); setGitModalOpen(true); }}
-                            >
-                                Import Repository
-                            </GoogleButton>
-                        </div>
+                            Explorer
+                        </button>
+                        <button
+                            onClick={() => setActiveSideView('stats')}
+                            className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-colors ${activeSideView === 'stats' ? 'bg-[var(--theme-surface-elevated)] text-[var(--theme-primary)]' : 'text-[var(--theme-text-tertiary)]'}`}
+                        >
+                            Statistics
+                        </button>
+                        <button
+                            onClick={() => setIsMobileSidebarOpen(false)}
+                            className="p-2 rounded-lg hover:bg-[var(--theme-surface-hover)] text-[var(--theme-text-tertiary)]"
+                        >
+                            <GoogleIcon icon={UI_ICONS_MAP.close} className="w-4 h-4" />
+                        </button>
                     </div>
 
-                    {files.length > 0 && (
-                        <div className="flex gap-2 overflow-x-auto pb-2 shrink-0 scrollbar-thin scrollbar-thumb-[#444746] scrollbar-track-transparent">
-                            <StatChip label="Files" value={stats.count} />
-                            <StatChip label="Tokens" value={formatNumber(stats.tokens)} />
-                            <StatChip label="Lines" value={formatNumber(stats.lines)} />
-                        </div>
-                    )}
-
-                    <div className="flex-1 flex flex-col min-h-0 bg-[var(--theme-surface)] rounded-3xl border border-[var(--theme-border)] overflow-hidden shadow-lg">
-                        <div className="px-4 py-3 border-b border-[var(--theme-border)] bg-[var(--theme-surface)] sticky top-0 z-10 shrink-0 flex items-center justify-between">
-                            <h3 className="text-[var(--theme-text-secondary)] font-medium text-sm uppercase tracking-wide pl-2">Explorer</h3>
-
-                            <div className="flex items-center gap-2">
-                                {/* Reset Button */}
-                                {files.length > 0 && (
-                                    <GoogleButton
-                                        variant="icon"
-                                        onClick={() => setDeleteConfirmOpen(true)}
-                                        icon={UI_ICONS_MAP.delete}
-                                        className="w-8 h-8 text-[var(--theme-text-tertiary)] hover:text-[var(--theme-error)]"
-                                    />
-                                )}
-
-                                {/* View Toggle */}
-                                <div className="flex bg-[var(--theme-surface-elevated)] rounded-full p-1">
-                                    <GoogleButton
-                                        variant="icon"
-                                        icon={UI_ICONS_MAP.view_tree}
-                                        active={viewMode === 'tree'}
-                                        onClick={() => setViewMode('tree')}
-                                        className="w-8 h-8"
-                                    />
-                                    <GoogleButton
-                                        variant="icon"
-                                        icon={UI_ICONS_MAP.view_list}
-                                        active={viewMode === 'list'}
-                                        onClick={() => setViewMode('list')}
-                                        className="w-8 h-8"
-                                    />
+                    {/* Mobile Sidebar Content */}
+                    <div className="flex-1 overflow-y-auto p-3">
+                        {activeSideView === 'explorer' ? (
+                            <>
+                                <div className="mb-3">
+                                    <OutputStyleSelector value={outputStyle} onChange={setOutputStyle} />
                                 </div>
-                            </div>
-                        </div>
-
-                        <div className={`flex-1 p-2 scrollbar-thin scrollbar-thumb-[var(--theme-border)] scrollbar-track-transparent ${files.length > 0 ? 'overflow-y-auto' : 'overflow-hidden'}`}>
-                            {isLoadingSession ? (
-                                <div className="flex items-center justify-center h-full text-[var(--theme-text-tertiary)] gap-2">
-                                    <div className="w-4 h-4 border-2 border-[var(--theme-border)] border-t-[var(--theme-primary)] rounded-full animate-spin"></div>
-                                    <span className="text-sm">Restoring session...</span>
-                                </div>
-                            ) : files.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-full text-[var(--theme-text-tertiary)] py-10 opacity-60">
-                                    <GoogleIcon icon={UI_ICONS_MAP.folder_open} className="w-16 h-16 mb-4 opacity-20" />
-                                    <p className="text-sm">Workspace empty</p>
-                                </div>
-                            ) : viewMode === 'list' ? (
-                                // Use virtualized list for large file sets (50+), regular DnD for small sets
-                                files.length > 50 ? (
-                                    <VirtualizedFileList files={files} onRemove={removeFile} />
+                                <motion.div
+                                    onClick={open}
+                                    whileTap={{ scale: 0.98 }}
+                                    className="rounded-xl border border-dashed border-[var(--theme-border)] bg-[var(--theme-bg)] p-4 cursor-pointer mb-3 flex flex-col items-center text-center gap-2"
+                                >
+                                    <GoogleIcon icon={UI_ICONS_MAP.upload} className="w-6 h-6 text-[var(--theme-text-tertiary)]" />
+                                    <p className="text-xs text-[var(--theme-text-primary)]">Drop files or click</p>
+                                </motion.div>
+                                <button
+                                    onClick={() => { setGitModalOpen(true); setIsMobileSidebarOpen(false); }}
+                                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs rounded-lg border border-[var(--theme-border)] mb-3"
+                                >
+                                    <GoogleIcon icon={UI_ICONS_MAP.github} className="w-4 h-4" />
+                                    Import Repository
+                                </button>
+                                <div className="text-[10px] font-semibold text-[var(--theme-text-tertiary)] uppercase tracking-wider mb-2 px-1">Files</div>
+                                {files.length === 0 ? (
+                                    <div className="text-center py-8 text-[var(--theme-text-tertiary)] opacity-60">
+                                        <GoogleIcon icon={UI_ICONS_MAP.folder_open} className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                                        <p className="text-xs">No files</p>
+                                    </div>
                                 ) : (
-                                    <DndContext
-                                        sensors={sensors}
-                                        collisionDetection={closestCenter}
-                                        onDragStart={handleDragStart}
-                                        onDragEnd={handleDragEnd}
-                                    >
-                                        <SortableContext items={files.map(f => f.id)} strategy={verticalListSortingStrategy}>
-                                            <ul className="flex flex-col p-2">
-                                                {files.map(file => (
-                                                    <SortableItem key={file.id} file={file} onRemove={removeFile} isDragging={activeId === file.id} />
-                                                ))}
-                                            </ul>
-                                        </SortableContext>
-                                        <DragOverlay dropAnimation={{ sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.5' } } }) }}>
-                                            {activeFile ? <FileCard file={activeFile} isDragging /> : null}
-                                        </DragOverlay>
-                                    </DndContext>
-                                )
-                            ) : (
-                                <div className="p-2">
-                                    {fileTree.map(node => (
-                                        <TreeItem key={node.id} node={node} level={0} onRemove={removeNode} />
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                                    <div className="space-y-0.5">
+                                        {fileTree.map(node => (
+                                            <TreeItem key={node.id} node={node} level={0} onRemove={removeNode} />
+                                        ))}
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <StatsView files={files} stats={stats} />
+                        )}
                     </div>
                 </aside>
 
-                <main className="flex-1 flex flex-col h-full min-w-0" role="main">
-                    <div className="bg-[var(--theme-surface)] lg:rounded-3xl lg:border border-[var(--theme-border)] flex flex-col h-full lg:shadow-lg overflow-hidden relative border-t lg:border-t-0">
-                        <div className="px-4 lg:px-6 py-4 border-b border-[var(--theme-border)] flex items-center justify-between bg-[var(--theme-surface)] shrink-0 flex-wrap gap-4" role="toolbar" aria-label="Code viewer controls">
+                {/* Main Editor Area */}
+                <div className="flex-1 flex flex-col h-full min-w-0">
+                    <div className="bg-[var(--theme-surface)] flex flex-col h-full overflow-hidden relative">
+                        <div className="px-4 py-3 border-b border-[var(--theme-border)] flex items-center justify-between bg-[var(--theme-surface)] shrink-0 flex-wrap gap-3" role="toolbar" aria-label="Code viewer controls">
 
-                            <div className="flex-1 min-w-[240px] flex items-center gap-3 bg-[var(--theme-surface-hover)] rounded-full px-5 py-2.5 border border-[var(--theme-border)] focus-within:border-[var(--theme-primary)] focus-within:bg-[var(--theme-surface)] transition-all" role="search">
-                                <GoogleIcon icon={UI_ICONS_MAP.search} className="text-[var(--theme-text-tertiary)] w-5 h-5" aria-hidden="true" />
+                            <div className="flex-1 min-w-[200px] flex items-center gap-2 bg-[var(--theme-bg)] rounded-lg px-3 py-2 border border-[var(--theme-border)] focus-within:border-[var(--theme-primary)] transition-all" role="search">
+                                <GoogleIcon icon={UI_ICONS_MAP.search} className="text-[var(--theme-text-tertiary)] w-4 h-4" aria-hidden="true" />
                                 <label htmlFor="code-search" className="sr-only">Search in code</label>
                                 <input
                                     id="code-search"
@@ -787,19 +942,19 @@ function Contextractor() {
                                     className="bg-transparent border-none outline-none text-[var(--theme-text-primary)] text-sm w-full placeholder-[var(--theme-text-tertiary)]"
                                 />
                                 {searchTerm && (
-                                    <div className="flex items-center gap-2 pl-2 border-l border-[var(--theme-border)]" role="group" aria-label="Search navigation">
+                                    <div className="flex items-center gap-1.5 pl-2 border-l border-[var(--theme-border)]" role="group" aria-label="Search navigation">
                                         <span id="search-results-count" className="text-xs text-[var(--theme-text-tertiary)] whitespace-nowrap font-mono" aria-live="polite">
                                             {searchMatches.length > 0 ? `${currentMatchIdx + 1}/${searchMatches.length}` : '0'}
                                         </span>
-                                        <button onClick={handlePrevMatch} aria-label="Previous match" className="p-1 hover:text-[var(--theme-primary)] text-[var(--theme-text-secondary)] disabled:opacity-30"><GoogleIcon icon={UI_ICONS_MAP.arrow_up} className="w-4 h-4" aria-hidden="true"/></button>
-                                        <button onClick={handleNextMatch} aria-label="Next match" className="p-1 hover:text-[var(--theme-primary)] text-[var(--theme-text-secondary)] disabled:opacity-30"><GoogleIcon icon={UI_ICONS_MAP.arrow_down} className="w-4 h-4" aria-hidden="true"/></button>
-                                        <button onClick={() => setSearchTerm("")} aria-label="Clear search" className="p-1 hover:text-[var(--theme-error)] text-[var(--theme-text-tertiary)]"><GoogleIcon icon={UI_ICONS_MAP.close} className="w-4 h-4" aria-hidden="true"/></button>
+                                        <button onClick={handlePrevMatch} aria-label="Previous match" className="p-0.5 hover:text-[var(--theme-primary)] text-[var(--theme-text-secondary)]"><GoogleIcon icon={UI_ICONS_MAP.arrow_up} className="w-3.5 h-3.5" aria-hidden="true"/></button>
+                                        <button onClick={handleNextMatch} aria-label="Next match" className="p-0.5 hover:text-[var(--theme-primary)] text-[var(--theme-text-secondary)]"><GoogleIcon icon={UI_ICONS_MAP.arrow_down} className="w-3.5 h-3.5" aria-hidden="true"/></button>
+                                        <button onClick={() => setSearchTerm("")} aria-label="Clear search" className="p-0.5 hover:text-[var(--theme-error)] text-[var(--theme-text-tertiary)]"><GoogleIcon icon={UI_ICONS_MAP.close} className="w-3.5 h-3.5" aria-hidden="true"/></button>
                                     </div>
                                 )}
                             </div>
 
-                            <div className="flex items-center gap-3 shrink-0">
-                                <div className="relative hidden md:block group z-50">
+                            <div className="flex items-center gap-2 shrink-0">
+                                <div className="relative hidden md:block">
                                     <OutputStyleSelector 
                                         value={outputStyle} 
                                         onChange={setOutputStyle} 
@@ -817,9 +972,8 @@ function Contextractor() {
                             </div>
                         </div>
 
-                        {/* High-Performance Virtualized Code Viewer */}
+                        {/* Code Viewer */}
                         <div className="relative flex-1 min-h-0 bg-[var(--theme-bg)] overflow-hidden">
-                            {/* Hidden textarea for copy and select all functionality */}
                             <textarea
                                 ref={textAreaRef}
                                 value={combinedText}
@@ -829,7 +983,6 @@ function Contextractor() {
                                 aria-hidden="true"
                             />
                             
-                            {/* Processing indicator */}
                             {isTextPending && (
                                 <div className="absolute top-2 right-2 z-10 bg-[var(--theme-surface)]/90 backdrop-blur-sm px-3 py-1.5 rounded-full border border-[var(--theme-border)] flex items-center gap-2">
                                     <div className="w-3 h-3 border-2 border-[var(--theme-primary)] border-t-transparent rounded-full animate-spin" />
@@ -837,7 +990,6 @@ function Contextractor() {
                                 </div>
                             )}
                             
-                            {/* Virtualized Code Display - Only renders visible lines */}
                             <VirtualizedCodeViewer
                                 content={combinedText}
                                 lineNumbers={lineNumbers}
@@ -847,7 +999,7 @@ function Contextractor() {
                             />
                         </div>
                     </div>
-                </main>
+                </div>
                 </motion.main>
                 )}
             </AnimatePresence>

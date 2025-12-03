@@ -4,10 +4,12 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RecentProject } from '@/types/session';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
 import { formatNumber } from '@/lib/format';
+import { LANGUAGE_CONFIG } from '@/constants/languages';
 
 // Material You Icons - Clean, minimal paths
 const ICONS = {
@@ -24,33 +26,7 @@ const ICONS = {
     clearAll: "M5 13h14v-2H5v2zm-2 4h14v-2H3v2zM7 7v2h14V7H7z",
     folder: "M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z",
     openInNew: "M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z",
-};
-
-// Language/Extension icons and colors
-const LANGUAGE_CONFIG: Record<string, { color: string; name: string }> = {
-    ts: { color: '#3178C6', name: 'TypeScript' },
-    tsx: { color: '#3178C6', name: 'React TSX' },
-    js: { color: '#F7DF1E', name: 'JavaScript' },
-    jsx: { color: '#61DAFB', name: 'React JSX' },
-    py: { color: '#3776AB', name: 'Python' },
-    java: { color: '#ED8B00', name: 'Java' },
-    go: { color: '#00ADD8', name: 'Go' },
-    rs: { color: '#DEA584', name: 'Rust' },
-    vue: { color: '#42B883', name: 'Vue' },
-    svelte: { color: '#FF3E00', name: 'Svelte' },
-    css: { color: '#1572B6', name: 'CSS' },
-    scss: { color: '#CC6699', name: 'SCSS' },
-    html: { color: '#E34F26', name: 'HTML' },
-    json: { color: '#292929', name: 'JSON' },
-    md: { color: '#083FA1', name: 'Markdown' },
-    php: { color: '#777BB4', name: 'PHP' },
-    rb: { color: '#CC342D', name: 'Ruby' },
-    swift: { color: '#FA7343', name: 'Swift' },
-    kt: { color: '#7F52FF', name: 'Kotlin' },
-    c: { color: '#A8B9CC', name: 'C' },
-    cpp: { color: '#00599C', name: 'C++' },
-    cs: { color: '#239120', name: 'C#' },
-    txt: { color: '#8E918F', name: 'Text' },
+    pin: "M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z",
 };
 
 // Format relative time
@@ -88,6 +64,7 @@ interface HomeViewProps {
     recentProjects: RecentProject[];
     onOpenRecent: (projectId: string) => void;
     onRemoveRecent: (projectId: string) => void;
+    onTogglePinRecent: (projectId: string) => void;
     onClearRecentProjects: () => void;
     onCreateSession: () => void;
     onOpenFilePicker: () => void;
@@ -101,6 +78,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
     recentProjects,
     onOpenRecent,
     onRemoveRecent,
+    onTogglePinRecent,
     onClearRecentProjects,
     onCreateSession,
     onOpenFilePicker,
@@ -125,20 +103,22 @@ export const HomeView: React.FC<HomeViewProps> = ({
         }
 
         // Sort
-        switch (sortBy) {
-            case 'name':
-                result.sort((a, b) => a.name.localeCompare(b.name));
-                break;
-            case 'fileCount':
-                result.sort((a, b) => b.fileCount - a.fileCount);
-                break;
-            case 'createdAt':
-                result.sort((a, b) => b.createdAt - a.createdAt);
-                break;
-            case 'lastOpened':
-            default:
-                result.sort((a, b) => b.lastOpened - a.lastOpened);
-        }
+        result.sort((a, b) => {
+            // Always prioritize pinned projects
+            if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+            
+            switch (sortBy) {
+                case 'name':
+                    return a.name.localeCompare(b.name);
+                case 'fileCount':
+                    return b.fileCount - a.fileCount;
+                case 'createdAt':
+                    return b.createdAt - a.createdAt;
+                case 'lastOpened':
+                default:
+                    return b.lastOpened - a.lastOpened;
+            }
+        });
 
         return result;
     }, [recentProjects, searchQuery, sortBy]);
@@ -151,28 +131,21 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     className="text-center mb-16"
                     role="banner"
                 >
-                    {/* App Icon - inline SVG for instant LCP */}
+                    {/* App Icon */}
                     <div className="flex justify-center mb-6">
                         <div 
                             className="relative w-20 h-20 rounded-[28px] bg-gradient-to-br from-[var(--theme-primary)] to-[#6366f1] p-[2px] shadow-lg shadow-[var(--theme-primary)]/20"
                             aria-hidden="true"
                         >
                             <div className="w-full h-full rounded-[26px] bg-[var(--theme-surface)] flex items-center justify-center overflow-hidden">
-                                {/* Inline SVG icon for zero network latency */}
-                                <svg 
-                                    width="52" 
-                                    height="52" 
-                                    viewBox="0 0 512 512" 
-                                    fill="none" 
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    className="text-[var(--theme-primary)]"
-                                    aria-hidden="true"
-                                >
-                                    <rect width="512" height="512" rx="128" fill="currentColor" fillOpacity="0.1"/>
-                                    <path d="M256 96C167.6 96 96 167.6 96 256s71.6 160 160 160 160-71.6 160-160S344.4 96 256 96zm0 280c-66.2 0-120-53.8-120-120s53.8-120 120-120 120 53.8 120 120-53.8 120-120 120z" fill="currentColor"/>
-                                    <path d="M256 176c-44.1 0-80 35.9-80 80s35.9 80 80 80 80-35.9 80-80-35.9-80-80-80zm0 120c-22.1 0-40-17.9-40-40s17.9-40 40-40 40 17.9 40 40-17.9 40-40 40z" fill="currentColor"/>
-                                    <circle cx="256" cy="256" r="24" fill="currentColor"/>
-                                </svg>
+                                <Image
+                                    src="/icon.png"
+                                    alt="Contextractor Logo"
+                                    width={80}
+                                    height={80}
+                                    className="w-full h-full object-cover"
+                                    priority
+                                />
                             </div>
                         </div>
                     </div>
@@ -327,6 +300,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                                                 onLeave={() => setHoveredProjectId(null)}
                                                 onOpen={() => onOpenRecent(project.id)}
                                                 onRemove={() => onRemoveRecent(project.id)}
+                                                onTogglePin={() => onTogglePinRecent(project.id)}
                                             />
                                         ))}
                                     </motion.div>
@@ -339,6 +313,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                                                 index={index}
                                                 onOpen={() => onOpenRecent(project.id)}
                                                 onRemove={() => onRemoveRecent(project.id)}
+                                                onTogglePin={() => onTogglePinRecent(project.id)}
                                             />
                                         ))}
                                     </motion.div>
@@ -452,6 +427,7 @@ interface RecentProjectCardProps {
     onLeave: () => void;
     onOpen: () => void;
     onRemove: () => void;
+    onTogglePin: () => void;
 }
 
 const RecentProjectCard: React.FC<RecentProjectCardProps> = ({
@@ -462,6 +438,7 @@ const RecentProjectCard: React.FC<RecentProjectCardProps> = ({
     onLeave,
     onOpen,
     onRemove,
+    onTogglePin,
 }) => {
     const langConfig = LANGUAGE_CONFIG[project.primaryLanguage || 'txt'] || LANGUAGE_CONFIG.txt;
 
@@ -475,7 +452,7 @@ const RecentProjectCard: React.FC<RecentProjectCardProps> = ({
             onMouseEnter={onHover}
             onMouseLeave={onLeave}
             onClick={onOpen}
-            className="group bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-2xl overflow-hidden cursor-pointer hover:border-[var(--theme-primary)]/30 hover:shadow-lg hover:shadow-black/5 transition-all duration-300"
+            className={`group bg-[var(--theme-surface)] border ${project.isPinned ? 'border-[var(--theme-primary)] shadow-md shadow-[var(--theme-primary)]/5' : 'border-[var(--theme-border)]'} rounded-2xl overflow-hidden cursor-pointer hover:border-[var(--theme-primary)]/30 hover:shadow-lg hover:shadow-black/5 transition-all duration-300 relative`}
         >
             {/* Header with language color */}
             <div 
@@ -512,23 +489,45 @@ const RecentProjectCard: React.FC<RecentProjectCardProps> = ({
                         </div>
                     </div>
 
-                    {/* Remove Button */}
-                    <AnimatePresence>
-                        {isHovered && (
-                            <motion.button
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.8 }}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onRemove();
-                                }}
-                                className="w-8 h-8 bg-[var(--theme-surface-hover)] rounded-lg flex items-center justify-center text-[var(--theme-text-tertiary)] hover:text-[var(--theme-error)] hover:bg-[var(--theme-error)]/10 transition-all shrink-0"
-                            >
-                                <GoogleIcon path={ICONS.delete} className="w-4 h-4" />
-                            </motion.button>
-                        )}
-                    </AnimatePresence>
+                    {/* Actions */}
+                    <div className="flex items-center gap-1">
+                        {/* Pin Button */}
+                        <AnimatePresence>
+                            {(isHovered || project.isPinned) && (
+                                <motion.button
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.8 }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onTogglePin();
+                                    }}
+                                    className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all shrink-0 ${project.isPinned ? 'bg-[var(--theme-primary)]/10 text-[var(--theme-primary)]' : 'bg-[var(--theme-surface-hover)] text-[var(--theme-text-tertiary)] hover:text-[var(--theme-primary)]'}`}
+                                    title={project.isPinned ? "Unpin project" : "Pin project"}
+                                >
+                                    <GoogleIcon path={ICONS.pin} className={`w-4 h-4 ${project.isPinned ? 'rotate-45' : ''}`} />
+                                </motion.button>
+                            )}
+                        </AnimatePresence>
+
+                        {/* Remove Button */}
+                        <AnimatePresence>
+                            {isHovered && (
+                                <motion.button
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.8 }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onRemove();
+                                    }}
+                                    className="w-8 h-8 bg-[var(--theme-surface-hover)] rounded-lg flex items-center justify-center text-[var(--theme-text-tertiary)] hover:text-[var(--theme-error)] hover:bg-[var(--theme-error)]/10 transition-all shrink-0"
+                                >
+                                    <GoogleIcon path={ICONS.delete} className="w-4 h-4" />
+                                </motion.button>
+                            )}
+                        </AnimatePresence>
+                    </div>
                 </div>
 
                 {/* Stats */}
@@ -562,6 +561,7 @@ interface RecentProjectRowProps {
     index: number;
     onOpen: () => void;
     onRemove: () => void;
+    onTogglePin: () => void;
 }
 
 const RecentProjectRow: React.FC<RecentProjectRowProps> = ({
@@ -569,6 +569,7 @@ const RecentProjectRow: React.FC<RecentProjectRowProps> = ({
     index,
     onOpen,
     onRemove,
+    onTogglePin,
 }) => {
     const langConfig = LANGUAGE_CONFIG[project.primaryLanguage || 'txt'] || LANGUAGE_CONFIG.txt;
 
@@ -580,7 +581,7 @@ const RecentProjectRow: React.FC<RecentProjectRowProps> = ({
             exit={{ opacity: 0, x: 20 }}
             transition={{ delay: index * 0.03 }}
             onClick={onOpen}
-            className="group flex items-center gap-4 bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-xl p-4 cursor-pointer hover:border-[var(--theme-primary)]/30 hover:bg-[var(--theme-surface-hover)] transition-all duration-200"
+            className={`group flex items-center gap-4 bg-[var(--theme-surface)] border ${project.isPinned ? 'border-[var(--theme-primary)] bg-[var(--theme-primary)]/5' : 'border-[var(--theme-border)]'} rounded-xl p-4 cursor-pointer hover:border-[var(--theme-primary)]/30 hover:bg-[var(--theme-surface-hover)] transition-all duration-200`}
         >
             {/* Icon */}
             <div 
@@ -624,6 +625,16 @@ const RecentProjectRow: React.FC<RecentProjectRowProps> = ({
 
             {/* Actions */}
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onTogglePin();
+                    }}
+                    className={`p-2 rounded-lg transition-all ${project.isPinned ? 'text-[var(--theme-primary)] bg-[var(--theme-primary)]/10' : 'text-[var(--theme-text-tertiary)] hover:text-[var(--theme-primary)] hover:bg-[var(--theme-primary)]/10'}`}
+                    title={project.isPinned ? "Unpin project" : "Pin project"}
+                >
+                    <GoogleIcon path={ICONS.pin} className={`w-4 h-4 ${project.isPinned ? 'rotate-45' : ''}`} />
+                </button>
                 <button
                     onClick={(e) => {
                         e.stopPropagation();

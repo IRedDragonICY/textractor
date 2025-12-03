@@ -47,6 +47,7 @@ export interface RecentProject {
     sessionSnapshot: Session;
     // Track which open sessions came from this recent project
     openSessionIds?: string[];
+    isPinned?: boolean;
 }
 
 export interface SessionManagerState {
