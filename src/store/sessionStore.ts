@@ -84,6 +84,7 @@ interface SessionState {
     sessions: SessionMeta[];
     activeSessionId: string | null;
     recentProjects: RecentProjectMeta[];
+    gitHubImportHistory: string[];
     showHomeView: boolean;
     isLoading: boolean;
     loadingProgress: number;
@@ -123,6 +124,9 @@ interface SessionActions {
     reorderSessions: (fromIndex: number, toIndex: number) => void;
     openSettingsTab: () => void;
     openReportIssueTab: () => void;
+    
+    // GitHub import history
+    addToGitHubHistory: (url: string) => void;
     
     // Loading state
     setLoading: (isLoading: boolean) => void;
@@ -201,6 +205,7 @@ export const useSessionStore = create<SessionStore>()(
             sessions: [],
             activeSessionId: null,
             recentProjects: [],
+            gitHubImportHistory: [],
             showHomeView: true,
             isLoading: true,
             loadingProgress: 0,
@@ -667,6 +672,17 @@ export const useSessionStore = create<SessionStore>()(
                     state.showHomeView = false;
                 });
             },
+
+            // ========== GitHub Import History ==========
+            
+            addToGitHubHistory: (url) => {
+                set((state) => {
+                    // Remove existing occurrence if present (to move to top)
+                    const filtered = state.gitHubImportHistory.filter(u => u !== url);
+                    // Add to beginning and limit to 5 items
+                    state.gitHubImportHistory = [url, ...filtered].slice(0, 5);
+                });
+            },
         })),
         {
             name: 'contextractor-session-store',
@@ -676,6 +692,7 @@ export const useSessionStore = create<SessionStore>()(
                 sessions: state.sessions,
                 activeSessionId: state.activeSessionId,
                 recentProjects: state.recentProjects,
+                gitHubImportHistory: state.gitHubImportHistory,
                 showHomeView: state.showHomeView,
             }),
             onRehydrateStorage: () => (state) => {
@@ -712,6 +729,9 @@ export const useSessionFiles = (sessionId: string) => useSessionStore((state) =>
 
 /** Get recent projects */
 export const useRecentProjects = () => useSessionStore((state) => state.recentProjects);
+
+/** Get GitHub import history */
+export const useGitHubImportHistory = () => useSessionStore((state) => state.gitHubImportHistory);
 
 /** Get UI state */
 export const useShowHomeView = () => useSessionStore((state) => state.showHomeView);
@@ -760,6 +780,7 @@ export const useSessionActions = () => useSessionStore((state) => ({
     reorderSessions: state.reorderSessions,
     openSettingsTab: state.openSettingsTab,
     openReportIssueTab: state.openReportIssueTab,
+    addToGitHubHistory: state.addToGitHubHistory,
 }));
 
 // ============================================

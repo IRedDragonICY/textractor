@@ -9,6 +9,7 @@ import { GitTreeNode, GitRepoMetadata, FileData } from '@/types';
 import { getFileIconInfo } from '@/lib/icons';
 import { fetchGitTree, countSelectedFiles, fetchGitRefs, fetchGitCommits } from '@/lib/git-service';
 import { gitImportManager } from '@/lib/git-import-worker';
+import { useGitHubImportHistory, useSessionStore } from '@/store/sessionStore';
 
 import { AppSettings } from '@/types/settings';
 
@@ -204,8 +205,13 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
     const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
     const [isCommitDropdownOpen, setIsCommitDropdownOpen] = useState(false);
     const [branchSearchTerm, setBranchSearchTerm] = useState('');
+    const [isInputFocused, setIsInputFocused] = useState(false);
     const branchDropdownRef = useRef<HTMLDivElement>(null);
     const commitDropdownRef = useRef<HTMLDivElement>(null);
+    
+    // GitHub import history
+    const gitHubImportHistory = useGitHubImportHistory();
+    const addToGitHubHistory = useSessionStore((state) => state.addToGitHubHistory);
     
     // Reset state when modal closes
     useEffect(() => {
@@ -407,6 +413,9 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
             setMetadata(result.metadata);
             setCurrentRef(result.metadata.branch);
             setStep('select');
+            
+            // Add to history on successful fetch
+            addToGitHubHistory(gitUrl);
             
             // Fetch refs
             fetchGitRefs(result.metadata.owner, result.metadata.repo).then(refs => {
@@ -767,10 +776,13 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
                                     type="text"
                                     value={gitUrl}
                                     onChange={(e) => setGitUrl(e.target.value)}
+                                    onFocus={() => setIsInputFocused(true)}
+                                    onBlur={() => setTimeout(() => setIsInputFocused(false), 150)}
                                     placeholder="https://github.com/username/repo"
                                     className="w-full bg-[var(--theme-surface-hover)] border border-[var(--theme-border)] rounded-xl pl-12 pr-4 py-3.5 text-[var(--theme-text-primary)] placeholder-[var(--theme-text-tertiary)] focus:outline-none focus:border-[var(--theme-primary)] focus:ring-1 focus:ring-[var(--theme-primary)] transition-all"
                                     disabled={loading}
                                     autoFocus
+                                    autoComplete="off"
                                 />
                                 <div className="absolute left-4 top-3.5 text-[var(--theme-text-secondary)]">
                                     <GoogleIcon icon={UI_ICONS_MAP.search} className="w-5 h-5" />
@@ -782,6 +794,58 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
                                 )}
                             </div>
                         </div>
+
+                        {/* Recent Imports History */}
+                        <AnimatePresence>
+                            {gitHubImportHistory.length > 0 && (isInputFocused || !gitUrl) && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: -8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -8 }}
+                                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                                    className="mb-4"
+                                >
+                                    <div className="border-t border-white/10 pt-4">
+                                        <p className="text-xs text-zinc-500 uppercase tracking-wide font-medium mb-2 px-1">
+                                            Recent Imports
+                                        </p>
+                                        <div className="space-y-1">
+                                            {gitHubImportHistory.map((url, index) => {
+                                                // Extract repo name for display
+                                                const urlParts = url.replace(/^https?:\/\//, '').split('/');
+                                                const displayName = urlParts.length >= 3 
+                                                    ? `${urlParts[1]}/${urlParts[2].replace('.git', '')}`
+                                                    : url;
+                                                
+                                                return (
+                                                    <motion.button
+                                                        key={url}
+                                                        initial={{ opacity: 0, x: -10 }}
+                                                        animate={{ opacity: 1, x: 0 }}
+                                                        transition={{ delay: index * 0.05 }}
+                                                        type="button"
+                                                        onClick={() => setGitUrl(url)}
+                                                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 hover:bg-zinc-800/50 transition-colors duration-150 cursor-pointer group"
+                                                    >
+                                                        <GoogleIcon 
+                                                            icon={UI_ICONS_MAP.github} 
+                                                            className="w-4 h-4 text-zinc-500 group-hover:text-zinc-400 transition-colors shrink-0" 
+                                                        />
+                                                        <span className="text-sm text-[var(--theme-text-secondary)] group-hover:text-[var(--theme-text-primary)] transition-colors truncate flex-1 text-left">
+                                                            {displayName}
+                                                        </span>
+                                                        <GoogleIcon 
+                                                            icon={UI_ICONS_MAP.chevron_right} 
+                                                            className="w-4 h-4 text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" 
+                                                        />
+                                                    </motion.button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
 
                         {loading && loadingText && (
                             <div className="bg-[var(--theme-primary)]/10 border border-[var(--theme-primary)]/30 rounded-xl p-4 mb-4 flex items-center gap-3">
