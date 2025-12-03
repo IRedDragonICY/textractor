@@ -42,7 +42,7 @@ import { VirtualizedFileList } from '@/components/VirtualizedFileList';
 import { StatsView } from '@/components/StatsView';
 
 // Hooks
-import { useSearch } from '@/hooks/useSearch';
+import { useSearchLines } from '@/hooks/useSearch';
 import { useSessionManager, fileDataToSessionFile, convertSessionFiles } from '@/hooks/useSessionManager';
 import { useHistory } from '@/hooks/useHistory';
 import { ThemeProvider, useThemeProvider } from '@/hooks/useTheme';
@@ -154,32 +154,74 @@ function Contextractor() {
     // OPTIMIZED CODE PROCESSING - Zero-Delay Tab Switching
     // ============================================
     
-    // Processed text state - initialized with immediate sync computation
-    const [combinedText, setCombinedText] = useState('');
+    // Processed lines state - lines array for zero main-thread blocking
+    const [combinedLines, setCombinedLines] = useState<string[]>([]);
     const [tokenSavings, setTokenSavings] = useState<number | undefined>(undefined);
-    const [isProcessing, setIsProcessing] = useState(false);
+    // Track which session is currently processing (null = none)
+    const [processingSessionId, setProcessingSessionId] = useState<string | null>(null);
+    
+    // isProcessing is true only if the CURRENT session is processing
+    const isProcessing = processingSessionId === activeSessionId;
     
     // Use deferred value for expensive renders - keeps UI responsive during processing
-    const deferredCombinedText = useDeferredValue(combinedText);
-    const isStale = deferredCombinedText !== combinedText;
+    const deferredCombinedLines = useDeferredValue(combinedLines);
+    const isStale = deferredCombinedLines !== combinedLines;
     
     // Memoized text files to prevent unnecessary re-renders
     const textFiles = useMemo(() => files.filter(f => f.isText), [files]);
     
-    // Generate raw output synchronously (instant, no processing)
-    const rawOutput = useMemo(() => {
-        if (textFiles.length === 0) return '';
-        return textFiles.map(f => {
+    // Generate raw output as lines array synchronously (instant, no processing)
+    const rawOutputLines = useMemo((): string[] => {
+        if (textFiles.length === 0) return [];
+        
+        const lines: string[] = [];
+        
+        for (let i = 0; i < textFiles.length; i++) {
+            const f = textFiles[i];
             const pathLabel = f.path || f.name;
             const ext = f.name.split('.').pop() || 'txt';
-            switch (outputStyle) {
-                case 'hash': return `# --- ${pathLabel} ---\n${f.content}`;
-                case 'minimal': return `--- ${pathLabel} ---\n${f.content}`;
-                case 'xml': return `<file name="${pathLabel}">\n${f.content}\n</file>`;
-                case 'markdown': return `### ${pathLabel}\n\`\`\`${ext}\n${f.content}\n\`\`\``;
-                case 'standard': default: return `/* --- ${pathLabel} --- */\n${f.content}`;
+            
+            // Add separator between files
+            if (i > 0) {
+                lines.push('');
             }
-        }).join('\n\n');
+            
+            // Add header based on output style
+            switch (outputStyle) {
+                case 'hash':
+                    lines.push(`# --- ${pathLabel} ---`);
+                    break;
+                case 'minimal':
+                    lines.push(`--- ${pathLabel} ---`);
+                    break;
+                case 'xml':
+                    lines.push(`<file name="${pathLabel}">`);
+                    break;
+                case 'markdown':
+                    lines.push(`### ${pathLabel}`);
+                    lines.push(`\`\`\`${ext}`);
+                    break;
+                case 'standard':
+                default:
+                    lines.push(`/* --- ${pathLabel} --- */`);
+                    break;
+            }
+            
+            // Push each content line
+            const contentLines = f.content.split('\n');
+            for (const line of contentLines) {
+                lines.push(line);
+            }
+            
+            // Add closing tags
+            if (outputStyle === 'xml') {
+                lines.push('</file>');
+            } else if (outputStyle === 'markdown') {
+                lines.push('```');
+            }
+        }
+        
+        return lines;
     }, [textFiles, outputStyle]);
 
     // INSTANT: Set content immediately on session/style change
@@ -187,14 +229,14 @@ function Contextractor() {
     // For other modes, this shows raw first, then updates with processed
     useEffect(() => {
         if (textFiles.length === 0) {
-            setCombinedText('');
+            setCombinedLines([]);
             setTokenSavings(undefined);
             return;
         }
 
         // For raw mode - instant, no processing needed
         if (codeProcessingMode === 'raw') {
-            setCombinedText(rawOutput);
+            setCombinedLines(rawOutputLines);
             setTokenSavings(undefined);
             return;
         }
@@ -209,15 +251,15 @@ function Contextractor() {
             );
             
             if (cached) {
-                setCombinedText(cached.result);
+                setCombinedLines(cached.lines);
                 setTokenSavings(cached.tokenSavings);
                 return;
             }
         }
 
         // Cache miss: Show raw output IMMEDIATELY while processing
-        setCombinedText(rawOutput);
-        setIsProcessing(true);
+        setCombinedLines(rawOutputLines);
+        setProcessingSessionId(activeSessionId);
 
         // Process in background
         const abortController = new AbortController();
@@ -233,11 +275,12 @@ function Contextractor() {
             outputStyle,
             codeProcessingMode
         )
-            .then(({ result, tokenSavings: savings }) => {
+            .then(({ lines, tokenSavings: savings }) => {
                 if (!abortController.signal.aborted) {
-                    setCombinedText(result);
+                    setCombinedLines(lines);
                     setTokenSavings(savings);
-                    setIsProcessing(false);
+                    // Only clear if this session is still the one processing
+                    setProcessingSessionId(prev => prev === activeSessionId ? null : prev);
                     
                     // Cache for next time
                     if (activeSessionId) {
@@ -246,7 +289,7 @@ function Contextractor() {
                             textFiles.map(f => ({ id: f.id, content: f.content })),
                             outputStyle,
                             codeProcessingMode,
-                            result,
+                            lines,
                             savings
                         );
                     }
@@ -255,14 +298,23 @@ function Contextractor() {
             .catch((error) => {
                 if (!abortController.signal.aborted && error.message !== 'Cancelled') {
                     console.error('Processing error:', error);
-                    setIsProcessing(false);
+                    setProcessingSessionId(prev => prev === activeSessionId ? null : prev);
                 }
             });
 
         return () => {
             abortController.abort();
         };
-    }, [textFiles, outputStyle, codeProcessingMode, activeSessionId, rawOutput]);
+    }, [textFiles, outputStyle, codeProcessingMode, activeSessionId, rawOutputLines]);
+
+    // Compute combinedText ONLY when needed for clipboard (lazy join)
+    // This avoids the expensive join on every render
+    const getCombinedText = useCallback(() => {
+        return combinedLines.join('\n');
+    }, [combinedLines]);
+    
+    // For checking if there's content (cheap length check)
+    const hasContent = combinedLines.length > 0;
 
     // Cleanup worker on unmount
     useEffect(() => {
@@ -381,11 +433,11 @@ function Contextractor() {
         setFiles([]);
     }, [setFiles]);
 
-    // Search Hook
+    // Search Hook - uses lines-based search for performance
     const { 
         searchTerm, setSearchTerm, searchMatches, currentMatchIdx, 
         handleNextMatch, handlePrevMatch 
-    } = useSearch(combinedText, textAreaRef);
+    } = useSearchLines(deferredCombinedLines);
 
     // DnD Sensors
     const sensors = useSensors(
@@ -538,7 +590,7 @@ function Contextractor() {
             // Ctrl+E: Export
             if (e.ctrlKey && e.key === 'e') {
                 e.preventDefault();
-                if (combinedText) {
+                if (hasContent) {
                     setExportModalOpen(true);
                 }
             }
@@ -547,24 +599,8 @@ function Contextractor() {
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [activeSessionId, sessions, createSession, handleCloseSession, switchSession, toggleHomeView, handleUndo, handleRedo]);
 
-    // Text Area Utils
-    const lineNumbers = useMemo(() => {
-        const targetFiles = files.filter(f => f.isText);
-
-        return targetFiles.map(f => {
-            const lines = f.linesOfCode;
-            const fileLineNums = Array.from({ length: lines }, (_, i) => i + 1).join('\n');
-
-            switch (outputStyle) {
-                case 'markdown': return ` \n \n${fileLineNums}\n `;
-                case 'xml': return ` \n${fileLineNums}\n `;
-                default: return ` \n${fileLineNums}`;
-            }
-        }).join('\n\n');
-    }, [files, outputStyle]);
-
     const copyToClipboard = () => {
-        if (!combinedText) return;
+        if (!hasContent) return;
 
         // Security Check
         if (settings.security.enablePreFlightCheck) {
@@ -580,8 +616,8 @@ function Contextractor() {
     };
 
     const performCopy = () => {
-        if (!combinedText) return;
-        navigator.clipboard.writeText(combinedText)
+        if (!hasContent) return;
+        navigator.clipboard.writeText(getCombinedText())
             .then(() => {
                 setIsCopied(true);
                 setTimeout(() => setIsCopied(false), 3000);
@@ -641,7 +677,7 @@ function Contextractor() {
                         onShowSettings={openSettingsTab}
                         onReportIssue={openReportIssueTab}
                         onExport={() => setExportModalOpen(true)}
-                        hasContent={!!combinedText}
+                        hasContent={hasContent}
                     />
                 </div>
             </nav>
@@ -1100,7 +1136,7 @@ function Contextractor() {
                                     onClick={copyToClipboard}
                                     variant="filled"
                                     icon={isCopied ? UI_ICONS_MAP.check : UI_ICONS_MAP.copy}
-                                    disabled={!combinedText || isProcessing}
+                                    disabled={!hasContent || isProcessing}
                                 >
                                     {isCopied ? 'Copied' : isProcessing ? 'Processing...' : 'Copy'}
                                 </GoogleButton>
@@ -1109,9 +1145,10 @@ function Contextractor() {
 
                         {/* Code Viewer */}
                         <div className="relative flex-1 min-h-0 bg-[var(--theme-bg)] overflow-hidden">
+                            {/* Hidden textarea for clipboard fallback - value computed lazily */}
                             <textarea
                                 ref={textAreaRef}
-                                value={combinedText}
+                                defaultValue=""
                                 readOnly
                                 className="absolute opacity-0 pointer-events-none"
                                 tabIndex={-1}
@@ -1126,8 +1163,7 @@ function Contextractor() {
                             )}
                             
                             <VirtualizedCodeViewer
-                                content={deferredCombinedText}
-                                lineNumbers={lineNumbers}
+                                lines={deferredCombinedLines}
                                 searchTerm={searchTerm}
                                 currentMatchIdx={currentMatchIdx}
                                 searchMatches={searchMatches}
@@ -1272,7 +1308,7 @@ function Contextractor() {
                     <ExportModal
                         isOpen={exportModalOpen}
                         onClose={() => setExportModalOpen(false)}
-                        content={combinedText}
+                        content={getCombinedText()}
                         files={files}
                         outputStyle={outputStyle}
                         sessionName={activeSession?.name || 'export'}

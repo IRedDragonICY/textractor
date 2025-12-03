@@ -1,5 +1,6 @@
-import { useState, useEffect, RefObject } from 'react';
+import { useState, useEffect, useCallback, RefObject } from 'react';
 
+// Legacy hook for string-based search (kept for backward compatibility)
 export const useSearch = (
     textToSearch: string,
     textAreaRef: RefObject<HTMLTextAreaElement | null>
@@ -49,6 +50,53 @@ export const useSearch = (
         textAreaRef.current?.blur();
         textAreaRef.current?.focus();
     };
+
+    return {
+        searchTerm,
+        setSearchTerm,
+        searchMatches,
+        currentMatchIdx,
+        handleNextMatch,
+        handlePrevMatch
+    };
+};
+
+// New hook for lines-based search (avoids main thread string operations)
+export const useSearchLines = (lines: string[]) => {
+    const [searchTerm, setSearchTerm] = useState("");
+    const [searchMatches, setSearchMatches] = useState<number[]>([]); // Line indices
+    const [currentMatchIdx, setCurrentMatchIdx] = useState(0);
+
+    useEffect(() => {
+        if (!searchTerm || lines.length === 0) {
+            setSearchMatches([]);
+            setCurrentMatchIdx(0);
+            return;
+        }
+        
+        const lowerTerm = searchTerm.toLowerCase();
+        const matches: number[] = [];
+        
+        // Find all line indices that contain the search term
+        for (let i = 0; i < lines.length; i++) {
+            if (lines[i].toLowerCase().includes(lowerTerm)) {
+                matches.push(i);
+            }
+        }
+        
+        setSearchMatches(matches);
+        setCurrentMatchIdx(0);
+    }, [searchTerm, lines]);
+
+    const handleNextMatch = useCallback(() => {
+        if (searchMatches.length === 0) return;
+        setCurrentMatchIdx(prev => (prev + 1) % searchMatches.length);
+    }, [searchMatches.length]);
+
+    const handlePrevMatch = useCallback(() => {
+        if (searchMatches.length === 0) return;
+        setCurrentMatchIdx(prev => (prev - 1 + searchMatches.length) % searchMatches.length);
+    }, [searchMatches.length]);
 
     return {
         searchTerm,

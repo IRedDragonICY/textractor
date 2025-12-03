@@ -1,51 +1,56 @@
 // VirtualizedCodeViewer - High-performance virtualized code display
-// Techniques: Virtual scrolling, GPU acceleration, content windowing
-// Inspired by VS Code's Monaco Editor and top-tier code viewers
+// Uses react-virtuoso for dynamic height support (code wrapping)
+// Accepts pre-split lines array to avoid main thread string operations
 
-import React, { useRef, useState, useEffect, useCallback, useMemo, memo } from 'react';
+import React, { useRef, useEffect, useCallback, useMemo, memo } from 'react';
+import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 
 interface VirtualizedCodeViewerProps {
-    content: string;
-    lineNumbers: string;
+    lines: string[];
     searchTerm?: string;
+    searchMatches?: number[]; // Line indices that contain matches
     currentMatchIdx?: number;
-    searchMatches?: number[]; // Array of start positions
-    onScroll?: (scrollTop: number) => void;
     className?: string;
 }
-
-// Constants for virtualization
-const LINE_HEIGHT = 20.8; // 13px font * 1.6 line-height
-const OVERSCAN_COUNT = 10; // Extra lines to render above/below viewport
-const BUFFER_ZONE = 5; // Additional buffer for smooth scrolling
 
 // Memoized line component for maximum performance
 const CodeLine = memo(({ 
     content, 
     lineNumber, 
-    style,
-    isHighlighted 
+    isHighlighted,
+    isCurrentMatch,
 }: { 
     content: string; 
     lineNumber: number; 
-    style: React.CSSProperties;
     isHighlighted?: boolean;
+    isCurrentMatch?: boolean;
 }) => (
     <div 
-        style={style} 
-        className={`flex ${isHighlighted ? 'bg-[var(--theme-primary)]/20' : ''}`}
+        className={`flex ${
+            isCurrentMatch 
+                ? 'bg-[var(--theme-primary)]/30' 
+                : isHighlighted 
+                    ? 'bg-[var(--theme-primary)]/20' 
+                    : ''
+        }`}
+        style={{
+            fontSize: '13px',
+            lineHeight: '1.6',
+        }}
     >
+        {/* Line number gutter - fixed width, non-selectable, stretches with content */}
         <span 
-            className="w-12 shrink-0 text-right pr-3 text-[var(--theme-text-tertiary)] select-none"
+            className="w-12 shrink-0 text-right pr-3 text-[var(--theme-text-tertiary)] select-none bg-[var(--theme-surface)] border-r border-[var(--theme-border)] sticky left-0"
             style={{ fontFamily: '"JetBrains Mono", "Fira Code", "Roboto Mono", monospace' }}
         >
             {lineNumber}
         </span>
+        {/* Code content - allows wrapping for dynamic height */}
         <span 
-            className="pl-4 whitespace-pre text-[var(--theme-text-secondary)]"
+            className="pl-4 whitespace-pre-wrap break-all text-[var(--theme-text-secondary)] flex-1"
             style={{ fontFamily: '"JetBrains Mono", "Fira Code", "Roboto Mono", monospace' }}
         >
-            {content}
+            {content || ' '} {/* Render space for empty lines to maintain height */}
         </span>
     </div>
 ));
@@ -54,107 +59,66 @@ CodeLine.displayName = 'CodeLine';
 
 // Main virtualized viewer component
 export const VirtualizedCodeViewer = memo(({
-    content,
+    lines,
     searchTerm = '',
     searchMatches = [],
-    onScroll,
+    currentMatchIdx,
     className = '',
 }: VirtualizedCodeViewerProps) => {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const [scrollTop, setScrollTop] = useState(0);
-    const [containerHeight, setContainerHeight] = useState(0);
-    const rafRef = useRef<number | null>(null);
-    
-    // Split content into lines - memoized for performance
-    const lines = useMemo(() => {
-        if (!content) return [];
-        return content.split('\n');
-    }, [content]);
+    const virtuosoRef = useRef<VirtuosoHandle>(null);
 
-    const totalHeight = lines.length * LINE_HEIGHT;
-
-    // Calculate visible range with overscan
-    const { startIndex, visibleLines } = useMemo(() => {
-        const start = Math.max(0, Math.floor(scrollTop / LINE_HEIGHT) - OVERSCAN_COUNT - BUFFER_ZONE);
-        const visibleCount = Math.ceil(containerHeight / LINE_HEIGHT);
-        const end = Math.min(lines.length, start + visibleCount + (OVERSCAN_COUNT * 2) + (BUFFER_ZONE * 2));
-        
-        const visible = lines.slice(start, end).map((line, idx) => ({
-            content: line,
-            lineNumber: start + idx + 1,
-            index: start + idx,
-        }));
-
-        return { startIndex: start, endIndex: end, visibleLines: visible };
-    }, [scrollTop, containerHeight, lines]);
-
-    // High-performance scroll handler with RAF
-    const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-        const target = e.currentTarget;
-        
-        // Cancel any pending RAF
-        if (rafRef.current) {
-            cancelAnimationFrame(rafRef.current);
+    // Find which lines contain search matches - searchMatches now contains line indices directly
+    const matchLineMap = useMemo(() => {
+        if (!searchTerm || searchMatches.length === 0) {
+            return { highlightedLines: new Set<number>(), matchToLine: new Map<number, number>() };
         }
+        
+        const highlightedLines = new Set<number>();
+        const matchToLine = new Map<number, number>();
+        
+        for (let matchIdx = 0; matchIdx < searchMatches.length; matchIdx++) {
+            const lineIndex = searchMatches[matchIdx];
+            highlightedLines.add(lineIndex);
+            matchToLine.set(matchIdx, lineIndex);
+        }
+        
+        return { highlightedLines, matchToLine };
+    }, [searchTerm, searchMatches]);
 
-        // Use RAF for smooth 60fps updates
-        rafRef.current = requestAnimationFrame(() => {
-            setScrollTop(target.scrollTop);
-            onScroll?.(target.scrollTop);
-        });
-    }, [onScroll]);
+    // Get the line index for the current match
+    const currentMatchLine = useMemo(() => {
+        if (currentMatchIdx === undefined || currentMatchIdx < 0) return undefined;
+        return matchLineMap.matchToLine.get(currentMatchIdx);
+    }, [currentMatchIdx, matchLineMap.matchToLine]);
 
-    // Update container height on resize
+    // Scroll to current match when it changes
     useEffect(() => {
-        const container = containerRef.current;
-        if (!container) return;
-
-        const resizeObserver = new ResizeObserver((entries) => {
-            for (const entry of entries) {
-                // Use RAF for smooth resize handling
-                requestAnimationFrame(() => {
-                    setContainerHeight(entry.contentRect.height);
-                });
-            }
-        });
-
-        resizeObserver.observe(container);
-        setContainerHeight(container.clientHeight);
-
-        return () => {
-            resizeObserver.disconnect();
-            if (rafRef.current) {
-                cancelAnimationFrame(rafRef.current);
-            }
-        };
-    }, []);
-
-    // Find highlighted lines based on search
-    const highlightedLines = useMemo(() => {
-        if (!searchTerm || searchMatches.length === 0) return new Set<number>();
-        
-        const highlighted = new Set<number>();
-        let charCount = 0;
-        
-        for (let i = 0; i < lines.length; i++) {
-            const lineStart = charCount;
-            const lineEnd = charCount + lines[i].length;
-            
-            for (const matchStart of searchMatches) {
-                if (matchStart >= lineStart && matchStart < lineEnd) {
-                    highlighted.add(i);
-                    break;
-                }
-            }
-            
-            charCount = lineEnd + 1; // +1 for newline
+        if (currentMatchLine !== undefined && virtuosoRef.current) {
+            virtuosoRef.current.scrollIntoView({
+                index: currentMatchLine,
+                behavior: 'smooth',
+                align: 'center',
+            });
         }
+    }, [currentMatchLine]);
+
+    // Memoized row renderer
+    const rowRenderer = useCallback((index: number) => {
+        const isHighlighted = matchLineMap.highlightedLines.has(index);
+        const isCurrentMatch = currentMatchLine === index;
         
-        return highlighted;
-    }, [searchTerm, searchMatches, lines]);
+        return (
+            <CodeLine
+                content={lines[index]}
+                lineNumber={index + 1}
+                isHighlighted={isHighlighted}
+                isCurrentMatch={isCurrentMatch}
+            />
+        );
+    }, [lines, matchLineMap.highlightedLines, currentMatchLine]);
 
     // Empty state
-    if (!content) {
+    if (lines.length === 0) {
         return (
             <div className={`flex items-center justify-center h-full text-[var(--theme-text-tertiary)] ${className}`}>
                 <pre 
@@ -169,59 +133,22 @@ export const VirtualizedCodeViewer = memo(({
 
     return (
         <div 
-            ref={containerRef}
-            onScroll={handleScroll}
-            className={`overflow-auto h-full scrollbar-thin scrollbar-thumb-[var(--theme-border)] scrollbar-track-transparent ${className}`}
+            className={`h-full overflow-hidden ${className}`}
             style={{
-                // GPU acceleration hints
-                willChange: 'scroll-position',
                 contain: 'strict',
-                overscrollBehavior: 'contain',
             }}
         >
-            {/* Virtual spacer for total scroll height */}
-            <div 
+            <Virtuoso
+                ref={virtuosoRef}
+                totalCount={lines.length}
+                itemContent={rowRenderer}
+                overscan={200}
+                className="scrollbar-thin scrollbar-thumb-[var(--theme-border)] scrollbar-track-transparent"
                 style={{ 
-                    height: Math.max(totalHeight, containerHeight),
-                    position: 'relative',
-                    // GPU layer promotion
-                    transform: 'translateZ(0)',
-                    willChange: 'transform',
+                    height: '100%',
+                    overscrollBehavior: 'contain',
                 }}
-            >
-                {/* Gutter Background - Full Height */}
-                <div className="absolute top-0 left-0 bottom-0 w-12 bg-[var(--theme-surface)] border-r border-[var(--theme-border)] z-0" />
-
-                {/* Rendered content window */}
-                <div
-                    style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        // GPU-accelerated positioning
-                        transform: `translate3d(0, ${startIndex * LINE_HEIGHT}px, 0)`,
-                        willChange: 'transform',
-                        zIndex: 1,
-                    }}
-                >
-                    {visibleLines.map((line) => (
-                        <CodeLine
-                            key={line.index}
-                            content={line.content}
-                            lineNumber={line.lineNumber}
-                            isHighlighted={highlightedLines.has(line.index)}
-                            style={{
-                                height: LINE_HEIGHT,
-                                fontSize: '13px',
-                                lineHeight: '1.6',
-                                // Prevent layout thrashing
-                                contain: 'layout style paint',
-                            }}
-                        />
-                    ))}
-                </div>
-            </div>
+            />
         </div>
     );
 });

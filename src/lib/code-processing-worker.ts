@@ -22,6 +22,7 @@ export interface WorkerResponse {
     type: 'result' | 'progress';
     id: string;
     result?: string;
+    lines?: string[];
     progress?: number;
     tokenSavings?: number;
 }
@@ -31,7 +32,7 @@ export interface WorkerResponse {
 // ============================================
 
 interface CacheEntry {
-    result: string;
+    lines: string[];
     tokenSavings: number;
     timestamp: number;
     filesHash: string;
@@ -69,7 +70,7 @@ export function getCachedResult(
     files: Array<{ id: string; content: string }>,
     outputStyle: string,
     mode: CodeProcessingMode
-): { result: string; tokenSavings: number } | null {
+): { lines: string[]; tokenSavings: number } | null {
     const sessionCache = processingCache.get(sessionId);
     if (!sessionCache) return null;
     
@@ -92,7 +93,7 @@ export function getCachedResult(
         return null;
     }
     
-    return { result: entry.result, tokenSavings: entry.tokenSavings };
+    return { lines: entry.lines, tokenSavings: entry.tokenSavings };
 }
 
 /**
@@ -103,7 +104,7 @@ export function setCachedResult(
     files: Array<{ id: string; content: string }>,
     outputStyle: string,
     mode: CodeProcessingMode,
-    result: string,
+    lines: string[],
     tokenSavings: number
 ): void {
     const filesHash = generateFilesHash(files);
@@ -134,7 +135,7 @@ export function setCachedResult(
     
     const cacheKey = `${outputStyle}_${mode}`;
     sessionCache.entries.set(cacheKey, {
-        result,
+        lines,
         tokenSavings,
         timestamp: Date.now(),
         filesHash
@@ -438,18 +439,59 @@ self.onmessage = function(e) {
     const total = textFiles.length;
     let processed = 0;
     let originalLength = 0;
+    let processedLength = 0;
     
-    const results = [];
+    // Build lines array directly - no intermediate string joins
+    const lines = [];
     
-    for (const f of textFiles) {
+    for (let i = 0; i < textFiles.length; i++) {
+        const f = textFiles[i];
         const pathLabel = f.path || f.name;
         const ext = f.name.split('.').pop() || 'txt';
         
         originalLength += f.content.length;
         
         const processedContent = processCode(f.content, ext, mode);
-        const formatted = formatFile(pathLabel, processedContent, ext, outputStyle);
-        results.push(formatted);
+        processedLength += processedContent.length;
+        
+        // Add separator between files (empty line)
+        if (i > 0) {
+            lines.push('');
+        }
+        
+        // Add header line(s) based on output style
+        switch (outputStyle) {
+            case 'hash':
+                lines.push('# --- ' + pathLabel + ' ---');
+                break;
+            case 'minimal':
+                lines.push('--- ' + pathLabel + ' ---');
+                break;
+            case 'xml':
+                lines.push('<file name="' + pathLabel + '">');
+                break;
+            case 'markdown':
+                lines.push('### ' + pathLabel);
+                lines.push('\`\`\`' + ext);
+                break;
+            case 'standard':
+            default:
+                lines.push('/* --- ' + pathLabel + ' --- */');
+                break;
+        }
+        
+        // Split processed content into lines and push each one
+        const contentLines = processedContent.split('\\n');
+        for (let j = 0; j < contentLines.length; j++) {
+            lines.push(contentLines[j]);
+        }
+        
+        // Add closing tag for xml/markdown
+        if (outputStyle === 'xml') {
+            lines.push('</file>');
+        } else if (outputStyle === 'markdown') {
+            lines.push('\`\`\`');
+        }
         
         processed++;
         
@@ -463,14 +505,13 @@ self.onmessage = function(e) {
         }
     }
     
-    const result = results.join('\\n\\n');
     const tokenSavings = mode === 'raw' ? 0 : 
-        Math.round(((originalLength - result.length) / originalLength) * 100);
+        Math.round(((originalLength - processedLength) / originalLength) * 100);
     
     self.postMessage({
         type: 'result',
         id,
-        result,
+        lines,
         tokenSavings: Math.max(0, tokenSavings)
     });
 };
@@ -478,7 +519,7 @@ self.onmessage = function(e) {
 
 // Create worker instance
 let worker: Worker | null = null;
-let pendingRequest: { id: string; resolve: (value: { result: string; tokenSavings: number }) => void; reject: (reason?: unknown) => void } | null = null;
+let pendingRequest: { id: string; resolve: (value: { lines: string[]; tokenSavings: number }) => void; reject: (reason?: unknown) => void } | null = null;
 
 export function getCodeProcessingWorker(): Worker {
     if (typeof window === 'undefined') {
@@ -493,7 +534,7 @@ export function getCodeProcessingWorker(): Worker {
         worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
             if (e.data.type === 'result' && pendingRequest && e.data.id === pendingRequest.id) {
                 pendingRequest.resolve({
-                    result: e.data.result || '',
+                    lines: e.data.lines || [],
                     tokenSavings: e.data.tokenSavings || 0
                 });
                 pendingRequest = null;
@@ -516,22 +557,59 @@ export function processCodeAsync(
     files: Array<{ id: string; name: string; path: string; content: string; isText: boolean }>,
     outputStyle: string,
     mode: CodeProcessingMode
-): Promise<{ result: string; tokenSavings: number }> {
+): Promise<{ lines: string[]; tokenSavings: number }> {
     return new Promise((resolve, reject) => {
-        // Fast path for raw mode - no worker needed
+        // Fast path for raw mode - no worker needed, build lines directly
         if (mode === 'raw') {
-            const result = files.filter(f => f.isText).map(f => {
+            const textFiles = files.filter(f => f.isText);
+            const lines: string[] = [];
+            
+            for (let i = 0; i < textFiles.length; i++) {
+                const f = textFiles[i];
                 const pathLabel = f.path || f.name;
                 const ext = f.name.split('.').pop() || 'txt';
-                switch (outputStyle) {
-                    case 'hash': return `# --- ${pathLabel} ---\n${f.content}`;
-                    case 'minimal': return `--- ${pathLabel} ---\n${f.content}`;
-                    case 'xml': return `<file name="${pathLabel}">\n${f.content}\n</file>`;
-                    case 'markdown': return `### ${pathLabel}\n\`\`\`${ext}\n${f.content}\n\`\`\``;
-                    case 'standard': default: return `/* --- ${pathLabel} --- */\n${f.content}`;
+                
+                // Add separator between files
+                if (i > 0) {
+                    lines.push('');
                 }
-            }).join('\n\n');
-            resolve({ result, tokenSavings: 0 });
+                
+                // Add header based on output style
+                switch (outputStyle) {
+                    case 'hash':
+                        lines.push(`# --- ${pathLabel} ---`);
+                        break;
+                    case 'minimal':
+                        lines.push(`--- ${pathLabel} ---`);
+                        break;
+                    case 'xml':
+                        lines.push(`<file name="${pathLabel}">`);
+                        break;
+                    case 'markdown':
+                        lines.push(`### ${pathLabel}`);
+                        lines.push(`\`\`\`${ext}`);
+                        break;
+                    case 'standard':
+                    default:
+                        lines.push(`/* --- ${pathLabel} --- */`);
+                        break;
+                }
+                
+                // Push each content line
+                const contentLines = f.content.split('\n');
+                for (const line of contentLines) {
+                    lines.push(line);
+                }
+                
+                // Add closing tags
+                if (outputStyle === 'xml') {
+                    lines.push('</file>');
+                } else if (outputStyle === 'markdown') {
+                    lines.push('```');
+                }
+            }
+            
+            resolve({ lines, tokenSavings: 0 });
             return;
         }
         

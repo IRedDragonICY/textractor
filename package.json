@@ -15,12 +15,16 @@
   "dependencies": {
     "@vercel/analytics": "^1.6.1",
     "gpt-tokenizer": "^3.0.0",
+    "idb": "^8.0.3",
+    "immer": "^11.0.1",
     "jszip": "^3.10.1",
     "lucide-react": "^0.513.0",
     "next": "16.0.6",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-icons": "^5.5.0"
+    "react-icons": "^5.5.0",
+    "react-virtuoso": "^4.16.1",
+    "zustand": "^5.0.9"
   },
   "devDependencies": {
     "@dnd-kit/sortable": "^10.0.0",
