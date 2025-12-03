@@ -13,6 +13,7 @@
     "tauri:export": "next build"
   },
   "dependencies": {
+    "@vercel/analytics": "^1.6.1",
     "gpt-tokenizer": "^3.0.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.513.0",
