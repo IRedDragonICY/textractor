@@ -34,6 +34,7 @@ import { HomeView } from '@/components/HomeView';
 import { MenuBar, AboutModal, ShortcutsModal } from '@/components/MenuBar';
 import { SettingsView } from '@/components/SettingsView';
 import { ReportIssueView } from '@/components/ReportIssueView';
+import { ChangelogView } from '@/components/ChangelogView';
 import { SecurityWarningModal } from '@/components/SecurityWarningModal';
 import { ExportModal } from '@/components/ExportModal';
 import { VirtualizedCodeViewer } from '@/components/VirtualizedCodeViewer';
@@ -104,6 +105,7 @@ function Contextractor() {
         toggleHomeView,
         openSettingsTab,
         openReportIssueTab,
+        openChangelogTab,
     } = useSessionManager();
 
     // Derived state from active session - uses cached batch conversion
@@ -676,6 +678,7 @@ function Contextractor() {
                         onShowShortcuts={() => setShortcutsModalOpen(true)}
                         onShowSettings={openSettingsTab}
                         onReportIssue={openReportIssueTab}
+                        onShowChangelog={openChangelogTab}
                         onExport={() => setExportModalOpen(true)}
                         hasContent={hasContent}
                     />
@@ -770,6 +773,20 @@ function Contextractor() {
                         aria-label="Report Issue"
                     >
                         <ReportIssueView
+                            onClose={() => activeSessionId && handleCloseSession(activeSessionId)}
+                        />
+                    </motion.main>
+                ) : activeSession?.type === 'changelog' ? (
+                    <motion.main
+                        key="changelog"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="flex-1 overflow-hidden"
+                        role="main"
+                        aria-label="Changelog"
+                    >
+                        <ChangelogView
                             onClose={() => activeSessionId && handleCloseSession(activeSessionId)}
                         />
                     </motion.main>

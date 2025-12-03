@@ -545,6 +545,50 @@ export const useSessionManager = () => {
         });
     }, []);
 
+    // Open Changelog Tab
+    const openChangelogTab = useCallback(() => {
+        setState(prev => {
+            // Check if changelog tab already exists
+            const existingChangelog = prev.sessions.find(s => s.type === 'changelog');
+            
+            if (existingChangelog) {
+                return {
+                    ...prev,
+                    sessions: prev.sessions.map(s => ({
+                        ...s,
+                        isActive: s.id === existingChangelog.id,
+                    })),
+                    activeSessionId: existingChangelog.id,
+                    showHomeView: false,
+                };
+            }
+
+            // Create new changelog session
+            const changelogSession: Session = {
+                id: 'changelog_tab',
+                type: 'changelog',
+                name: 'Changelog',
+                files: [],
+                outputStyle: 'standard',
+                viewMode: 'tree',
+                codeProcessingMode: 'raw',
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                isActive: true,
+                isPinned: false,
+                color: '#8B5CF6', // Purple for changelog
+            };
+
+            const updatedSessions = prev.sessions.map(s => ({ ...s, isActive: false }));
+            return {
+                ...prev,
+                sessions: [...updatedSessions, changelogSession],
+                activeSessionId: changelogSession.id,
+                showHomeView: false,
+            };
+        });
+    }, []);
+
     // Update session files
     const updateSessionFiles = useCallback((id: string, files: SessionFile[]) => {
         setState(prev => ({
@@ -706,5 +750,6 @@ export const useSessionManager = () => {
         toggleHomeView,
         openSettingsTab,
         openReportIssueTab,
+        openChangelogTab,
     };
 };

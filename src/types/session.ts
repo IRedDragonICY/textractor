@@ -3,7 +3,7 @@
 
 export interface Session {
     id: string;
-    type: 'editor' | 'settings' | 'report-issue';
+    type: 'editor' | 'settings' | 'report-issue' | 'changelog';
     name: string;
     files: SessionFile[];
     outputStyle: OutputStyleType;
