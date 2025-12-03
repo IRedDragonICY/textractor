@@ -9,6 +9,7 @@ import {
     SessionManagerState,
     OutputStyleType,
     ViewModeType,
+    CodeProcessingModeType,
     TAB_COLORS
 } from '@/types/session';
 import { FileData } from '@/types';
@@ -115,6 +116,7 @@ const createEmptySession = (name?: string): Session => ({
     files: [],
     outputStyle: 'standard',
     viewMode: 'tree',
+    codeProcessingMode: 'raw',
     createdAt: Date.now(),
     updatedAt: Date.now(),
     isActive: true,
@@ -390,20 +392,22 @@ export const useSessionManager = () => {
                 recentProjects: newRecentProjects.slice(0, MAX_RECENT_PROJECTS),
                 showHomeView: true,
             };
-        });
+    });
     }, []);
 
-    // Switch session - INSTANT, no transition needed with proper caching
+    // Switch session - INSTANT, only update activeSessionId without recreating session objects
     const switchSession = useCallback((id: string) => {
-        setState(prev => ({
-            ...prev,
-            sessions: prev.sessions.map(s => ({
-                ...s,
-                isActive: s.id === id,
-            })),
-            activeSessionId: id,
-            showHomeView: false,
-        }));
+        setState(prev => {
+            // Skip if already active - prevents unnecessary re-renders
+            if (prev.activeSessionId === id && !prev.showHomeView) {
+                return prev;
+            }
+            return {
+                ...prev,
+                activeSessionId: id,
+                showHomeView: false,
+            };
+        });
     }, []);
 
     // Rename session
@@ -479,6 +483,7 @@ export const useSessionManager = () => {
                 files: [],
                 outputStyle: 'standard',
                 viewMode: 'tree',
+                codeProcessingMode: 'raw',
                 createdAt: Date.now(),
                 updatedAt: Date.now(),
                 isActive: true,
@@ -522,6 +527,7 @@ export const useSessionManager = () => {
                 files: [],
                 outputStyle: 'standard',
                 viewMode: 'tree',
+                codeProcessingMode: 'raw',
                 createdAt: Date.now(),
                 updatedAt: Date.now(),
                 isActive: true,
@@ -550,7 +556,7 @@ export const useSessionManager = () => {
     }, []);
 
     // Update session settings
-    const updateSessionSettings = useCallback((id: string, settings: { outputStyle?: OutputStyleType; viewMode?: ViewModeType }) => {
+    const updateSessionSettings = useCallback((id: string, settings: { outputStyle?: OutputStyleType; viewMode?: ViewModeType; codeProcessingMode?: CodeProcessingModeType }) => {
         setState(prev => ({
             ...prev,
             sessions: prev.sessions.map(s =>

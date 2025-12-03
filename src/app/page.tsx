@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useRef, useCallback, useEffect, useDeferredValue } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect, useDeferredValue, memo } from 'react';
 import { useDropzone } from 'react-dropzone';
 import {
     DndContext,
@@ -26,6 +26,7 @@ import { FileCard } from '@/components/FileCard';
 import { SortableItem } from '@/components/SortableItem';
 import { TreeItem } from '@/components/TreeItem';
 import { OutputStyleSelector } from '@/components/OutputStyleSelector';
+import { CodeProcessingSelector } from '@/components/CodeProcessingSelector';
 import { GitFileSelector } from '@/components/GitFileSelector';
 import { GlobalImportIndicator } from '@/components/GlobalImportIndicator';
 import { TabBar } from '@/components/TabBar';
@@ -51,11 +52,18 @@ import { useSettings } from '@/hooks/useSettings';
 import { processFileObject, unzipAndProcess } from '@/lib/file-processing';
 import { buildFileTree } from '@/lib/file-tree';
 import { scanForSecrets, SecurityIssue } from '@/lib/security';
+import { 
+    processCodeAsync, 
+    terminateWorker, 
+    getCachedResult, 
+    setCachedResult,
+    clearSessionCache 
+} from '@/lib/code-processing-worker';
 
 // Types & Constants
-import { OutputStyle, FileData, ViewMode, TreeNode } from '@/types';
+import { OutputStyle, FileData, ViewMode, TreeNode, CodeProcessingMode as CodeProcessingModeType } from '@/types';
 import { UI_ICONS_MAP } from '@/lib/icon-mapping';
-import { OutputStyleType, ViewModeType } from '@/types/session';
+import { OutputStyleType, ViewModeType, CodeProcessingModeType as SessionCodeProcessingModeType } from '@/types/session';
 
 // Main App Wrapper with Theme Provider
 export default function ContextractorApp() {
@@ -107,6 +115,7 @@ function Contextractor() {
 
     const outputStyle = activeSession?.outputStyle || 'standard';
     const viewMode = activeSession?.viewMode || 'tree';
+    const codeProcessingMode = activeSession?.codeProcessingMode || 'raw';
 
     // Local UI State
     const [isCopied, setIsCopied] = useState(false);
@@ -140,6 +149,133 @@ function Contextractor() {
 
     // Refs
     const textAreaRef = useRef<HTMLTextAreaElement>(null);
+
+    // ============================================
+    // OPTIMIZED CODE PROCESSING - Zero-Delay Tab Switching
+    // ============================================
+    
+    // Processed text state - initialized with immediate sync computation
+    const [combinedText, setCombinedText] = useState('');
+    const [tokenSavings, setTokenSavings] = useState<number | undefined>(undefined);
+    const [isProcessing, setIsProcessing] = useState(false);
+    
+    // Use deferred value for expensive renders - keeps UI responsive during processing
+    const deferredCombinedText = useDeferredValue(combinedText);
+    const isStale = deferredCombinedText !== combinedText;
+    
+    // Memoized text files to prevent unnecessary re-renders
+    const textFiles = useMemo(() => files.filter(f => f.isText), [files]);
+    
+    // Generate raw output synchronously (instant, no processing)
+    const rawOutput = useMemo(() => {
+        if (textFiles.length === 0) return '';
+        return textFiles.map(f => {
+            const pathLabel = f.path || f.name;
+            const ext = f.name.split('.').pop() || 'txt';
+            switch (outputStyle) {
+                case 'hash': return `# --- ${pathLabel} ---\n${f.content}`;
+                case 'minimal': return `--- ${pathLabel} ---\n${f.content}`;
+                case 'xml': return `<file name="${pathLabel}">\n${f.content}\n</file>`;
+                case 'markdown': return `### ${pathLabel}\n\`\`\`${ext}\n${f.content}\n\`\`\``;
+                case 'standard': default: return `/* --- ${pathLabel} --- */\n${f.content}`;
+            }
+        }).join('\n\n');
+    }, [textFiles, outputStyle]);
+
+    // INSTANT: Set content immediately on session/style change
+    // For 'raw' mode, this is the final result
+    // For other modes, this shows raw first, then updates with processed
+    useEffect(() => {
+        if (textFiles.length === 0) {
+            setCombinedText('');
+            setTokenSavings(undefined);
+            return;
+        }
+
+        // For raw mode - instant, no processing needed
+        if (codeProcessingMode === 'raw') {
+            setCombinedText(rawOutput);
+            setTokenSavings(undefined);
+            return;
+        }
+
+        // Check cache first - INSTANT if cached
+        if (activeSessionId) {
+            const cached = getCachedResult(
+                activeSessionId,
+                textFiles.map(f => ({ id: f.id, content: f.content })),
+                outputStyle,
+                codeProcessingMode
+            );
+            
+            if (cached) {
+                setCombinedText(cached.result);
+                setTokenSavings(cached.tokenSavings);
+                return;
+            }
+        }
+
+        // Cache miss: Show raw output IMMEDIATELY while processing
+        setCombinedText(rawOutput);
+        setIsProcessing(true);
+
+        // Process in background
+        const abortController = new AbortController();
+        
+        processCodeAsync(
+            textFiles.map(f => ({
+                id: f.id,
+                name: f.name,
+                path: f.path,
+                content: f.content,
+                isText: f.isText
+            })),
+            outputStyle,
+            codeProcessingMode
+        )
+            .then(({ result, tokenSavings: savings }) => {
+                if (!abortController.signal.aborted) {
+                    setCombinedText(result);
+                    setTokenSavings(savings);
+                    setIsProcessing(false);
+                    
+                    // Cache for next time
+                    if (activeSessionId) {
+                        setCachedResult(
+                            activeSessionId,
+                            textFiles.map(f => ({ id: f.id, content: f.content })),
+                            outputStyle,
+                            codeProcessingMode,
+                            result,
+                            savings
+                        );
+                    }
+                }
+            })
+            .catch((error) => {
+                if (!abortController.signal.aborted && error.message !== 'Cancelled') {
+                    console.error('Processing error:', error);
+                    setIsProcessing(false);
+                }
+            });
+
+        return () => {
+            abortController.abort();
+        };
+    }, [textFiles, outputStyle, codeProcessingMode, activeSessionId, rawOutput]);
+
+    // Cleanup worker on unmount
+    useEffect(() => {
+        return () => {
+            terminateWorker();
+        };
+    }, []);
+
+    // Wrapped close session that also clears the processing cache
+    const handleCloseSession = useCallback((sessionId: string) => {
+        clearSessionCache(sessionId);
+        closeSession(sessionId);
+    }, [closeSession]);
 
     // Update session files
     const setFiles = useCallback((updater: FileData[] | ((prev: FileData[]) => FileData[])) => {
@@ -180,6 +316,11 @@ function Contextractor() {
     const setViewMode = useCallback((mode: ViewMode) => {
         if (!activeSessionId) return;
         updateSessionSettings(activeSessionId, { viewMode: mode as ViewModeType });
+    }, [activeSessionId, updateSessionSettings]);
+
+    const setCodeProcessingMode = useCallback((mode: CodeProcessingModeType) => {
+        if (!activeSessionId) return;
+        updateSessionSettings(activeSessionId, { codeProcessingMode: mode as SessionCodeProcessingModeType });
     }, [activeSessionId, updateSessionSettings]);
 
     // File processing
@@ -239,25 +380,6 @@ function Contextractor() {
     const clearWorkspace = useCallback(() => {
         setFiles([]);
     }, [setFiles]);
-
-    // Derived State (Computed Text) - Using useDeferredValue for non-blocking UI
-    const rawCombinedText = useMemo(() => {
-        return files.filter(f => f.isText).map(f => {
-            const pathLabel = f.path || f.name;
-            const ext = f.name.split('.').pop() || 'txt';
-            switch (outputStyle) {
-                case 'hash': return `# --- ${pathLabel} ---\n${f.content}`;
-                case 'minimal': return `--- ${pathLabel} ---\n${f.content}`;
-                case 'xml': return `<file name="${pathLabel}">\n${f.content}\n</file>`;
-                case 'markdown': return `### ${pathLabel}\n\`\`\`${ext}\n${f.content}\n\`\`\``;
-                case 'standard': default: return `/* --- ${pathLabel} --- */\n${f.content}`;
-            }
-        }).join('\n\n');
-    }, [files, outputStyle]);
-    
-    // Defer the expensive text so it doesn't block UI
-    const combinedText = useDeferredValue(rawCombinedText);
-    const isTextPending = rawCombinedText !== combinedText;
 
     // Search Hook
     const { 
@@ -380,7 +502,7 @@ function Contextractor() {
             // Ctrl+W: Close Tab
             if (e.ctrlKey && e.key === 'w' && activeSessionId) {
                 e.preventDefault();
-                closeSession(activeSessionId);
+                handleCloseSession(activeSessionId);
             }
             // Ctrl+Tab: Next Tab
             if (e.ctrlKey && e.key === 'Tab') {
@@ -423,7 +545,7 @@ function Contextractor() {
         };
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [activeSessionId, sessions, createSession, closeSession, switchSession, toggleHomeView, handleUndo, handleRedo]);
+    }, [activeSessionId, sessions, createSession, handleCloseSession, switchSession, toggleHomeView, handleUndo, handleRedo]);
 
     // Text Area Utils
     const lineNumbers = useMemo(() => {
@@ -530,7 +652,7 @@ function Contextractor() {
                 activeSessionId={activeSessionId}
                 showHomeView={showHomeView}
                 onSwitchSession={switchSession}
-                onCloseSession={closeSession}
+                onCloseSession={handleCloseSession}
                 onCreateSession={createSession}
                 onToggleHomeView={toggleHomeView}
                 onRenameSession={renameSession}
@@ -612,7 +734,7 @@ function Contextractor() {
                         aria-label="Report Issue"
                     >
                         <ReportIssueView
-                            onClose={() => activeSessionId && closeSession(activeSessionId)}
+                            onClose={() => activeSessionId && handleCloseSession(activeSessionId)}
                         />
                     </motion.main>
                 ) : (
@@ -886,8 +1008,13 @@ function Contextractor() {
                     <div className="flex-1 overflow-y-auto p-3">
                         {activeSideView === 'explorer' ? (
                             <>
-                                <div className="mb-3">
+                                <div className="mb-3 space-y-2">
                                     <OutputStyleSelector value={outputStyle} onChange={setOutputStyle} />
+                                    <CodeProcessingSelector 
+                                        value={codeProcessingMode}
+                                        onChange={setCodeProcessingMode}
+                                        savingsPercent={tokenSavings}
+                                    />
                                 </div>
                                 <motion.div
                                     onClick={open}
@@ -961,13 +1088,21 @@ function Contextractor() {
                                     />
                                 </div>
 
+                                <div className="relative hidden md:block">
+                                    <CodeProcessingSelector 
+                                        value={codeProcessingMode}
+                                        onChange={setCodeProcessingMode}
+                                        savingsPercent={tokenSavings}
+                                    />
+                                </div>
+
                                 <GoogleButton
                                     onClick={copyToClipboard}
                                     variant="filled"
                                     icon={isCopied ? UI_ICONS_MAP.check : UI_ICONS_MAP.copy}
-                                    disabled={!combinedText || isTextPending}
+                                    disabled={!combinedText || isProcessing}
                                 >
-                                    {isCopied ? 'Copied' : isTextPending ? 'Processing...' : 'Copy'}
+                                    {isCopied ? 'Copied' : isProcessing ? 'Processing...' : 'Copy'}
                                 </GoogleButton>
                             </div>
                         </div>
@@ -983,7 +1118,7 @@ function Contextractor() {
                                 aria-hidden="true"
                             />
                             
-                            {isTextPending && (
+                            {(isProcessing || isStale) && (
                                 <div className="absolute top-2 right-2 z-10 bg-[var(--theme-surface)]/90 backdrop-blur-sm px-3 py-1.5 rounded-full border border-[var(--theme-border)] flex items-center gap-2">
                                     <div className="w-3 h-3 border-2 border-[var(--theme-primary)] border-t-transparent rounded-full animate-spin" />
                                     <span className="text-xs text-[var(--theme-primary)]">Processing...</span>
@@ -991,7 +1126,7 @@ function Contextractor() {
                             )}
                             
                             <VirtualizedCodeViewer
-                                content={combinedText}
+                                content={deferredCombinedText}
                                 lineNumbers={lineNumbers}
                                 searchTerm={searchTerm}
                                 currentMatchIdx={currentMatchIdx}

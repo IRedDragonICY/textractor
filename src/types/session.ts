@@ -8,6 +8,7 @@ export interface Session {
     files: SessionFile[];
     outputStyle: OutputStyleType;
     viewMode: ViewModeType;
+    codeProcessingMode: CodeProcessingModeType;
     createdAt: number;
     updatedAt: number;
     isActive: boolean;
@@ -59,6 +60,7 @@ export interface SessionManagerState {
 
 export type OutputStyleType = 'standard' | 'hash' | 'minimal' | 'xml' | 'markdown';
 export type ViewModeType = 'list' | 'tree';
+export type CodeProcessingModeType = 'raw' | 'remove-comments' | 'minify';
 
 // Tab actions
 export type TabAction = 
@@ -72,7 +74,7 @@ export type TabAction =
     | { type: 'UNPIN_SESSION'; payload: { id: string } }
     | { type: 'DUPLICATE_SESSION'; payload: { id: string } }
     | { type: 'UPDATE_SESSION_FILES'; payload: { id: string; files: SessionFile[] } }
-    | { type: 'UPDATE_SESSION_SETTINGS'; payload: { id: string; outputStyle?: OutputStyleType; viewMode?: ViewModeType } }
+    | { type: 'UPDATE_SESSION_SETTINGS'; payload: { id: string; outputStyle?: OutputStyleType; viewMode?: ViewModeType; codeProcessingMode?: CodeProcessingModeType } }
     | { type: 'SAVE_TO_RECENT'; payload: { session: Session } }
     | { type: 'OPEN_RECENT'; payload: { projectId: string } }
     | { type: 'REMOVE_RECENT'; payload: { projectId: string } }

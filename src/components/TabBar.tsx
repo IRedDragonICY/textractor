@@ -1,9 +1,10 @@
 // VS Code Style Tab Bar Component
 // Professional-grade tab management with context menu, drag & drop, and animations
+// OPTIMIZED: React.memo, useCallback, minimal re-renders for smooth 60fps interactions
 
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     DndContext,
@@ -86,7 +87,7 @@ interface ContextMenuState {
     y: number;
 }
 
-// Sortable Tab Component
+// Sortable Tab Component - MEMOIZED for performance
 interface SortableTabProps {
     session: Session;
     isActive: boolean;
@@ -105,7 +106,7 @@ interface SortableTabProps {
     isDragging?: boolean;
 }
 
-const SortableTab: React.FC<SortableTabProps> = ({
+const SortableTab = memo<SortableTabProps>(function SortableTab({
     session,
     isActive,
     showHomeView,
@@ -121,7 +122,7 @@ const SortableTab: React.FC<SortableTabProps> = ({
     onKeyDown,
     onCloseSession,
     isDragging = false,
-}) => {
+}) {
     const {
         attributes,
         listeners,
@@ -134,20 +135,45 @@ const SortableTab: React.FC<SortableTabProps> = ({
     const fileCount = session.files.length;
     const hasUnsavedChanges = session.files.length > 0;
     const isActiveTab = isActive && !showHomeView;
+    const isEditing = editingTabId === session.id;
+
+    // Memoize click handler to prevent re-creation
+    const handleClick = useCallback(() => {
+        if (!isEditing) {
+            onSwitchSession(session.id);
+            onToggleHomeView(false);
+        }
+    }, [isEditing, onSwitchSession, session.id, onToggleHomeView]);
+
+    const handleDoubleClick = useCallback(() => {
+        onStartEdit(session.id, session.name);
+    }, [onStartEdit, session.id, session.name]);
+
+    const handleContextMenuClick = useCallback((e: React.MouseEvent) => {
+        onContextMenu(e, session.id);
+    }, [onContextMenu, session.id]);
+
+    const handleClose = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        onCloseSession(session.id);
+    }, [onCloseSession, session.id]);
+
+    const handlePointerDown = useCallback((e: React.PointerEvent) => {
+        e.stopPropagation();
+    }, []);
+
+    const handleInputClick = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+    }, []);
 
     return (
         <div
             ref={setNodeRef}
             {...attributes}
             {...listeners}
-            onContextMenu={(e) => onContextMenu(e, session.id)}
-            onClick={() => {
-                if (editingTabId !== session.id) {
-                    onSwitchSession(session.id);
-                    onToggleHomeView(false);
-                }
-            }}
-            onDoubleClick={() => onStartEdit(session.id, session.name)}
+            onContextMenu={handleContextMenuClick}
+            onClick={handleClick}
+            onDoubleClick={handleDoubleClick}
             className={`
                 group relative flex items-center gap-2 px-3 h-[35px] min-w-[120px] max-w-[200px] cursor-grab active:cursor-grabbing
                 border-r border-[var(--theme-border-subtle)] transition-all duration-150
@@ -182,7 +208,7 @@ const SortableTab: React.FC<SortableTabProps> = ({
             </div>
 
             {/* Tab name or input */}
-            {editingTabId === session.id ? (
+            {isEditing ? (
                 <input
                     ref={editInputRef}
                     type="text"
@@ -191,14 +217,14 @@ const SortableTab: React.FC<SortableTabProps> = ({
                     onBlur={onFinishEdit}
                     onKeyDown={onKeyDown}
                     className="flex-1 bg-[var(--theme-surface-hover)] text-[var(--theme-text-primary)] text-xs px-1 py-0.5 rounded outline-none border border-[var(--theme-primary)] min-w-0"
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={handleInputClick}
                 />
             ) : (
                 <span className="text-xs truncate flex-1">{session.name}</span>
             )}
 
             {/* File count badge */}
-            {fileCount > 0 && editingTabId !== session.id && (
+            {fileCount > 0 && !isEditing && (
                 <span className="text-[10px] bg-[var(--theme-surface-hover)] text-[var(--theme-text-tertiary)] px-1.5 rounded-full shrink-0">
                     {fileCount}
                 </span>
@@ -211,11 +237,8 @@ const SortableTab: React.FC<SortableTabProps> = ({
 
             {/* Close button */}
             <button
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onCloseSession(session.id);
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
+                onClick={handleClose}
+                onPointerDown={handlePointerDown}
                 className={`
                     w-5 h-5 rounded flex items-center justify-center shrink-0
                     text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-surface-hover)]
@@ -226,7 +249,21 @@ const SortableTab: React.FC<SortableTabProps> = ({
             </button>
         </div>
     );
-};
+}, (prevProps, nextProps) => {
+    // Custom comparison for performance - only re-render when these change
+    return (
+        prevProps.session.id === nextProps.session.id &&
+        prevProps.session.name === nextProps.session.name &&
+        prevProps.session.files.length === nextProps.session.files.length &&
+        prevProps.session.isPinned === nextProps.session.isPinned &&
+        prevProps.session.color === nextProps.session.color &&
+        prevProps.isActive === nextProps.isActive &&
+        prevProps.showHomeView === nextProps.showHomeView &&
+        prevProps.editingTabId === nextProps.editingTabId &&
+        (prevProps.editingTabId !== prevProps.session.id || prevProps.editValue === nextProps.editValue) &&
+        prevProps.isDragging === nextProps.isDragging
+    );
+});
 
 // Drag overlay tab (shown while dragging)
 const DragOverlayTab: React.FC<{ session: Session }> = ({ session }) => {
@@ -257,7 +294,7 @@ const DragOverlayTab: React.FC<{ session: Session }> = ({ session }) => {
     );
 };
 
-export const TabBar: React.FC<TabBarProps> = ({
+export const TabBar = memo<TabBarProps>(function TabBar({
     sessions,
     activeSessionId,
     showHomeView,
@@ -271,7 +308,7 @@ export const TabBar: React.FC<TabBarProps> = ({
     onCloseAllSessions,
     onTogglePinSession,
     onReorderSessions,
-}) => {
+}) {
     const [contextMenu, setContextMenu] = useState<ContextMenuState>({
         isOpen: false,
         sessionId: null,
@@ -493,7 +530,7 @@ export const TabBar: React.FC<TabBarProps> = ({
             </AnimatePresence>
         </div>
     );
-};
+});
 
 // Context Menu Item Component
 interface ContextMenuItemProps {
@@ -531,4 +568,25 @@ const ContextMenuItem: React.FC<ContextMenuItemProps> = ({
     </button>
 );
 
-export default TabBar;
+// Helper to compare sessions array for memo
+const areSessionsEqual = (prev: Session[], next: Session[]): boolean => {
+    if (prev.length !== next.length) return false;
+    for (let i = 0; i < prev.length; i++) {
+        if (prev[i].id !== next[i].id ||
+            prev[i].name !== next[i].name ||
+            prev[i].files.length !== next[i].files.length ||
+            prev[i].isPinned !== next[i].isPinned) {
+            return false;
+        }
+    }
+    return true;
+};
+
+// Export with custom comparison for maximum performance
+export default memo(TabBar, (prev, next) => {
+    return (
+        areSessionsEqual(prev.sessions, next.sessions) &&
+        prev.activeSessionId === next.activeSessionId &&
+        prev.showHomeView === next.showHomeView
+    );
+});

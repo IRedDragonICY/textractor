@@ -33,7 +33,8 @@ export const AnimatedIcon = ({ icon, className = "w-5 h-5", style }: AnimatedIco
                     {/* Track 1 */}
                     <line x1="3" y1="7" x2="21" y2="7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.2"/>
                     <motion.circle 
-                        cx="8" cy="7" r="3" fill="currentColor"
+                        cy={7} r={3} fill="currentColor"
+                        initial={{ cx: 8 }}
                         animate={{ cx: isHovered ? 17 : 8 }}
                         transition={{ type: "spring", stiffness: 250, damping: 20 }}
                     />
@@ -41,7 +42,8 @@ export const AnimatedIcon = ({ icon, className = "w-5 h-5", style }: AnimatedIco
                     {/* Track 2 */}
                     <line x1="3" y1="17" x2="21" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.2"/>
                     <motion.circle 
-                        cx="16" cy="17" r="3" fill="currentColor"
+                        cy={17} r={3} fill="currentColor"
+                        initial={{ cx: 16 }}
                         animate={{ cx: isHovered ? 7 : 16 }}
                         transition={{ type: "spring", stiffness: 250, damping: 20, delay: 0.05 }}
                     />
