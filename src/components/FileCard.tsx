@@ -3,7 +3,7 @@ import { FileData } from '@/types';
 import { getFileIconInfo } from '@/lib/icons';
 import { formatNumber } from '@/lib/format';
 import { GoogleIcon } from './ui/GoogleIcon';
-import { UI_ICONS } from '@/constants';
+import { UI_ICONS_MAP } from '@/lib/icon-mapping';
 
 export const FileCard = React.memo(({ file, onRemove, isDragging = false }: { file: FileData, onRemove?: (id: string) => void, isDragging?: boolean }) => {
     const iconInfo = getFileIconInfo(file.name);
@@ -16,7 +16,7 @@ export const FileCard = React.memo(({ file, onRemove, isDragging = false }: { fi
             }
         `}>
             <div className="w-8 h-8 rounded-lg bg-[var(--theme-surface-elevated)] flex items-center justify-center flex-shrink-0 mr-3">
-                <GoogleIcon path={iconInfo.path} style={{ color: iconInfo.color }} className="w-5 h-5" />
+                <GoogleIcon icon={iconInfo.icon} path={iconInfo.path} style={{ color: iconInfo.color }} className="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
                 <h4 className="text-[var(--theme-text-primary)] font-medium text-sm truncate" title={file.path}>{file.name}</h4>
@@ -34,7 +34,7 @@ export const FileCard = React.memo(({ file, onRemove, isDragging = false }: { fi
                     className="p-1.5 text-[var(--theme-text-secondary)] hover:text-[var(--theme-error)] hover:bg-[var(--theme-error)]/10 rounded-full transition-colors ml-2"
                     type="button"
                 >
-                    <GoogleIcon path={UI_ICONS.delete} className="w-4 h-4" />
+                    <GoogleIcon icon={UI_ICONS_MAP.delete} className="w-4 h-4" />
                 </button>
             )}
         </div>

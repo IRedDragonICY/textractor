@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { GoogleButton } from './ui/GoogleButton';
 import { GoogleIcon } from './ui/GoogleIcon';
-import { UI_ICONS } from '@/constants';
+import { UI_ICONS_MAP } from '@/lib/icon-mapping';
 import { SecurityIssue } from '@/lib/security';
 
 interface SecurityWarningModalProps {
@@ -32,7 +32,7 @@ export const SecurityWarningModal = ({ isOpen, onClose, onProceed, issues }: Sec
             >
                 <div className="p-6 flex flex-col items-center text-center">
                     <div className="w-16 h-16 rounded-full bg-[var(--theme-error)]/10 flex items-center justify-center mb-4">
-                        <GoogleIcon path={UI_ICONS.warning} className="w-8 h-8 text-[var(--theme-error)]" />
+                        <GoogleIcon icon={UI_ICONS_MAP.warning} className="w-8 h-8 text-[var(--theme-error)]" />
                     </div>
                     
                     <h3 className="text-xl font-medium text-[var(--theme-text-primary)] mb-2">
@@ -46,7 +46,7 @@ export const SecurityWarningModal = ({ isOpen, onClose, onProceed, issues }: Sec
                     <div className="w-full bg-[var(--theme-surface-hover)] rounded-xl border border-[var(--theme-border)] p-4 mb-6 max-h-[200px] overflow-y-auto text-left">
                         {issues.map((issue, idx) => (
                             <div key={idx} className="flex items-start gap-3 mb-3 last:mb-0">
-                                <GoogleIcon path={UI_ICONS.warning} className="w-4 h-4 text-[var(--theme-error)] shrink-0 mt-0.5" />
+                                <GoogleIcon icon={UI_ICONS_MAP.warning} className="w-4 h-4 text-[var(--theme-error)] shrink-0 mt-0.5" />
                                 <div>
                                     <p className="text-sm font-medium text-[var(--theme-text-primary)]">
                                         {issue.fileName}

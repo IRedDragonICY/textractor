@@ -4,7 +4,7 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleButton } from './ui/GoogleButton';
 import { GoogleIcon } from './ui/GoogleIcon';
-import { UI_ICONS, ICONS_PATHS } from '@/constants';
+import { UI_ICONS_MAP } from '@/lib/icon-mapping';
 import { GitTreeNode, GitRepoMetadata, FileData } from '@/types';
 import { getFileIconInfo } from '@/lib/icons';
 import { fetchGitTree, countSelectedFiles, fetchGitRefs, fetchGitCommits } from '@/lib/git-service';
@@ -86,7 +86,7 @@ const TreeItemComponent = React.memo(({ node, level, onToggle, expandedFolders, 
                             animate={{ rotate: isExpanded ? 90 : 0 }}
                             transition={{ duration: 0.15 }}
                         >
-                            <GoogleIcon path={UI_ICONS.chevron_right} className="w-4 h-4" />
+                            <GoogleIcon icon={UI_ICONS_MAP.chevron_right} className="w-4 h-4" />
                         </motion.div>
                     </button>
                 ) : (
@@ -108,7 +108,7 @@ const TreeItemComponent = React.memo(({ node, level, onToggle, expandedFolders, 
                     `}
                 >
                     {node.selected && !node.indeterminate && (
-                        <GoogleIcon path={UI_ICONS.check} className="w-3.5 h-3.5 text-[var(--theme-surface)]" />
+                        <GoogleIcon icon={UI_ICONS_MAP.check} className="w-3.5 h-3.5 text-[var(--theme-surface)]" />
                     )}
                     {node.indeterminate && (
                         <div className="w-2.5 h-0.5 bg-[var(--theme-primary)] rounded" />
@@ -119,12 +119,12 @@ const TreeItemComponent = React.memo(({ node, level, onToggle, expandedFolders, 
                 <div className="shrink-0">
                     {isFolder ? (
                         <GoogleIcon 
-                            path={isExpanded ? ICONS_PATHS.folder_open : ICONS_PATHS.folder} 
+                            icon={isExpanded ? UI_ICONS_MAP.folder_open : UI_ICONS_MAP.folder} 
                             className="w-5 h-5 text-[var(--theme-primary)]" 
                         />
                     ) : (
                         <GoogleIcon 
-                            path={iconInfo?.path || ICONS_PATHS.default_file} 
+                            icon={iconInfo?.icon || UI_ICONS_MAP.default_file} 
                             className="w-5 h-5"
                             style={{ color: iconInfo?.color || 'var(--theme-text-secondary)' }}
                         />
@@ -517,7 +517,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
     // Quick actions
     const selectCommonPatterns = useCallback((pattern: 'code' | 'config' | 'docs') => {
         const patterns: Record<string, RegExp> = {
-            code: /\.(js|jsx|ts|tsx|py|java|go|rs|rb|php|swift|kt|c|cpp|cs|vue|svelte|html|htm|css|scss|sass|less)$/i,
+            code: new RegExp(`\\.(${settings.filters.sourceCodeExtensions.join('|')})$`, 'i'),
             config: /\.(json|yaml|yml|toml|env|ini|config|rc)$|(package\.json|tsconfig|\.eslintrc)/i,
             docs: /\.(md|txt|rst|adoc)$/i
         };
@@ -543,7 +543,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
             };
             return updateNodes(prevTree);
         });
-    }, []);
+    }, [settings.filters.sourceCodeExtensions]);
 
     // Don't render anything if modal is closed
     if (!isOpen) return null;
@@ -566,7 +566,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
                 {/* Header */}
                 <div className="flex items-center gap-4 p-6 border-b border-[var(--theme-border)]">
                     <div className="w-12 h-12 rounded-2xl bg-[var(--theme-surface-elevated)] flex items-center justify-center shrink-0">
-                        <GoogleIcon path={UI_ICONS.github} className="w-7 h-7 text-[var(--theme-text-primary)]" />
+                        <GoogleIcon icon={UI_ICONS_MAP.github} className="w-7 h-7 text-[var(--theme-text-primary)]" />
                     </div>
                     <div className="flex-1 min-w-0">
                         <h3 className="text-xl text-[var(--theme-text-primary)] font-medium">Import from GitHub</h3>
@@ -584,18 +584,18 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
                                             disabled={loading}
                                             title="Select Branch or Tag"
                                         >
-                                            <GoogleIcon path={ICONS_PATHS.git} className="w-3.5 h-3.5 text-[var(--theme-text-tertiary)] mr-2" />
+                                            <GoogleIcon icon={UI_ICONS_MAP.git} className="w-3.5 h-3.5 text-[var(--theme-text-tertiary)] mr-2" />
                                             <span className="text-xs text-[var(--theme-text-primary)] font-medium max-w-[120px] truncate mr-2">
                                                 {currentRef}
                                             </span>
-                                            <GoogleIcon path={UI_ICONS.expand_more} className="w-3.5 h-3.5 text-[var(--theme-text-tertiary)]" />
+                                            <GoogleIcon icon={UI_ICONS_MAP.expand_more} className="w-3.5 h-3.5 text-[var(--theme-text-tertiary)]" />
                                         </button>
 
                                         {isBranchDropdownOpen && (
                                             <div className="absolute top-full left-0 mt-1 w-[280px] bg-[var(--theme-surface-elevated)] border border-[var(--theme-border)] rounded-xl shadow-xl z-50 overflow-hidden flex flex-col max-h-[300px]">
                                                 <div className="p-2 border-b border-[var(--theme-border)]">
                                                     <div className="flex items-center bg-[var(--theme-surface)] rounded-lg px-2 py-1.5 border border-[var(--theme-border)] focus-within:border-[var(--theme-primary)]">
-                                                        <GoogleIcon path={UI_ICONS.search} className="w-3.5 h-3.5 text-[var(--theme-text-tertiary)] mr-2" />
+                                                        <GoogleIcon icon={UI_ICONS_MAP.search} className="w-3.5 h-3.5 text-[var(--theme-text-tertiary)] mr-2" />
                                                         <input
                                                             type="text"
                                                             value={branchSearchTerm}
@@ -624,9 +624,9 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
                                                                             : 'text-[var(--theme-text-secondary)] hover:bg-[var(--theme-surface-hover)] hover:text-[var(--theme-text-primary)]'
                                                                     }`}
                                                                 >
-                                                                    <GoogleIcon path={ICONS_PATHS.git} className="w-3.5 h-3.5 opacity-70" />
+                                                                    <GoogleIcon icon={UI_ICONS_MAP.git} className="w-3.5 h-3.5 opacity-70" />
                                                                     <span className="truncate">{branch}</span>
-                                                                    {currentRef === branch && <GoogleIcon path={UI_ICONS.check} className="w-3.5 h-3.5 ml-auto" />}
+                                                                    {currentRef === branch && <GoogleIcon icon={UI_ICONS_MAP.check} className="w-3.5 h-3.5 ml-auto" />}
                                                                 </button>
                                                             ))}
                                                         </div>
@@ -649,9 +649,9 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
                                                                             : 'text-[var(--theme-text-secondary)] hover:bg-[var(--theme-surface-hover)] hover:text-[var(--theme-text-primary)]'
                                                                     }`}
                                                                 >
-                                                                    <GoogleIcon path={ICONS_PATHS.git} className="w-3.5 h-3.5 opacity-70" />
+                                                                    <GoogleIcon icon={UI_ICONS_MAP.git} className="w-3.5 h-3.5 opacity-70" />
                                                                     <span className="truncate">{tag}</span>
-                                                                    {currentRef === tag && <GoogleIcon path={UI_ICONS.check} className="w-3.5 h-3.5 ml-auto" />}
+                                                                    {currentRef === tag && <GoogleIcon icon={UI_ICONS_MAP.check} className="w-3.5 h-3.5 ml-auto" />}
                                                                 </button>
                                                             ))}
                                                         </div>
@@ -675,11 +675,11 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
                                             disabled={loading}
                                             title="Select Commit"
                                         >
-                                            <GoogleIcon path={UI_ICONS.timer} className="w-3.5 h-3.5 text-[var(--theme-text-tertiary)] mr-2" />
+                                            <GoogleIcon icon={UI_ICONS_MAP.timer} className="w-3.5 h-3.5 text-[var(--theme-text-tertiary)] mr-2" />
                                             <span className="text-xs text-[var(--theme-text-primary)] font-medium max-w-[120px] truncate mr-2">
                                                 {selectedCommit ? selectedCommit.substring(0, 7) : 'Latest'}
                                             </span>
-                                            <GoogleIcon path={UI_ICONS.expand_more} className="w-3.5 h-3.5 text-[var(--theme-text-tertiary)]" />
+                                            <GoogleIcon icon={UI_ICONS_MAP.expand_more} className="w-3.5 h-3.5 text-[var(--theme-text-tertiary)]" />
                                         </button>
 
                                         {isCommitDropdownOpen && (
@@ -705,7 +705,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
                                                             <span className={`font-medium ${!selectedCommit ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-text-primary)]'}`}>
                                                                 Latest (HEAD)
                                                             </span>
-                                                            {!selectedCommit && <GoogleIcon path={UI_ICONS.check} className="w-3.5 h-3.5 text-[var(--theme-primary)]" />}
+                                                            {!selectedCommit && <GoogleIcon icon={UI_ICONS_MAP.check} className="w-3.5 h-3.5 text-[var(--theme-primary)]" />}
                                                         </div>
                                                         <span className="text-[10px] text-[var(--theme-text-tertiary)]">Current branch state</span>
                                                     </button>
@@ -727,7 +727,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
                                                                 <span className={`font-medium truncate ${selectedCommit === commit.sha ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-text-primary)]'}`}>
                                                                     {commit.message}
                                                                 </span>
-                                                                {selectedCommit === commit.sha && <GoogleIcon path={UI_ICONS.check} className="w-3.5 h-3.5 text-[var(--theme-primary)] shrink-0" />}
+                                                                {selectedCommit === commit.sha && <GoogleIcon icon={UI_ICONS_MAP.check} className="w-3.5 h-3.5 text-[var(--theme-primary)] shrink-0" />}
                                                             </div>
                                                             <div className="flex items-center justify-between text-[10px] text-[var(--theme-text-tertiary)]">
                                                                 <div className="flex items-center gap-1.5">
@@ -754,7 +754,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
                             Change repo
                         </button>
                     )}
-                    <GoogleButton variant="icon" icon={UI_ICONS.close} onClick={onClose} />
+                    <GoogleButton variant="icon" icon={UI_ICONS_MAP.close} onClick={onClose} />
                 </div>
 
                 {/* URL Input Step */}
@@ -773,7 +773,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
                                     autoFocus
                                 />
                                 <div className="absolute left-4 top-3.5 text-[var(--theme-text-secondary)]">
-                                    <GoogleIcon path={UI_ICONS.search} className="w-5 h-5" />
+                                    <GoogleIcon icon={UI_ICONS_MAP.search} className="w-5 h-5" />
                                 </div>
                                 {loading && (
                                     <div className="absolute right-4 top-3.5">
@@ -814,7 +814,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
                         <div className="px-6 py-3 border-b border-[var(--theme-border)] flex flex-wrap items-center gap-3 bg-[var(--theme-bg)]">
                             {/* Search */}
                             <div className="flex-1 min-w-[200px] flex items-center gap-2 bg-[var(--theme-surface-hover)] rounded-full px-4 py-2 border border-[var(--theme-border)] focus-within:border-[var(--theme-primary)] transition-all">
-                                <GoogleIcon path={UI_ICONS.search} className="text-[var(--theme-text-tertiary)] w-4 h-4" />
+                                <GoogleIcon icon={UI_ICONS_MAP.search} className="text-[var(--theme-text-tertiary)] w-4 h-4" />
                                 <input
                                     type="text"
                                     placeholder="Search files..."
@@ -824,7 +824,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
                                 />
                                 {searchTerm && (
                                     <button onClick={() => setSearchTerm('')} className="text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)]">
-                                        <GoogleIcon path={UI_ICONS.close} className="w-4 h-4" />
+                                        <GoogleIcon icon={UI_ICONS_MAP.close} className="w-4 h-4" />
                                     </button>
                                 )}
                             </div>
@@ -854,21 +854,21 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
                                 onClick={() => selectCommonPatterns('code')}
                                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--theme-border)] hover:bg-[var(--theme-surface-hover)] transition-all text-xs font-medium text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] shrink-0"
                             >
-                                <GoogleIcon path={UI_ICONS.code} className="w-4 h-4" />
+                                <GoogleIcon icon={UI_ICONS_MAP.code} className="w-4 h-4" />
                                 Source Code
                             </button>
                             <button
                                 onClick={() => selectCommonPatterns('config')}
                                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--theme-border)] hover:bg-[var(--theme-surface-hover)] transition-all text-xs font-medium text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] shrink-0"
                             >
-                                <GoogleIcon path={ICONS_PATHS.settings} className="w-4 h-4" />
+                                <GoogleIcon icon={UI_ICONS_MAP.settings} className="w-4 h-4" />
                                 Config Files
                             </button>
                             <button
                                 onClick={() => selectCommonPatterns('docs')}
                                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--theme-border)] hover:bg-[var(--theme-surface-hover)] transition-all text-xs font-medium text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] shrink-0"
                             >
-                                <GoogleIcon path={ICONS_PATHS.readme} className="w-4 h-4" />
+                                <GoogleIcon icon={UI_ICONS_MAP.readme} className="w-4 h-4" />
                                 Documentation
                             </button>
                             <div className="w-px h-4 bg-[var(--theme-border)] mx-1 shrink-0" />
@@ -876,7 +876,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
                                 onClick={onOpenSettings}
                                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--theme-border)] hover:bg-[var(--theme-surface-hover)] transition-all text-xs font-medium text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] shrink-0"
                             >
-                                <GoogleIcon path={UI_ICONS.tune} className="w-4 h-4" />
+                                <GoogleIcon icon={UI_ICONS_MAP.tune} className="w-4 h-4" />
                                 Configure Filters
                             </button>
                         </div>
@@ -885,7 +885,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
                         <div className="flex-1 overflow-y-auto p-4 min-h-[300px] max-h-[400px] scrollbar-thin scrollbar-thumb-[var(--theme-border)] scrollbar-track-transparent">
                             {tree.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center h-full text-[var(--theme-text-tertiary)]">
-                                    <GoogleIcon path={ICONS_PATHS.folder_open} className="w-16 h-16 mb-4 opacity-20" />
+                                    <GoogleIcon icon={UI_ICONS_MAP.folder_open} className="w-16 h-16 mb-4 opacity-20" />
                                     <p className="text-sm">No files found</p>
                                 </div>
                             ) : (
@@ -908,7 +908,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
                             <div className="flex items-center justify-between gap-4">
                                 <div className="flex items-center gap-3">
                                     <div className="flex items-center gap-2 bg-[var(--theme-surface-elevated)] rounded-full px-4 py-2">
-                                        <GoogleIcon path={ICONS_PATHS.check_circle} className="w-4 h-4 text-[var(--theme-primary)]" />
+                                        <GoogleIcon icon={UI_ICONS_MAP.check_circle} className="w-4 h-4 text-[var(--theme-primary)]" />
                                         <span className="text-sm text-[var(--theme-text-primary)]">
                                             <span className="font-medium">{selectedCount}</span>
                                             <span className="text-[var(--theme-text-tertiary)]"> / {totalFiles} files</span>
@@ -917,7 +917,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
                                     
                                     {/* Background import hint */}
                                     <span className="text-xs text-[var(--theme-text-tertiary)] hidden sm:flex items-center gap-1.5">
-                                        <GoogleIcon path={UI_ICONS.network} className="w-3.5 h-3.5" />
+                                        <GoogleIcon icon={UI_ICONS_MAP.network} className="w-3.5 h-3.5" />
                                         Import runs in background
                                     </span>
                                 </div>

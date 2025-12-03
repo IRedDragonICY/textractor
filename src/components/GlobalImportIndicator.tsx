@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleButton } from './ui/GoogleButton';
-import { GoogleIcon } from './ui/GoogleIcon';
-import { UI_ICONS } from '@/constants';
+import { GoogleIcon } from '@/lib/icons';
+import { UI_ICONS_MAP } from '@/lib/icon-mapping';
 import { ImportProgress, formatSpeed, formatETA, formatBytes, gitImportManager } from '@/lib/git-import-worker';
 
 interface GlobalImportIndicatorProps {
@@ -90,15 +90,15 @@ export const GlobalImportIndicator: React.FC<GlobalImportIndicatorProps> = ({
                             }
                         `}>
                             {isComplete ? (
-                                <GoogleIcon path={UI_ICONS.check} className="w-6 h-6 text-green-500" />
+                                <GoogleIcon icon={UI_ICONS_MAP.check} className="w-6 h-6 text-green-500" />
                             ) : isError ? (
-                                <GoogleIcon path={UI_ICONS.warning} className="w-6 h-6 text-red-500" />
+                                <GoogleIcon icon={UI_ICONS_MAP.warning} className="w-6 h-6 text-red-500" />
                             ) : (
                                 <motion.div
                                     animate={{ rotate: 360 }}
                                     transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
                                 >
-                                    <GoogleIcon path={UI_ICONS.github} className="w-6 h-6 text-[var(--theme-primary)]" />
+                                    <GoogleIcon icon={UI_ICONS_MAP.github} className="w-6 h-6 text-[var(--theme-primary)]" />
                                 </motion.div>
                             )}
                         </div>
@@ -113,7 +113,7 @@ export const GlobalImportIndicator: React.FC<GlobalImportIndicatorProps> = ({
                         {!isComplete && !isError && (
                             <GoogleButton 
                                 variant="icon" 
-                                icon={UI_ICONS.minimize} 
+                                icon={UI_ICONS_MAP.minimize} 
                                 onClick={() => setIsMinimized(true)}
                             />
                         )}
@@ -155,7 +155,7 @@ export const GlobalImportIndicator: React.FC<GlobalImportIndicatorProps> = ({
                             <div className="grid grid-cols-3 gap-4">
                                 <div className="bg-[var(--theme-surface-elevated)] rounded-xl p-3 text-center">
                                     <div className="flex items-center justify-center gap-1.5 mb-1">
-                                        <GoogleIcon path={UI_ICONS.speed} className="w-4 h-4 text-[var(--theme-text-tertiary)]" />
+                                        <GoogleIcon icon={UI_ICONS_MAP.speed} className="w-4 h-4 text-[var(--theme-text-tertiary)]" />
                                         <span className="text-xs text-[var(--theme-text-tertiary)]">Speed</span>
                                     </div>
                                     <span className="text-sm font-medium text-[var(--theme-text-primary)]">
@@ -165,7 +165,7 @@ export const GlobalImportIndicator: React.FC<GlobalImportIndicatorProps> = ({
 
                                 <div className="bg-[var(--theme-surface-elevated)] rounded-xl p-3 text-center">
                                     <div className="flex items-center justify-center gap-1.5 mb-1">
-                                        <GoogleIcon path={UI_ICONS.download} className="w-4 h-4 text-[var(--theme-text-tertiary)]" />
+                                        <GoogleIcon icon={UI_ICONS_MAP.download} className="w-4 h-4 text-[var(--theme-text-tertiary)]" />
                                         <span className="text-xs text-[var(--theme-text-tertiary)]">Downloaded</span>
                                     </div>
                                     <span className="text-sm font-medium text-[var(--theme-text-primary)]">
@@ -175,7 +175,7 @@ export const GlobalImportIndicator: React.FC<GlobalImportIndicatorProps> = ({
 
                                 <div className="bg-[var(--theme-surface-elevated)] rounded-xl p-3 text-center">
                                     <div className="flex items-center justify-center gap-1.5 mb-1">
-                                        <GoogleIcon path={UI_ICONS.timer} className="w-4 h-4 text-[var(--theme-text-tertiary)]" />
+                                        <GoogleIcon icon={UI_ICONS_MAP.timer} className="w-4 h-4 text-[var(--theme-text-tertiary)]" />
                                         <span className="text-xs text-[var(--theme-text-tertiary)]">ETA</span>
                                     </div>
                                     <span className="text-sm font-medium text-[var(--theme-text-primary)]">
@@ -192,7 +192,7 @@ export const GlobalImportIndicator: React.FC<GlobalImportIndicatorProps> = ({
                                     animate={{ opacity: [0.5, 1, 0.5] }}
                                     transition={{ duration: 1, repeat: Infinity }}
                                 >
-                                    <GoogleIcon path={UI_ICONS.file} className="w-4 h-4 text-[var(--theme-primary)]" />
+                                    <GoogleIcon icon={UI_ICONS_MAP.default_file} className="w-4 h-4 text-[var(--theme-primary)]" />
                                 </motion.div>
                                 <span className="text-xs text-[var(--theme-text-secondary)] font-mono truncate flex-1">
                                     {progress.currentFile}
@@ -204,7 +204,7 @@ export const GlobalImportIndicator: React.FC<GlobalImportIndicatorProps> = ({
                         {progress.errors.length > 0 && (
                             <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3">
                                 <div className="flex items-center gap-2 mb-2">
-                                    <GoogleIcon path={UI_ICONS.warning} className="w-4 h-4 text-red-500" />
+                                    <GoogleIcon icon={UI_ICONS_MAP.warning} className="w-4 h-4 text-red-500" />
                                     <span className="text-sm font-medium text-red-500">
                                         {progress.errors.length} {progress.errors.length === 1 ? 'error' : 'errors'}
                                     </span>
@@ -343,7 +343,7 @@ export const GlobalImportIndicator: React.FC<GlobalImportIndicatorProps> = ({
                             tabIndex={0}
                         >
                             <motion.div animate={{ rotate: isExpanded ? 180 : 0 }}>
-                                <GoogleIcon path={UI_ICONS.chevron_right} className="w-4 h-4 rotate-90" />
+                                <GoogleIcon icon={UI_ICONS_MAP.chevron_right} className="w-4 h-4 rotate-90" />
                             </motion.div>
                         </div>
 
@@ -354,7 +354,7 @@ export const GlobalImportIndicator: React.FC<GlobalImportIndicatorProps> = ({
                                 role="button"
                                 tabIndex={0}
                             >
-                                <GoogleIcon path={UI_ICONS.close} className="w-4 h-4" />
+                                <GoogleIcon icon={UI_ICONS_MAP.close} className="w-4 h-4" />
                             </div>
                         )}
 
@@ -365,7 +365,7 @@ export const GlobalImportIndicator: React.FC<GlobalImportIndicatorProps> = ({
                                 role="button"
                                 tabIndex={0}
                             >
-                                <GoogleIcon path={UI_ICONS.close} className="w-4 h-4" />
+                                <GoogleIcon icon={UI_ICONS_MAP.close} className="w-4 h-4" />
                             </div>
                         )}
                     </div>
@@ -404,7 +404,7 @@ export const GlobalImportIndicator: React.FC<GlobalImportIndicatorProps> = ({
                                             animate={{ opacity: [0.5, 1, 0.5] }}
                                             transition={{ duration: 1, repeat: Infinity }}
                                         >
-                                            <GoogleIcon path={UI_ICONS.file} className="w-3.5 h-3.5 text-[var(--theme-primary)]" />
+                                            <GoogleIcon icon={UI_ICONS_MAP.default_file} className="w-3.5 h-3.5 text-[var(--theme-primary)]" />
                                         </motion.div>
                                         <span className="text-xs text-[var(--theme-text-secondary)] font-mono truncate">
                                             {progress.currentFile}
@@ -415,7 +415,7 @@ export const GlobalImportIndicator: React.FC<GlobalImportIndicatorProps> = ({
                                 {/* Errors indicator */}
                                 {progress.errors.length > 0 && (
                                     <div className="flex items-center gap-2 text-xs text-red-400">
-                                        <GoogleIcon path={UI_ICONS.warning} className="w-3.5 h-3.5" />
+                                        <GoogleIcon icon={UI_ICONS_MAP.warning} className="w-3.5 h-3.5" />
                                         <span>{progress.errors.length} errors - click for details</span>
                                     </div>
                                 )}

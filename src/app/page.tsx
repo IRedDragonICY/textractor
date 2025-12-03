@@ -53,7 +53,7 @@ import { scanForSecrets, SecurityIssue } from '@/lib/security';
 
 // Types & Constants
 import { OutputStyle, FileData, ViewMode, TreeNode } from '@/types';
-import { UI_ICONS, ICONS_PATHS } from '@/constants';
+import { UI_ICONS_MAP } from '@/lib/icon-mapping';
 import { OutputStyleType, ViewModeType } from '@/types/session';
 
 // Main App Wrapper with Theme Provider
@@ -460,7 +460,7 @@ function Contextractor() {
                     <GoogleButton
                         variant="icon"
                         onClick={() => setIsMobileSidebarOpen(prev => !prev)}
-                        icon={UI_ICONS.menu}
+                        icon={UI_ICONS_MAP.menu}
                         className="w-8 h-8"
                     />
                 </div>
@@ -588,10 +588,10 @@ function Contextractor() {
                     {/* Mobile Sidebar Header */}
                     <div className="flex items-center justify-between mb-2 lg:hidden">
                         <h2 className="text-lg font-medium text-[var(--theme-text-primary)] flex items-center gap-2">
-                            <GoogleIcon path={ICONS_PATHS.folder_open} className="w-5 h-5 text-[var(--theme-primary)]" />
+                            <GoogleIcon icon={UI_ICONS_MAP.folder_open} className="w-5 h-5 text-[var(--theme-primary)]" />
                             Files
                         </h2>
-                        <GoogleButton variant="icon" icon={UI_ICONS.close} onClick={() => setIsMobileSidebarOpen(false)} />
+                        <GoogleButton variant="icon" icon={UI_ICONS_MAP.close} onClick={() => setIsMobileSidebarOpen(false)} />
                     </div>
 
                     {/* Mobile-Only Output Style Selector - Added here as requested */}
@@ -620,7 +620,7 @@ function Contextractor() {
                                 <div className="w-12 h-12 border-4 border-[var(--theme-surface-elevated)] border-t-[var(--theme-primary)] rounded-full animate-spin mb-1"></div>
                             ) : (
                                 <div className="w-12 h-12 bg-[var(--theme-surface-elevated)] rounded-full flex items-center justify-center text-[var(--theme-text-secondary)] group-hover:text-[var(--theme-primary)] transition-colors shadow-md">
-                                    <GoogleIcon path={UI_ICONS.upload} className="w-6 h-6" />
+                                    <GoogleIcon icon={UI_ICONS_MAP.upload} className="w-6 h-6" />
                                 </div>
                             )}
                             <div>
@@ -632,7 +632,7 @@ function Contextractor() {
                         <div className="mt-3">
                             <GoogleButton
                                 variant="outlined"
-                                icon={UI_ICONS.github}
+                                icon={UI_ICONS_MAP.github}
                                 className="w-full justify-center border-[var(--theme-border)] bg-[var(--theme-surface)]"
                                 onClick={(e) => { if(e) e.stopPropagation(); setGitModalOpen(true); }}
                             >
@@ -659,7 +659,7 @@ function Contextractor() {
                                     <GoogleButton
                                         variant="icon"
                                         onClick={() => setDeleteConfirmOpen(true)}
-                                        icon={UI_ICONS.delete}
+                                        icon={UI_ICONS_MAP.delete}
                                         className="w-8 h-8 text-[var(--theme-text-tertiary)] hover:text-[var(--theme-error)]"
                                     />
                                 )}
@@ -668,14 +668,14 @@ function Contextractor() {
                                 <div className="flex bg-[var(--theme-surface-elevated)] rounded-full p-1">
                                     <GoogleButton
                                         variant="icon"
-                                        icon={UI_ICONS.view_tree}
+                                        icon={UI_ICONS_MAP.view_tree}
                                         active={viewMode === 'tree'}
                                         onClick={() => setViewMode('tree')}
                                         className="w-8 h-8"
                                     />
                                     <GoogleButton
                                         variant="icon"
-                                        icon={UI_ICONS.view_list}
+                                        icon={UI_ICONS_MAP.view_list}
                                         active={viewMode === 'list'}
                                         onClick={() => setViewMode('list')}
                                         className="w-8 h-8"
@@ -692,7 +692,7 @@ function Contextractor() {
                                 </div>
                             ) : files.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center h-full text-[var(--theme-text-tertiary)] py-10 opacity-60">
-                                    <GoogleIcon path={ICONS_PATHS.folder_open} className="w-16 h-16 mb-4 opacity-20" />
+                                    <GoogleIcon icon={UI_ICONS_MAP.folder_open} className="w-16 h-16 mb-4 opacity-20" />
                                     <p className="text-sm">Workspace empty</p>
                                 </div>
                             ) : viewMode === 'list' ? (
@@ -734,7 +734,7 @@ function Contextractor() {
                         <div className="px-4 lg:px-6 py-4 border-b border-[var(--theme-border)] flex items-center justify-between bg-[var(--theme-surface)] shrink-0 flex-wrap gap-4">
 
                             <div className="flex-1 min-w-[240px] flex items-center gap-3 bg-[var(--theme-surface-hover)] rounded-full px-5 py-2.5 border border-[var(--theme-border)] focus-within:border-[var(--theme-primary)] focus-within:bg-[var(--theme-surface)] transition-all">
-                                <GoogleIcon path={UI_ICONS.search} className="text-[var(--theme-text-tertiary)] w-5 h-5" />
+                                <GoogleIcon icon={UI_ICONS_MAP.search} className="text-[var(--theme-text-tertiary)] w-5 h-5" />
                                 <input
                                     type="text"
                                     placeholder="Find in code..."
@@ -747,9 +747,9 @@ function Contextractor() {
                                         <span className="text-xs text-[var(--theme-text-tertiary)] whitespace-nowrap font-mono">
                                             {searchMatches.length > 0 ? `${currentMatchIdx + 1}/${searchMatches.length}` : '0'}
                                         </span>
-                                        <button onClick={handlePrevMatch} className="p-1 hover:text-[var(--theme-primary)] text-[var(--theme-text-secondary)] disabled:opacity-30"><GoogleIcon path={UI_ICONS.arrow_up} className="w-4 h-4"/></button>
-                                        <button onClick={handleNextMatch} className="p-1 hover:text-[var(--theme-primary)] text-[var(--theme-text-secondary)] disabled:opacity-30"><GoogleIcon path={UI_ICONS.arrow_down} className="w-4 h-4"/></button>
-                                        <button onClick={() => setSearchTerm("")} className="p-1 hover:text-[var(--theme-error)] text-[var(--theme-text-tertiary)]"><GoogleIcon path={UI_ICONS.close} className="w-4 h-4"/></button>
+                                        <button onClick={handlePrevMatch} className="p-1 hover:text-[var(--theme-primary)] text-[var(--theme-text-secondary)] disabled:opacity-30"><GoogleIcon icon={UI_ICONS_MAP.arrow_up} className="w-4 h-4"/></button>
+                                        <button onClick={handleNextMatch} className="p-1 hover:text-[var(--theme-primary)] text-[var(--theme-text-secondary)] disabled:opacity-30"><GoogleIcon icon={UI_ICONS_MAP.arrow_down} className="w-4 h-4"/></button>
+                                        <button onClick={() => setSearchTerm("")} className="p-1 hover:text-[var(--theme-error)] text-[var(--theme-text-tertiary)]"><GoogleIcon icon={UI_ICONS_MAP.close} className="w-4 h-4"/></button>
                                     </div>
                                 )}
                             </div>
@@ -765,7 +765,7 @@ function Contextractor() {
                                 <GoogleButton
                                     onClick={copyToClipboard}
                                     variant="filled"
-                                    icon={isCopied ? UI_ICONS.check : UI_ICONS.copy}
+                                    icon={isCopied ? UI_ICONS_MAP.check : UI_ICONS_MAP.copy}
                                     disabled={!combinedText || isTextPending}
                                 >
                                     {isCopied ? 'Copied' : isTextPending ? 'Processing...' : 'Copy'}
@@ -819,7 +819,7 @@ function Contextractor() {
                             className="bg-[var(--theme-surface)] p-10 rounded-[32px] shadow-2xl border border-[var(--theme-primary)]/30 flex flex-col items-center"
                         >
                             <div className="w-24 h-24 bg-[var(--theme-surface-elevated)] rounded-full flex items-center justify-center text-[var(--theme-primary)] mb-6 animate-bounce border-2 border-[var(--theme-border)]">
-                                <GoogleIcon path={UI_ICONS.upload} className="w-10 h-10" />
+                                <GoogleIcon icon={UI_ICONS_MAP.upload} className="w-10 h-10" />
                             </div>
                             <h2 className="text-3xl text-[var(--theme-text-primary)] font-normal">Drop to analyze</h2>
                         </motion.div>
@@ -835,7 +835,7 @@ function Contextractor() {
                         exit={{ opacity: 0, y: 20, scale: 0.95 }}
                         className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-[var(--theme-primary)] text-[var(--theme-primary-contrast)] px-6 py-3.5 rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.4)] text-sm font-medium flex items-center gap-3"
                     >
-                        <GoogleIcon path={UI_ICONS.check} className="w-5 h-5" />
+                        <GoogleIcon icon={UI_ICONS_MAP.check} className="w-5 h-5" />
                         Content copied to clipboard
                     </motion.div>
                 )}
@@ -855,7 +855,7 @@ function Contextractor() {
                         >
                             <div className="flex flex-col items-center text-center mb-6">
                                 <div className="w-12 h-12 rounded-full bg-[var(--theme-error)]/20 text-[var(--theme-error)] flex items-center justify-center mb-4">
-                                    <GoogleIcon path={UI_ICONS.delete} className="w-6 h-6" />
+                                    <GoogleIcon icon={UI_ICONS_MAP.delete} className="w-6 h-6" />
                                 </div>
                                 <h3 className="text-2xl text-[var(--theme-text-primary)] leading-8">Reset workspace?</h3>
                                 <p className="text-[var(--theme-text-secondary)] text-sm mt-2 leading-5">

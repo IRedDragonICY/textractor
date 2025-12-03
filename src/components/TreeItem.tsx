@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TreeNode } from '@/types';
-import { ICONS_PATHS, UI_ICONS } from '@/constants';
+import { UI_ICONS_MAP } from '@/lib/icon-mapping';
 import { getFileIconInfo } from '@/lib/icons';
 import { formatNumber } from '@/lib/format';
 import { GoogleIcon } from './ui/GoogleIcon';
@@ -12,7 +12,7 @@ export const TreeItem = ({ node, level, onRemove }: { node: TreeNode, level: num
     const indent = level * 16;
 
     const iconInfo = isFolder
-        ? { path: isOpen ? ICONS_PATHS.folder_open : ICONS_PATHS.folder, color: isOpen ? 'var(--theme-primary)' : 'var(--theme-text-secondary)' }
+        ? { icon: isOpen ? UI_ICONS_MAP.folder_open : UI_ICONS_MAP.folder, color: isOpen ? 'var(--theme-primary)' : 'var(--theme-text-secondary)' }
         : getFileIconInfo(node.name);
 
     return (
@@ -24,11 +24,11 @@ export const TreeItem = ({ node, level, onRemove }: { node: TreeNode, level: num
             >
                 <div className="flex items-center flex-1 min-w-0 overflow-hidden">
                     <span className={`mr-1 text-[var(--theme-text-tertiary)] transition-transform duration-200 flex-shrink-0 ${isOpen ? 'rotate-90' : ''} ${!isFolder && 'opacity-0 w-4'}`}>
-                        {isFolder && <GoogleIcon path={UI_ICONS.chevron_right} className="w-4 h-4" />}
+                        {isFolder && <GoogleIcon icon={UI_ICONS_MAP.chevron_right} className="w-4 h-4" />}
                     </span>
 
                     <span className="mr-2.5 flex-shrink-0">
-                        <GoogleIcon path={iconInfo.path} style={{ color: iconInfo.color }} className="w-5 h-5" />
+                        <GoogleIcon icon={iconInfo.icon} style={{ color: iconInfo.color }} className="w-5 h-5" />
                     </span>
 
                     <span className={`text-[13px] truncate font-mono ${isFolder ? 'text-[var(--theme-text-primary)] font-bold tracking-tight' : 'text-[var(--theme-text-secondary)]'}`}>
@@ -47,7 +47,7 @@ export const TreeItem = ({ node, level, onRemove }: { node: TreeNode, level: num
                     onClick={(e) => { e.stopPropagation(); onRemove(node); }}
                     className="p-1 opacity-0 group-hover:opacity-100 text-[var(--theme-text-secondary)] hover:text-[var(--theme-error)] hover:bg-[var(--theme-error)]/10 rounded-full transition-all ml-1 shrink-0"
                 >
-                    <GoogleIcon path={UI_ICONS.delete} className="w-3.5 h-3.5" />
+                    <GoogleIcon icon={UI_ICONS_MAP.delete} className="w-3.5 h-3.5" />
                 </button>
             </div>
 

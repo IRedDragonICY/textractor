@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleIcon } from './ui/GoogleIcon';
 import { AnimatedIcon } from './ui/AnimatedIcon';
-import { UI_ICONS, OUTPUT_STYLES_CONFIG } from '@/constants';
+import { OUTPUT_STYLES_CONFIG } from '@/constants';
+import { UI_ICONS_MAP } from '@/lib/icon-mapping';
 import { OutputStyle } from '@/types';
 
 interface OutputStyleSelectorProps {
@@ -43,7 +44,7 @@ export const OutputStyleSelector = ({ value, onChange, className }: OutputStyleS
                 {/* Animated Icon */}
                 <div className="relative w-4.5 h-4.5 flex items-center justify-center shrink-0">
                     <AnimatedIcon 
-                        path={UI_ICONS.tune} 
+                        icon={UI_ICONS_MAP.tune} 
                         className={`w-full h-full ${isOpen ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-text-secondary)]'}`}
                     />
                 </div>
@@ -56,7 +57,7 @@ export const OutputStyleSelector = ({ value, onChange, className }: OutputStyleS
                     transition={{ duration: 0.2 }}
                     className={`shrink-0 ${isOpen ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-text-tertiary)]'}`}
                 >
-                    <GoogleIcon path={UI_ICONS.expand_more} className="w-4 h-4" />
+                    <GoogleIcon icon={UI_ICONS_MAP.expand_more} className="w-4 h-4" />
                 </motion.div>
             </motion.button>
 
@@ -111,7 +112,7 @@ export const OutputStyleSelector = ({ value, onChange, className }: OutputStyleS
                                                         animate={{ scale: 1 }}
                                                         className="text-[var(--theme-primary)]"
                                                     >
-                                                        <GoogleIcon path={UI_ICONS.check} className="w-4 h-4" />
+                                                        <GoogleIcon icon={UI_ICONS_MAP.check} className="w-4 h-4" />
                                                     </motion.div>
                                                 )}
                                             </div>

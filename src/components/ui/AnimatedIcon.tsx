@@ -2,22 +2,23 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { UI_ICONS } from '@/constants';
+import { UI_ICONS_MAP } from '@/lib/icon-mapping';
 import { GoogleIcon } from './GoogleIcon';
+import { IconType } from 'react-icons';
 
 interface AnimatedIconProps {
-    path: string;
+    icon: IconType | string;
     className?: string;
     style?: React.CSSProperties;
 }
 
-export const AnimatedIcon = ({ path, className = "w-5 h-5", style }: AnimatedIconProps) => {
+export const AnimatedIcon = ({ icon, className = "w-5 h-5", style }: AnimatedIconProps) => {
     const [isHovered, setIsHovered] = useState(false);
 
-    // Helper to detect icon type based on path string
-    const isTune = path === UI_ICONS.tune;
-    const isCopy = path === UI_ICONS.copy;
-    const isCheck = path === UI_ICONS.check;
+    // Helper to detect icon type based on icon reference
+    const isTune = icon === UI_ICONS_MAP.tune;
+    const isCopy = icon === UI_ICONS_MAP.copy;
+    const isCheck = icon === UI_ICONS_MAP.check;
 
     if (isTune) {
         // Settings / Tune Animation: Sliders moving left/right
@@ -105,7 +106,7 @@ export const AnimatedIcon = ({ path, className = "w-5 h-5", style }: AnimatedIco
             whileHover={{ scale: 1.1 }}
             transition={{ type: "spring", stiffness: 400, damping: 17 }}
         >
-            <GoogleIcon path={path} className="w-full h-full" />
+            <GoogleIcon icon={icon} className="w-full h-full" />
         </motion.div>
     );
 };

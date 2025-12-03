@@ -1,3 +1,5 @@
+import { IconType } from 'react-icons';
+
 export interface FileData {
     id: string;
     name: string;
@@ -20,7 +22,8 @@ export interface TreeNode {
 }
 
 export interface IconInfo {
-    path: string;
+    path?: string;
+    icon?: IconType;
     color: string;
 }
 
@@ -28,7 +31,7 @@ export interface GoogleButtonProps {
     children?: React.ReactNode;
     onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
     variant?: 'filled' | 'tonal' | 'text' | 'fab' | 'outlined' | 'icon';
-    icon?: string;
+    icon?: string | IconType;
     disabled?: boolean;
     className?: string;
     type?: 'button' | 'submit' | 'reset';

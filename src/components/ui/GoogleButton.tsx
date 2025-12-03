@@ -25,7 +25,7 @@ export const GoogleButton = React.memo(({
         >
             {icon && (
                 <div className={`relative flex items-center justify-center ${children ? 'mr-2' : ''} ${variant === 'fab' ? 'w-6 h-6' : 'w-5 h-5'}`}>
-                    <AnimatedIcon path={icon} className="w-full h-full" />
+                    <AnimatedIcon icon={icon} className="w-full h-full" />
                 </div>
             )}
             {children}
