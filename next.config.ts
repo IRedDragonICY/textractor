@@ -23,7 +23,15 @@ const nextConfig: NextConfig = {
     } : false,
   },
   
-  // Modern JavaScript optimizations - reduce polyfills
+  // Turbopack configuration (now top-level in Next.js 16)
+  turbopack: {
+    // Resolve aliases if needed
+    resolveAlias: {
+      // Add any module aliases here if needed
+    },
+  },
+  
+  // Modern JavaScript optimizations
   experimental: {
     // Optimize package imports for tree shaking
     optimizePackageImports: [
@@ -33,36 +41,8 @@ const nextConfig: NextConfig = {
       '@dnd-kit/core',
       '@dnd-kit/sortable',
     ],
-  },
-  
-  // Webpack optimizations
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      // Optimize chunks
-      config.optimization = {
-        ...config.optimization,
-        splitChunks: {
-          ...config.optimization?.splitChunks,
-          cacheGroups: {
-            ...(config.optimization?.splitChunks as { cacheGroups?: Record<string, unknown> })?.cacheGroups,
-            // Separate heavy libraries into their own chunks
-            framerMotion: {
-              test: /[\\/]node_modules[\\/]framer-motion[\\/]/,
-              name: 'framer-motion',
-              chunks: 'all',
-              priority: 20,
-            },
-            dndKit: {
-              test: /[\\/]node_modules[\\/]@dnd-kit[\\/]/,
-              name: 'dnd-kit',
-              chunks: 'all',
-              priority: 20,
-            },
-          },
-        },
-      };
-    }
-    return config;
+    // Enable Turbopack filesystem caching for faster dev startup
+    turbopackFileSystemCacheForDev: true,
   },
 };
 

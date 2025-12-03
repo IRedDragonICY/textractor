@@ -35,6 +35,7 @@ import { MenuBar, AboutModal, ShortcutsModal } from '@/components/MenuBar';
 import { SettingsView } from '@/components/SettingsView';
 import { ReportIssueView } from '@/components/ReportIssueView';
 import { SecurityWarningModal } from '@/components/SecurityWarningModal';
+import { ExportModal } from '@/components/ExportModal';
 import { VirtualizedCodeViewer } from '@/components/VirtualizedCodeViewer';
 import { WorkspaceSkeleton, LoadingProgress } from '@/components/LoadingSkeleton';
 import { VirtualizedFileList } from '@/components/VirtualizedFileList';
@@ -118,6 +119,7 @@ function Contextractor() {
     const [activeId, setActiveId] = useState<string | null>(null);
     const [aboutModalOpen, setAboutModalOpen] = useState(false);
     const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
+    const [exportModalOpen, setExportModalOpen] = useState(false);
     const [securityWarningOpen, setSecurityWarningOpen] = useState(false);
     const [securityIssues, setSecurityIssues] = useState<SecurityIssue[]>([]);
 
@@ -390,6 +392,13 @@ function Contextractor() {
                 e.preventDefault();
                 setShortcutsModalOpen(true);
             }
+            // Ctrl+E: Export
+            if (e.ctrlKey && e.key === 'e') {
+                e.preventDefault();
+                if (combinedText) {
+                    setExportModalOpen(true);
+                }
+            }
         };
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
@@ -488,6 +497,7 @@ function Contextractor() {
                         onShowShortcuts={() => setShortcutsModalOpen(true)}
                         onShowSettings={openSettingsTab}
                         onReportIssue={openReportIssueTab}
+                        onExport={() => setExportModalOpen(true)}
                         hasContent={!!combinedText}
                     />
                 </div>
@@ -965,6 +975,20 @@ function Contextractor() {
                         onClose={() => setSecurityWarningOpen(false)}
                         onProceed={performCopy}
                         issues={securityIssues}
+                    />
+                )}
+            </AnimatePresence>
+
+            {/* Export Modal */}
+            <AnimatePresence>
+                {exportModalOpen && (
+                    <ExportModal
+                        isOpen={exportModalOpen}
+                        onClose={() => setExportModalOpen(false)}
+                        content={combinedText}
+                        files={files}
+                        outputStyle={outputStyle}
+                        sessionName={activeSession?.name || 'export'}
                     />
                 )}
             </AnimatePresence>

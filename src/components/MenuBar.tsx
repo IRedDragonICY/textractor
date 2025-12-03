@@ -19,6 +19,7 @@ const ICONS = {
     redo: "M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z",
     copy: "M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z",
     selectAll: "M3 5h2V3c-1.1 0-2 .9-2 2zm0 8h2v-2H3v2zm4 8h2v-2H7v2zM3 9h2V7H3v2zm10-6h-2v2h2V3zm6 0v2h2c0-1.1-.9-2-2-2zM5 21v-2H3c0 1.1.9 2 2 2zm-2-4h2v-2H3v2zM9 3H7v2h2V3zm2 18h2v-2h-2v2zm8-8h2v-2h-2v2zm0 8c1.1 0 2-.9 2-2h-2v2zm0-12h2V7h-2v2zm0 8h2v-2h-2v2zm-4 4h2v-2h-2v2zm0-16h2V3h-2v2z",
+    export: "M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z",
     help: "M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z",
     info: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z",
     keyboard: "M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z",
@@ -65,6 +66,7 @@ interface MenuBarProps {
     onShowShortcuts: () => void;
     onShowSettings: () => void;
     onReportIssue: () => void;
+    onExport: () => void;
     hasContent: boolean;
 }
 
@@ -82,6 +84,7 @@ export const MenuBar: React.FC<MenuBarProps> = ({
     onShowShortcuts,
     onShowSettings,
     onReportIssue,
+    onExport,
     hasContent,
 }) => {
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -108,6 +111,8 @@ export const MenuBar: React.FC<MenuBarProps> = ({
                 { id: 'open', label: 'Open Files...', icon: ICONS.upload, shortcut: 'Ctrl+O', onClick: onOpenFiles },
                 { id: 'import', label: 'Import Repository...', icon: ICONS.github, onClick: onImportRepo },
                 { id: 'divider2', label: '', divider: true },
+                { id: 'export', label: 'Export...', icon: ICONS.export, shortcut: 'Ctrl+E', onClick: onExport, disabled: !hasContent },
+                { id: 'divider3', label: '', divider: true },
                 { id: 'settings', label: 'Settings', icon: ICONS.settings, onClick: onShowSettings },
             ],
         },
