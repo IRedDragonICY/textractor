@@ -1,4 +1,4 @@
-import { encode } from 'gpt-tokenizer';
+import { calculateTokens } from '@/lib/tokenWorker';
 import { FileData, GitHubRepoInfo, GitHubTreeItem, GitTreeNode, GitRepoMetadata } from "@/types";
 
 interface GitHubRef {
@@ -270,6 +270,8 @@ export const fetchSelectedFiles = async (
                 if (!res.ok) return null;
                 const text = await res.text();
                 const fileId = `git-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+                // Use async token counting via web worker (non-blocking)
+                const tokenCount = await calculateTokens(text);
                 return {
                     id: fileId,
                     name: f.name,
@@ -278,7 +280,7 @@ export const fetchSelectedFiles = async (
                     fileObject: new Blob([text], { type: 'text/plain' }),
                     linesOfCode: text.split('\n').length,
                     characterCount: text.length,
-                    tokenCount: encode(text).length,
+                    tokenCount,
                     path: f.path
                 } as FileData;
             } catch { return null; }

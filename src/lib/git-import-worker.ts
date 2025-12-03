@@ -3,15 +3,46 @@
 // Uses chunked processing and deferred token counting
 
 import { FileData, GitTreeNode, GitRepoMetadata } from '@/types';
+import { getEncoding, Tiktoken } from 'js-tiktoken';
 
-// Lazy token counting - will be done after import completes
-let tokenEncoder: ((text: string) => number[]) | null = null;
-const loadTokenEncoder = async () => {
+// Token encoder instance (initialized lazily)
+let tokenEncoder: Tiktoken | null = null;
+
+const loadTokenEncoder = (): Tiktoken => {
     if (!tokenEncoder) {
-        const { encode } = await import('gpt-tokenizer');
-        tokenEncoder = encode;
+        try {
+            // Try o200k_base first (GPT-4o encoding)
+            tokenEncoder = getEncoding('o200k_base');
+        } catch {
+            try {
+                // Fallback to cl100k_base (GPT-4/3.5 encoding)
+                tokenEncoder = getEncoding('cl100k_base');
+            } catch (error) {
+                console.error('Failed to initialize tokenizer:', error);
+                throw new Error('Failed to initialize tokenizer');
+            }
+        }
     }
     return tokenEncoder;
+};
+
+// Estimate tokens for very large texts
+const estimateTokens = (text: string): number => {
+    return Math.ceil(text.length / 4);
+};
+
+// Count tokens with fallback
+const countTokens = (text: string): number => {
+    // For very large texts, use estimation to prevent blocking
+    if (text.length > 500_000) {
+        return estimateTokens(text);
+    }
+    try {
+        const encoder = loadTokenEncoder();
+        return encoder.encode(text).length;
+    } catch {
+        return estimateTokens(text);
+    }
 };
 
 export interface ImportProgress {
@@ -280,10 +311,6 @@ class GitImportManager {
     }
 
     private async countTokensInChunks(files: FileData[], task: ImportTask): Promise<void> {
-        // Load encoder lazily
-        const encode = await loadTokenEncoder();
-        if (!encode) return;
-
         // Process in small chunks
         const CHUNK_SIZE = 3;
         
@@ -293,17 +320,7 @@ class GitImportManager {
             const chunk = files.slice(i, i + CHUNK_SIZE);
             
             for (const file of chunk) {
-                try {
-                    // For large files, estimate tokens instead of counting
-                    if (file.content.length > 50000) {
-                        // Rough estimate: ~4 chars per token
-                        file.tokenCount = Math.ceil(file.content.length / 4);
-                    } else {
-                        file.tokenCount = encode(file.content).length;
-                    }
-                } catch {
-                    file.tokenCount = Math.ceil(file.content.length / 4);
-                }
+                file.tokenCount = countTokens(file.content);
             }
 
             // Yield after each chunk

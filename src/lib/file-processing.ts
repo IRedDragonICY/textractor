@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { encode } from 'gpt-tokenizer';
+import { calculateTokens, calculateTokensBatch, estimateTokens } from '@/lib/tokenWorker';
 import { FileData } from "@/types";
 import { TEXT_FILE_EXTENSIONS } from "@/constants";
 
@@ -46,7 +46,8 @@ export const processFileObject = async (fileObject: File | Blob, explicitPath: s
             content = await fileObject.text();
             lines = content.split('\n').length;
             chars = content.length;
-            tokens = encode(content).length;
+            // Use async token counting via web worker (non-blocking)
+            tokens = await calculateTokens(content);
         } catch (e) { console.error(e); }
     }
 

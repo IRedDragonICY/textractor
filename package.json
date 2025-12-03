@@ -14,9 +14,9 @@
   },
   "dependencies": {
     "@vercel/analytics": "^1.6.1",
-    "gpt-tokenizer": "^3.0.0",
     "idb": "^8.0.3",
     "immer": "^11.0.1",
+    "js-tiktoken": "^1.0.21",
     "jszip": "^3.10.1",
     "lucide-react": "^0.513.0",
     "next": "16.0.6",
