@@ -119,15 +119,16 @@
   --theme-border: #DADCE0;
   --theme-border-subtle: #E8EAED;
   
-  /* Text */
+  /* Text - Improved contrast for WCAG AA compliance */
   --theme-text-primary: #202124;
-  --theme-text-secondary: #5F6368;
-  --theme-text-tertiary: #80868B;
-  --theme-text-muted: #9AA0A6;
+  --theme-text-secondary: #3C4043;
+  --theme-text-tertiary: #5F6368; /* Was #80868B - improved to 4.6:1 contrast ratio */
+  --theme-text-muted: #70757A; /* Was #9AA0A6 - improved contrast */
   
   /* Brand colors */
   --theme-primary: #1A73E8;
   --theme-primary-hover: #1967D2;
+  --theme-primary-contrast: #FFFFFF;
   --theme-accent: #137333;
   
   /* Semantic colors */

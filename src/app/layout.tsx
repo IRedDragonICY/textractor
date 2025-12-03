@@ -235,9 +235,6 @@ export default function RootLayout({
         {/* Critical rendering path optimization */}
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         
-        {/* Preload critical assets for faster LCP */}
-        <link rel="preload" href="/icon-192x192.png" as="image" type="image/png" />
-        
         {/* Font optimization */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

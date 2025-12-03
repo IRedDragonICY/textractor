@@ -5,7 +5,6 @@
 
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import Image from 'next/image';
 import { RecentProject } from '@/types/session';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
 import { formatNumber } from '@/lib/format';
@@ -152,23 +151,28 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     className="text-center mb-16"
                     role="banner"
                 >
-                    {/* App Icon - static for faster LCP */}
+                    {/* App Icon - inline SVG for instant LCP */}
                     <div className="flex justify-center mb-6">
                         <div 
                             className="relative w-20 h-20 rounded-[28px] bg-gradient-to-br from-[var(--theme-primary)] to-[#6366f1] p-[2px] shadow-lg shadow-[var(--theme-primary)]/20"
                             aria-hidden="true"
                         >
                             <div className="w-full h-full rounded-[26px] bg-[var(--theme-surface)] flex items-center justify-center overflow-hidden">
-                                {/* Use smaller optimized image for better LCP */}
-                                <Image 
-                                    src="/icon-192x192.png" 
-                                    alt="" 
-                                    width={52} 
-                                    height={52}
-                                    className="object-contain"
-                                    priority
-                                    fetchPriority="high"
-                                />
+                                {/* Inline SVG icon for zero network latency */}
+                                <svg 
+                                    width="52" 
+                                    height="52" 
+                                    viewBox="0 0 512 512" 
+                                    fill="none" 
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="text-[var(--theme-primary)]"
+                                    aria-hidden="true"
+                                >
+                                    <rect width="512" height="512" rx="128" fill="currentColor" fillOpacity="0.1"/>
+                                    <path d="M256 96C167.6 96 96 167.6 96 256s71.6 160 160 160 160-71.6 160-160S344.4 96 256 96zm0 280c-66.2 0-120-53.8-120-120s53.8-120 120-120 120 53.8 120 120-53.8 120-120 120z" fill="currentColor"/>
+                                    <path d="M256 176c-44.1 0-80 35.9-80 80s35.9 80 80 80 80-35.9 80-80-35.9-80-80-80zm0 120c-22.1 0-40-17.9-40-40s17.9-40 40-40 40 17.9 40 40-17.9 40-40 40z" fill="currentColor"/>
+                                    <circle cx="256" cy="256" r="24" fill="currentColor"/>
+                                </svg>
                             </div>
                         </div>
                     </div>

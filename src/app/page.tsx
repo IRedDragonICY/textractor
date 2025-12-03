@@ -533,12 +533,14 @@ function Contextractor() {
                         <WorkspaceSkeleton />
                     </motion.div>
                 ) : showHomeView ? (
-                    <motion.div
+                    <motion.main
                         key="home"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         className="flex-1 overflow-hidden"
+                        role="main"
+                        aria-label="Home"
                     >
                         <HomeView
                             recentProjects={recentProjects}
@@ -549,14 +551,16 @@ function Contextractor() {
                             onOpenFilePicker={handleOpenFilePicker}
                             onOpenGitImport={handleOpenGitImport}
                         />
-                    </motion.div>
+                    </motion.main>
                 ) : activeSession?.type === 'settings' ? (
-                    <motion.div
+                    <motion.main
                         key="settings"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         className="flex-1 overflow-hidden"
+                        role="main"
+                        aria-label="Settings"
                     >
                         <SettingsView
                             settings={settings}
@@ -564,19 +568,21 @@ function Contextractor() {
                             onUpdateFilters={updateFilterSettings}
                             onReset={resetSettings}
                         />
-                    </motion.div>
+                    </motion.main>
                 ) : activeSession?.type === 'report-issue' ? (
-                    <motion.div
+                    <motion.main
                         key="report-issue"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         className="flex-1 overflow-hidden"
+                        role="main"
+                        aria-label="Report Issue"
                     >
                         <ReportIssueView
                             onClose={() => activeSessionId && closeSession(activeSessionId)}
                         />
-                    </motion.div>
+                    </motion.main>
                 ) : (
                     <motion.main
                         key="workspace"
