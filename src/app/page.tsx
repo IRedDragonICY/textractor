@@ -28,9 +28,12 @@ import { TreeItem } from '@/components/TreeItem';
 import { OutputStyleSelector } from '@/components/OutputStyleSelector';
 import { StatChip } from '@/components/StatChip';
 import { GitFileSelector } from '@/components/GitFileSelector';
+import { GlobalImportIndicator } from '@/components/GlobalImportIndicator';
 import { TabBar } from '@/components/TabBar';
 import { HomeView } from '@/components/HomeView';
 import { MenuBar, AboutModal, ShortcutsModal } from '@/components/MenuBar';
+import { SettingsView } from '@/components/SettingsView';
+import { SecurityWarningModal } from '@/components/SecurityWarningModal';
 import { VirtualizedCodeViewer } from '@/components/VirtualizedCodeViewer';
 import { WorkspaceSkeleton, LoadingProgress } from '@/components/LoadingSkeleton';
 import { VirtualizedFileList } from '@/components/VirtualizedFileList';
@@ -40,11 +43,13 @@ import { useSearch } from '@/hooks/useSearch';
 import { useSessionManager, fileDataToSessionFile, convertSessionFiles } from '@/hooks/useSessionManager';
 import { useHistory } from '@/hooks/useHistory';
 import { ThemeProvider, useThemeProvider } from '@/hooks/useTheme';
+import { useSettings } from '@/hooks/useSettings';
 
 // Services & Utils
 import { formatNumber } from '@/lib/format';
 import { processFileObject, unzipAndProcess } from '@/lib/file-processing';
 import { buildFileTree } from '@/lib/file-tree';
+import { scanForSecrets, SecurityIssue } from '@/lib/security';
 
 // Types & Constants
 import { OutputStyle, FileData, ViewMode, TreeNode } from '@/types';
@@ -87,6 +92,7 @@ function Contextractor() {
         removeRecentProject,
         clearRecentProjects,
         toggleHomeView,
+        openSettingsTab,
     } = useSessionManager();
 
     // Derived state from active session - uses cached batch conversion
@@ -104,10 +110,22 @@ function Contextractor() {
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [gitModalOpen, setGitModalOpen] = useState(false);
+    const [currentImportTaskId, setCurrentImportTaskId] = useState<string | null>(null);
+    const [currentRepoName, setCurrentRepoName] = useState<string>('');
     const [processing, setProcessing] = useState(false);
     const [activeId, setActiveId] = useState<string | null>(null);
     const [aboutModalOpen, setAboutModalOpen] = useState(false);
     const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
+    const [securityWarningOpen, setSecurityWarningOpen] = useState(false);
+    const [securityIssues, setSecurityIssues] = useState<SecurityIssue[]>([]);
+
+    // Settings
+    const { 
+        settings, 
+        updateSecuritySettings, 
+        updateFilterSettings, 
+        resetSettings 
+    } = useSettings();
 
     // History for undo/redo
     const { canUndo, canRedo, undo, redo, recordState } = useHistory();
@@ -266,8 +284,13 @@ function Contextractor() {
         };
     }, [files]);
 
-    // Git Import Handler
-    const handleGitImport = (newFiles: FileData[]) => {
+    // Git Import Handler - Updated for background import
+    const handleStartImport = useCallback((taskId: string, repoName: string) => {
+        setCurrentImportTaskId(taskId);
+        setCurrentRepoName(repoName);
+    }, []);
+
+    const handleGitImport = useCallback((newFiles: FileData[]) => {
         // Create session if none exists
         if (!activeSessionId) {
             createSession();
@@ -276,7 +299,7 @@ function Contextractor() {
         setGitModalOpen(false);
         setViewMode('tree');
         setIsMobileSidebarOpen(false);
-    };
+    }, [activeSessionId, createSession, setFiles, setViewMode]);
 
     // Dropzone
     const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
@@ -388,11 +411,28 @@ function Contextractor() {
 
     const copyToClipboard = () => {
         if (!combinedText) return;
+
+        // Security Check
+        if (settings.security.enablePreFlightCheck) {
+            const issues = scanForSecrets(files, settings.security);
+            if (issues.length > 0) {
+                setSecurityIssues(issues);
+                setSecurityWarningOpen(true);
+                return;
+            }
+        }
+
+        performCopy();
+    };
+
+    const performCopy = () => {
+        if (!combinedText) return;
         navigator.clipboard.writeText(combinedText)
             .then(() => {
                 setIsCopied(true);
                 setTimeout(() => setIsCopied(false), 3000);
             });
+        setSecurityWarningOpen(false);
     };
 
     // Handler for HomeView actions
@@ -438,6 +478,7 @@ function Contextractor() {
                         onSelectAll={() => textAreaRef.current?.select()}
                         onShowAbout={() => setAboutModalOpen(true)}
                         onShowShortcuts={() => setShortcutsModalOpen(true)}
+                        onShowSettings={openSettingsTab}
                         hasContent={!!combinedText}
                     />
                 </div>
@@ -498,6 +539,21 @@ function Contextractor() {
                             onCreateSession={handleCreateSessionFromHome}
                             onOpenFilePicker={handleOpenFilePicker}
                             onOpenGitImport={handleOpenGitImport}
+                        />
+                    </motion.div>
+                ) : activeSession?.type === 'settings' ? (
+                    <motion.div
+                        key="settings"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="flex-1 overflow-hidden"
+                    >
+                        <SettingsView
+                            settings={settings}
+                            onUpdateSecurity={updateSecuritySettings}
+                            onUpdateFilters={updateFilterSettings}
+                            onReset={resetSettings}
                         />
                     </motion.div>
                 ) : (
@@ -830,9 +886,22 @@ function Contextractor() {
                         isOpen={gitModalOpen}
                         onClose={() => setGitModalOpen(false)}
                         onImport={handleGitImport}
+                        onStartImport={handleStartImport}
+                        onOpenSettings={openSettingsTab}
+                        settings={settings}
                     />
                 )}
             </AnimatePresence>
+
+            {/* Global Import Indicator */}
+            <GlobalImportIndicator
+                taskId={currentImportTaskId}
+                repoName={currentRepoName}
+                onComplete={() => {
+                    setCurrentImportTaskId(null);
+                    setCurrentRepoName('');
+                }}
+            />
 
             {/* About Modal */}
             <AnimatePresence>
@@ -850,6 +919,18 @@ function Contextractor() {
                     <ShortcutsModal
                         isOpen={shortcutsModalOpen}
                         onClose={() => setShortcutsModalOpen(false)}
+                    />
+                )}
+            </AnimatePresence>
+
+            {/* Security Warning Modal */}
+            <AnimatePresence>
+                {securityWarningOpen && (
+                    <SecurityWarningModal
+                        isOpen={securityWarningOpen}
+                        onClose={() => setSecurityWarningOpen(false)}
+                        onProceed={performCopy}
+                        issues={securityIssues}
                     />
                 )}
             </AnimatePresence>

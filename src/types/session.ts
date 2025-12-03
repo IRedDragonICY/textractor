@@ -3,6 +3,7 @@
 
 export interface Session {
     id: string;
+    type: 'editor' | 'settings';
     name: string;
     files: SessionFile[];
     outputStyle: OutputStyleType;

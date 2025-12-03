@@ -110,6 +110,7 @@ export const convertSessionFiles = (sessionId: string, files: SessionFile[]): Fi
 // Create empty session
 const createEmptySession = (name?: string): Session => ({
     id: generateId(),
+    type: 'editor',
     name: name || `Untitled ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
     files: [],
     outputStyle: 'standard',
@@ -452,6 +453,49 @@ export const useSessionManager = () => {
         });
     }, []);
 
+    // Open Settings Tab
+    const openSettingsTab = useCallback(() => {
+        setState(prev => {
+            // Check if settings tab already exists
+            const existingSettings = prev.sessions.find(s => s.type === 'settings');
+            
+            if (existingSettings) {
+                return {
+                    ...prev,
+                    sessions: prev.sessions.map(s => ({
+                        ...s,
+                        isActive: s.id === existingSettings.id,
+                    })),
+                    activeSessionId: existingSettings.id,
+                    showHomeView: false,
+                };
+            }
+
+            // Create new settings session
+            const settingsSession: Session = {
+                id: 'settings_tab',
+                type: 'settings',
+                name: 'Settings',
+                files: [],
+                outputStyle: 'standard',
+                viewMode: 'tree',
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                isActive: true,
+                isPinned: false,
+                color: '#89D185', // Greenish for settings
+            };
+
+            const updatedSessions = prev.sessions.map(s => ({ ...s, isActive: false }));
+            return {
+                ...prev,
+                sessions: [...updatedSessions, settingsSession],
+                activeSessionId: settingsSession.id,
+                showHomeView: false,
+            };
+        });
+    }, []);
+
     // Update session files
     const updateSessionFiles = useCallback((id: string, files: SessionFile[]) => {
         setState(prev => ({
@@ -594,5 +638,6 @@ export const useSessionManager = () => {
 
         // UI actions
         toggleHomeView,
+        openSettingsTab,
     };
 };

@@ -27,6 +27,7 @@ const ICONS = {
     moon: "M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z",
     system: "M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z",
     palette: "M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z",
+    heart: "M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z",
 };
 
 interface MenuItem {
@@ -57,6 +58,7 @@ interface MenuBarProps {
     onSelectAll: () => void;
     onShowAbout: () => void;
     onShowShortcuts: () => void;
+    onShowSettings: () => void;
     hasContent: boolean;
 }
 
@@ -72,6 +74,7 @@ export const MenuBar: React.FC<MenuBarProps> = ({
     onSelectAll,
     onShowAbout,
     onShowShortcuts,
+    onShowSettings,
     hasContent,
 }) => {
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -97,6 +100,8 @@ export const MenuBar: React.FC<MenuBarProps> = ({
                 { id: 'divider1', label: '', divider: true },
                 { id: 'open', label: 'Open Files...', icon: ICONS.upload, shortcut: 'Ctrl+O', onClick: onOpenFiles },
                 { id: 'import', label: 'Import Repository...', icon: ICONS.github, onClick: onImportRepo },
+                { id: 'divider2', label: '', divider: true },
+                { id: 'settings', label: 'Settings', icon: ICONS.palette, onClick: onShowSettings },
             ],
         },
         {
@@ -308,7 +313,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-[var(--theme-text-primary)] truncate">Mohammad Farid Hendianto</p>
-                            <p className="text-xs text-[var(--theme-text-tertiary)]">Developer • Indonesia 🇮🇩</p>
+                            <p className="text-xs text-[var(--theme-text-tertiary)]">Developer • Indonesia</p>
                         </div>
                     </div>
 
@@ -333,8 +338,8 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
                     </div>
 
                     {/* Footer */}
-                    <p className="text-center text-[10px] text-[var(--theme-text-muted)] mt-4">
-                        © 2025 Contextractor • Made with ❤️
+                    <p className="text-center text-[10px] text-[var(--theme-text-muted)] mt-4 flex items-center justify-center gap-1">
+                        © 2025 Contextractor • Made with <GoogleIcon path={ICONS.heart} className="w-3 h-3 text-red-500" />
                     </p>
                 </div>
             </motion.div>

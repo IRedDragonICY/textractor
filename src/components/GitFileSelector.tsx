@@ -1,18 +1,24 @@
 'use client';
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleButton } from './ui/GoogleButton';
 import { GoogleIcon } from './ui/GoogleIcon';
 import { UI_ICONS, ICONS_PATHS } from '@/constants';
-import { GitTreeNode, GitRepoMetadata } from '@/types';
+import { GitTreeNode, GitRepoMetadata, FileData } from '@/types';
 import { getFileIconInfo } from '@/lib/icons';
-import { fetchGitTree, fetchSelectedFiles, countSelectedFiles } from '@/lib/git-service';
+import { fetchGitTree, countSelectedFiles, fetchGitRefs, fetchGitCommits } from '@/lib/git-service';
+import { gitImportManager } from '@/lib/git-import-worker';
+
+import { AppSettings } from '@/types/settings';
 
 interface GitFileSelectorProps {
     isOpen: boolean;
     onClose: () => void;
-    onImport: (files: Awaited<ReturnType<typeof fetchSelectedFiles>>) => void;
+    onImport: (files: FileData[]) => void;
+    onStartImport: (taskId: string, repoName: string) => void;
+    onOpenSettings: () => void;
+    settings: AppSettings;
 }
 
 interface TreeItemProps {
@@ -91,7 +97,7 @@ const TreeItemComponent = React.memo(({ node, level, onToggle, expandedFolders, 
                 <button
                     onClick={(e) => { e.stopPropagation(); onToggle(node.path); }}
                     className={`
-                        w-5 h-5 rounded border-2 flex items-center justify-center shrink-0
+                        w-[18px] h-[18px] rounded-[2px] border-2 flex items-center justify-center shrink-0
                         transition-all duration-150
                         ${node.selected && !node.indeterminate
                             ? 'bg-[var(--theme-primary)] border-[var(--theme-primary)]' 
@@ -177,9 +183,12 @@ const TreeItemComponent = React.memo(({ node, level, onToggle, expandedFolders, 
 });
 TreeItemComponent.displayName = 'TreeItemComponent';
 
-export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorProps) => {
+
+
+export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOpenSettings, settings }: GitFileSelectorProps) => {
     const [step, setStep] = useState<'url' | 'select'>('url');
     const [gitUrl, setGitUrl] = useState('');
+    const [fullTree, setFullTree] = useState<GitTreeNode[]>([]);
     const [tree, setTree] = useState<GitTreeNode[]>([]);
     const [metadata, setMetadata] = useState<GitRepoMetadata | null>(null);
     const [loading, setLoading] = useState(false);
@@ -187,20 +196,93 @@ export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorPr
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
-    const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
-
+    const [branches, setBranches] = useState<string[]>([]);
+    const [tags, setTags] = useState<string[]>([]);
+    const [currentRef, setCurrentRef] = useState('');
+    const [commits, setCommits] = useState<{ sha: string, message: string, date: string, author: string }[]>([]);
+    const [selectedCommit, setSelectedCommit] = useState<string>('');
+    const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
+    const [isCommitDropdownOpen, setIsCommitDropdownOpen] = useState(false);
+    const [branchSearchTerm, setBranchSearchTerm] = useState('');
+    const branchDropdownRef = useRef<HTMLDivElement>(null);
+    const commitDropdownRef = useRef<HTMLDivElement>(null);
+    
     // Reset state when modal closes
     useEffect(() => {
         if (!isOpen) {
             setStep('url');
+            setFullTree([]);
             setTree([]);
             setMetadata(null);
             setError('');
             setSearchTerm('');
             setExpandedFolders(new Set());
-            setImportProgress(null);
+            setBranches([]);
+            setTags([]);
+            setCurrentRef('');
+            setCommits([]);
+            setSelectedCommit('');
+            setIsBranchDropdownOpen(false);
+            setIsCommitDropdownOpen(false);
+            setBranchSearchTerm('');
         }
     }, [isOpen]);
+
+    // Close dropdowns when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (branchDropdownRef.current && !branchDropdownRef.current.contains(event.target as Node)) {
+                setIsBranchDropdownOpen(false);
+            }
+            if (commitDropdownRef.current && !commitDropdownRef.current.contains(event.target as Node)) {
+                setIsCommitDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Filter tree based on settings
+    useEffect(() => {
+        if (fullTree.length === 0) return;
+
+        const filterNodes = (nodes: GitTreeNode[]): GitTreeNode[] => {
+            return nodes.filter(node => {
+                if (node.type === 'folder') {
+                    if (settings.filters.ignoredFolders.includes(node.name)) return false;
+                    const filteredChildren = filterNodes(node.children);
+                    // If all children are filtered out and it's a folder, should we keep it?
+                    // Maybe keep it if it's not explicitly ignored, but it will be empty.
+                    // Let's keep it but update children.
+                    node.children = filteredChildren;
+                    return true;
+                } else {
+                    const parts = node.name.split('.');
+                    if (parts.length > 1) {
+                        const ext = parts.pop()?.toLowerCase() || '';
+                        // Check against "lock" and ".lock"
+                        if (settings.filters.ignoredExtensions.includes(ext)) return false;
+                        if (settings.filters.ignoredExtensions.includes('.' + ext)) return false;
+                    }
+                    return true;
+                }
+            });
+        };
+
+        // Deep copy to avoid mutating fullTree directly in a way that affects future filters
+        const treeCopy = JSON.parse(JSON.stringify(fullTree));
+        setTree(filterNodes(treeCopy));
+    }, [fullTree, settings.filters]);
+
+    // Filtered lists
+    const filteredBranches = useMemo(() => 
+        branches.filter(b => b.toLowerCase().includes(branchSearchTerm.toLowerCase())),
+        [branches, branchSearchTerm]
+    );
+    const filteredTags = useMemo(() => 
+        tags.filter(t => t.toLowerCase().includes(branchSearchTerm.toLowerCase())),
+        [tags, branchSearchTerm]
+    );
 
     // Stats
     const selectedCount = useMemo(() => countSelectedFiles(tree), [tree]);
@@ -320,9 +402,20 @@ export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorPr
 
         try {
             const result = await fetchGitTree(gitUrl, setLoadingText);
-            setTree(result.tree);
+            setFullTree(result.tree);
+            // setTree will be handled by useEffect
             setMetadata(result.metadata);
+            setCurrentRef(result.metadata.branch);
             setStep('select');
+            
+            // Fetch refs
+            fetchGitRefs(result.metadata.owner, result.metadata.repo).then(refs => {
+                setBranches(refs.branches);
+                setTags(refs.tags);
+            });
+
+            // Fetch commits for default branch
+            fetchGitCommits(result.metadata.owner, result.metadata.repo, result.metadata.branch).then(setCommits);
             
             // Expand first level by default
             const firstLevelFolders = result.tree.filter(n => n.type === 'folder').map(n => n.path);
@@ -335,28 +428,91 @@ export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorPr
         }
     };
 
-    // Import selected files
-    const handleImport = async () => {
-        if (!metadata || selectedCount === 0) return;
-
+    // Handle ref (branch/tag) change
+    const handleRefChange = async (newRef: string) => {
+        if (!metadata || newRef === currentRef) return;
+        
         setLoading(true);
         setError('');
-        setImportProgress({ current: 0, total: selectedCount });
-
+        
         try {
-            const files = await fetchSelectedFiles(tree, metadata, setLoadingText, (current, total) => {
-                setImportProgress({ current, total });
-            });
-            onImport(files);
-            onClose();
+            const result = await fetchGitTree(gitUrl, setLoadingText, newRef);
+            setFullTree(result.tree);
+            setMetadata(result.metadata);
+            setCurrentRef(newRef);
+            setSelectedCommit(''); // Reset selected commit when branch changes
+            
+            // Fetch commits for new ref
+            fetchGitCommits(metadata.owner, metadata.repo, newRef).then(setCommits);
+            
+            // Expand first level
+            const firstLevelFolders = result.tree.filter(n => n.type === 'folder').map(n => n.path);
+            setExpandedFolders(new Set(firstLevelFolders));
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to import files');
+            setError(err instanceof Error ? err.message : 'Failed to switch branch');
         } finally {
             setLoading(false);
             setLoadingText('');
-            setImportProgress(null);
         }
     };
+
+    // Handle commit change
+    const handleCommitChange = async (sha: string) => {
+        if (!metadata || sha === selectedCommit) return;
+
+        setLoading(true);
+        setError('');
+
+        try {
+            // If sha is empty, revert to currentRef (branch head)
+            const targetRef = sha || currentRef;
+            const result = await fetchGitTree(gitUrl, setLoadingText, targetRef);
+            setFullTree(result.tree);
+            // Don't update metadata branch/ref, just the tree content
+            setSelectedCommit(sha);
+
+            // Expand first level
+            const firstLevelFolders = result.tree.filter(n => n.type === 'folder').map(n => n.path);
+            setExpandedFolders(new Set(firstLevelFolders));
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to switch commit');
+        } finally {
+            setLoading(false);
+            setLoadingText('');
+        }
+    };
+
+    // Import selected files - Background processing
+    const handleImport = useCallback(async () => {
+        if (!metadata || selectedCount === 0) return;
+
+        // Create background import task
+        const taskId = gitImportManager.createTask(
+            gitUrl,
+            tree,
+            metadata,
+            // Progress callback - handled by global indicator
+            () => {},
+            // Complete callback
+            (files) => {
+                onImport(files);
+            },
+            // Error callback
+            (err) => {
+                console.error('Import error:', err);
+                // We don't set error here because the modal will be closed
+            }
+        );
+
+        // Notify parent to show global indicator
+        onStartImport(taskId, metadata.repo);
+        
+        // Start the import
+        gitImportManager.startTask(taskId);
+        
+        // Close modal immediately
+        onClose();
+    }, [metadata, selectedCount, gitUrl, tree, onClose, onImport, onStartImport]);
 
     // Quick actions
     const selectCommonPatterns = useCallback((pattern: 'code' | 'config' | 'docs') => {
@@ -389,6 +545,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorPr
         });
     }, []);
 
+    // Don't render anything if modal is closed
     if (!isOpen) return null;
 
     return (
@@ -397,7 +554,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorPr
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 bg-[var(--theme-overlay)] backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={() => !loading && onClose()}
+            onClick={onClose}
         >
             <motion.div
                 initial={{ scale: 0.95, opacity: 0 }}
@@ -413,9 +570,181 @@ export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorPr
                     </div>
                     <div className="flex-1 min-w-0">
                         <h3 className="text-xl text-[var(--theme-text-primary)] font-medium">Import from GitHub</h3>
-                        <p className="text-sm text-[var(--theme-text-tertiary)] truncate">
-                            {step === 'url' ? 'Enter repository URL' : `${metadata?.owner}/${metadata?.repo}`}
-                        </p>
+                        <div className="flex items-center gap-2">
+                            <p className="text-sm text-[var(--theme-text-tertiary)] truncate">
+                                {step === 'url' ? 'Enter repository URL' : `${metadata?.owner}/${metadata?.repo}`}
+                            </p>
+                            {step === 'select' && (branches.length > 0 || tags.length > 0) && (
+                                <div className="flex items-center gap-2">
+                                    {/* Branch Selector */}
+                                    <div className="relative" ref={branchDropdownRef}>
+                                        <button 
+                                            onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
+                                            className="flex items-center bg-[var(--theme-surface-hover)] rounded-md px-2 py-1 border border-[var(--theme-border)] hover:border-[var(--theme-primary)] transition-colors"
+                                            disabled={loading}
+                                            title="Select Branch or Tag"
+                                        >
+                                            <GoogleIcon path={ICONS_PATHS.git} className="w-3.5 h-3.5 text-[var(--theme-text-tertiary)] mr-2" />
+                                            <span className="text-xs text-[var(--theme-text-primary)] font-medium max-w-[120px] truncate mr-2">
+                                                {currentRef}
+                                            </span>
+                                            <GoogleIcon path={UI_ICONS.expand_more} className="w-3.5 h-3.5 text-[var(--theme-text-tertiary)]" />
+                                        </button>
+
+                                        {isBranchDropdownOpen && (
+                                            <div className="absolute top-full left-0 mt-1 w-[280px] bg-[var(--theme-surface-elevated)] border border-[var(--theme-border)] rounded-xl shadow-xl z-50 overflow-hidden flex flex-col max-h-[300px]">
+                                                <div className="p-2 border-b border-[var(--theme-border)]">
+                                                    <div className="flex items-center bg-[var(--theme-surface)] rounded-lg px-2 py-1.5 border border-[var(--theme-border)] focus-within:border-[var(--theme-primary)]">
+                                                        <GoogleIcon path={UI_ICONS.search} className="w-3.5 h-3.5 text-[var(--theme-text-tertiary)] mr-2" />
+                                                        <input
+                                                            type="text"
+                                                            value={branchSearchTerm}
+                                                            onChange={(e) => setBranchSearchTerm(e.target.value)}
+                                                            placeholder="Find branch or tag..."
+                                                            className="bg-transparent border-none outline-none text-xs text-[var(--theme-text-primary)] w-full placeholder-[var(--theme-text-tertiary)]"
+                                                            autoFocus
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="overflow-y-auto flex-1 p-1">
+                                                    {/* Branches */}
+                                                    {filteredBranches.length > 0 && (
+                                                        <div className="mb-2">
+                                                            <div className="px-2 py-1 text-[10px] font-bold text-[var(--theme-text-tertiary)] uppercase tracking-wider">Branches</div>
+                                                            {filteredBranches.map(branch => (
+                                                                <button
+                                                                    key={branch}
+                                                                    onClick={() => {
+                                                                        handleRefChange(branch);
+                                                                        setIsBranchDropdownOpen(false);
+                                                                    }}
+                                                                    className={`w-full text-left px-2 py-1.5 rounded-md text-xs flex items-center gap-2 ${
+                                                                        currentRef === branch 
+                                                                            ? 'bg-[var(--theme-primary)]/10 text-[var(--theme-primary)]' 
+                                                                            : 'text-[var(--theme-text-secondary)] hover:bg-[var(--theme-surface-hover)] hover:text-[var(--theme-text-primary)]'
+                                                                    }`}
+                                                                >
+                                                                    <GoogleIcon path={ICONS_PATHS.git} className="w-3.5 h-3.5 opacity-70" />
+                                                                    <span className="truncate">{branch}</span>
+                                                                    {currentRef === branch && <GoogleIcon path={UI_ICONS.check} className="w-3.5 h-3.5 ml-auto" />}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {/* Tags */}
+                                                    {filteredTags.length > 0 && (
+                                                        <div>
+                                                            <div className="px-2 py-1 text-[10px] font-bold text-[var(--theme-text-tertiary)] uppercase tracking-wider">Tags</div>
+                                                            {filteredTags.map(tag => (
+                                                                <button
+                                                                    key={tag}
+                                                                    onClick={() => {
+                                                                        handleRefChange(tag);
+                                                                        setIsBranchDropdownOpen(false);
+                                                                    }}
+                                                                    className={`w-full text-left px-2 py-1.5 rounded-md text-xs flex items-center gap-2 ${
+                                                                        currentRef === tag 
+                                                                            ? 'bg-[var(--theme-primary)]/10 text-[var(--theme-primary)]' 
+                                                                            : 'text-[var(--theme-text-secondary)] hover:bg-[var(--theme-surface-hover)] hover:text-[var(--theme-text-primary)]'
+                                                                    }`}
+                                                                >
+                                                                    <GoogleIcon path={ICONS_PATHS.git} className="w-3.5 h-3.5 opacity-70" />
+                                                                    <span className="truncate">{tag}</span>
+                                                                    {currentRef === tag && <GoogleIcon path={UI_ICONS.check} className="w-3.5 h-3.5 ml-auto" />}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
+
+                                                    {filteredBranches.length === 0 && filteredTags.length === 0 && (
+                                                        <div className="p-4 text-center text-xs text-[var(--theme-text-tertiary)]">
+                                                            No matches found
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Commit Selector */}
+                                    <div className="relative" ref={commitDropdownRef}>
+                                        <button 
+                                            onClick={() => setIsCommitDropdownOpen(!isCommitDropdownOpen)}
+                                            className="flex items-center bg-[var(--theme-surface-hover)] rounded-md px-2 py-1 border border-[var(--theme-border)] hover:border-[var(--theme-primary)] transition-colors"
+                                            disabled={loading}
+                                            title="Select Commit"
+                                        >
+                                            <GoogleIcon path={UI_ICONS.timer} className="w-3.5 h-3.5 text-[var(--theme-text-tertiary)] mr-2" />
+                                            <span className="text-xs text-[var(--theme-text-primary)] font-medium max-w-[120px] truncate mr-2">
+                                                {selectedCommit ? selectedCommit.substring(0, 7) : 'Latest'}
+                                            </span>
+                                            <GoogleIcon path={UI_ICONS.expand_more} className="w-3.5 h-3.5 text-[var(--theme-text-tertiary)]" />
+                                        </button>
+
+                                        {isCommitDropdownOpen && (
+                                            <div className="absolute top-full left-0 mt-1 w-[320px] bg-[var(--theme-surface-elevated)] border border-[var(--theme-border)] rounded-xl shadow-xl z-50 overflow-hidden flex flex-col max-h-[400px]">
+                                                <div className="p-2 border-b border-[var(--theme-border)] bg-[var(--theme-surface)]">
+                                                    <p className="text-[10px] font-bold text-[var(--theme-text-tertiary)] uppercase tracking-wider px-2">
+                                                        Commits for {currentRef}
+                                                    </p>
+                                                </div>
+                                                <div className="overflow-y-auto flex-1 p-1">
+                                                    <button
+                                                        onClick={() => {
+                                                            handleCommitChange('');
+                                                            setIsCommitDropdownOpen(false);
+                                                        }}
+                                                        className={`w-full text-left px-3 py-2 rounded-md text-xs flex flex-col gap-0.5 ${
+                                                            !selectedCommit 
+                                                                ? 'bg-[var(--theme-primary)]/10' 
+                                                                : 'hover:bg-[var(--theme-surface-hover)]'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <span className={`font-medium ${!selectedCommit ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-text-primary)]'}`}>
+                                                                Latest (HEAD)
+                                                            </span>
+                                                            {!selectedCommit && <GoogleIcon path={UI_ICONS.check} className="w-3.5 h-3.5 text-[var(--theme-primary)]" />}
+                                                        </div>
+                                                        <span className="text-[10px] text-[var(--theme-text-tertiary)]">Current branch state</span>
+                                                    </button>
+
+                                                    {commits.map(commit => (
+                                                        <button
+                                                            key={commit.sha}
+                                                            onClick={() => {
+                                                                handleCommitChange(commit.sha);
+                                                                setIsCommitDropdownOpen(false);
+                                                            }}
+                                                            className={`w-full text-left px-3 py-2 rounded-md text-xs flex flex-col gap-0.5 border-t border-[var(--theme-border)]/50 ${
+                                                                selectedCommit === commit.sha 
+                                                                    ? 'bg-[var(--theme-primary)]/10' 
+                                                                    : 'hover:bg-[var(--theme-surface-hover)]'
+                                                            }`}
+                                                        >
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <span className={`font-medium truncate ${selectedCommit === commit.sha ? 'text-[var(--theme-primary)]' : 'text-[var(--theme-text-primary)]'}`}>
+                                                                    {commit.message}
+                                                                </span>
+                                                                {selectedCommit === commit.sha && <GoogleIcon path={UI_ICONS.check} className="w-3.5 h-3.5 text-[var(--theme-primary)] shrink-0" />}
+                                                            </div>
+                                                            <div className="flex items-center justify-between text-[10px] text-[var(--theme-text-tertiary)]">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="font-mono bg-[var(--theme-surface-hover)] px-1 rounded">{commit.sha.substring(0, 7)}</span>
+                                                                    <span>{commit.author}</span>
+                                                                </div>
+                                                                <span>{new Date(commit.date).toLocaleDateString()}</span>
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                     {step === 'select' && (
                         <button
@@ -425,7 +754,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorPr
                             Change repo
                         </button>
                     )}
-                    <GoogleButton variant="icon" icon={UI_ICONS.close} onClick={onClose} disabled={loading} />
+                    <GoogleButton variant="icon" icon={UI_ICONS.close} onClick={onClose} />
                 </div>
 
                 {/* URL Input Step */}
@@ -468,7 +797,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorPr
                         )}
 
                         <div className="flex justify-end gap-3 mt-6">
-                            <GoogleButton variant="text" onClick={onClose} disabled={loading}>
+                            <GoogleButton variant="text" onClick={onClose}>
                                 Cancel
                             </GoogleButton>
                             <GoogleButton variant="filled" type="submit" disabled={!gitUrl || loading}>
@@ -520,24 +849,35 @@ export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorPr
 
                         {/* Quick Filters */}
                         <div className="px-6 py-2 border-b border-[var(--theme-border)] flex items-center gap-2 bg-[var(--theme-bg)] overflow-x-auto">
-                            <span className="text-xs text-[var(--theme-text-tertiary)] shrink-0">Quick select:</span>
+                            <span className="text-xs text-[var(--theme-text-tertiary)] shrink-0 font-medium">Quick select:</span>
                             <button
                                 onClick={() => selectCommonPatterns('code')}
-                                className="text-xs bg-[var(--theme-surface-elevated)] hover:bg-[var(--theme-surface-hover)] text-[var(--theme-text-primary)] px-3 py-1 rounded-full transition-colors shrink-0"
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--theme-border)] hover:bg-[var(--theme-surface-hover)] transition-all text-xs font-medium text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] shrink-0"
                             >
-                                📄 Source Code
+                                <GoogleIcon path={UI_ICONS.code} className="w-4 h-4" />
+                                Source Code
                             </button>
                             <button
                                 onClick={() => selectCommonPatterns('config')}
-                                className="text-xs bg-[var(--theme-surface-elevated)] hover:bg-[var(--theme-surface-hover)] text-[var(--theme-text-primary)] px-3 py-1 rounded-full transition-colors shrink-0"
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--theme-border)] hover:bg-[var(--theme-surface-hover)] transition-all text-xs font-medium text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] shrink-0"
                             >
-                                ⚙️ Config Files
+                                <GoogleIcon path={ICONS_PATHS.settings} className="w-4 h-4" />
+                                Config Files
                             </button>
                             <button
                                 onClick={() => selectCommonPatterns('docs')}
-                                className="text-xs bg-[var(--theme-surface-elevated)] hover:bg-[var(--theme-surface-hover)] text-[var(--theme-text-primary)] px-3 py-1 rounded-full transition-colors shrink-0"
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--theme-border)] hover:bg-[var(--theme-surface-hover)] transition-all text-xs font-medium text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] shrink-0"
                             >
-                                📝 Documentation
+                                <GoogleIcon path={ICONS_PATHS.readme} className="w-4 h-4" />
+                                Documentation
+                            </button>
+                            <div className="w-px h-4 bg-[var(--theme-border)] mx-1 shrink-0" />
+                            <button
+                                onClick={onOpenSettings}
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--theme-border)] hover:bg-[var(--theme-surface-hover)] transition-all text-xs font-medium text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] shrink-0"
+                            >
+                                <GoogleIcon path={UI_ICONS.tune} className="w-4 h-4" />
+                                Configure Filters
                             </button>
                         </div>
 
@@ -563,35 +903,27 @@ export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorPr
                             )}
                         </div>
 
-                        {/* Footer */}
-                        <div className="px-6 py-4 border-t border-[var(--theme-border)] bg-[var(--theme-bg)] flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-2 bg-[var(--theme-surface-elevated)] rounded-full px-4 py-2">
-                                    <GoogleIcon path={ICONS_PATHS.check_circle} className="w-4 h-4 text-[var(--theme-primary)]" />
-                                    <span className="text-sm text-[var(--theme-text-primary)]">
-                                        <span className="font-medium">{selectedCount}</span>
-                                        <span className="text-[var(--theme-text-tertiary)]"> / {totalFiles} files</span>
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Progress or Actions */}
-                            {importProgress ? (
+                        {/* Footer - Updated for background import */}
+                        <div className="px-6 py-4 border-t border-[var(--theme-border)] bg-[var(--theme-bg)]">
+                            <div className="flex items-center justify-between gap-4">
                                 <div className="flex items-center gap-3">
-                                    <div className="flex-1 h-2 bg-[var(--theme-surface-elevated)] rounded-full overflow-hidden w-32">
-                                        <motion.div
-                                            className="h-full bg-[var(--theme-primary)]"
-                                            initial={{ width: 0 }}
-                                            animate={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
-                                        />
+                                    <div className="flex items-center gap-2 bg-[var(--theme-surface-elevated)] rounded-full px-4 py-2">
+                                        <GoogleIcon path={ICONS_PATHS.check_circle} className="w-4 h-4 text-[var(--theme-primary)]" />
+                                        <span className="text-sm text-[var(--theme-text-primary)]">
+                                            <span className="font-medium">{selectedCount}</span>
+                                            <span className="text-[var(--theme-text-tertiary)]"> / {totalFiles} files</span>
+                                        </span>
                                     </div>
-                                    <span className="text-xs text-[var(--theme-text-tertiary)]">
-                                        {importProgress.current}/{importProgress.total}
+                                    
+                                    {/* Background import hint */}
+                                    <span className="text-xs text-[var(--theme-text-tertiary)] hidden sm:flex items-center gap-1.5">
+                                        <GoogleIcon path={UI_ICONS.network} className="w-3.5 h-3.5" />
+                                        Import runs in background
                                     </span>
                                 </div>
-                            ) : (
+
                                 <div className="flex gap-3">
-                                    <GoogleButton variant="text" onClick={onClose} disabled={loading}>
+                                    <GoogleButton variant="text" onClick={onClose}>
                                         Cancel
                                     </GoogleButton>
                                     <GoogleButton
@@ -602,12 +934,12 @@ export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorPr
                                         Import {selectedCount > 0 ? `${selectedCount} Files` : ''}
                                     </GoogleButton>
                                 </div>
-                            )}
+                            </div>
                         </div>
 
-                        {/* Loading Overlay */}
+                        {/* Loading Overlay - Non-blocking, only covers the tree area */}
                         {loading && (
-                            <div className="absolute inset-0 bg-[var(--theme-surface)]/80 flex items-center justify-center">
+                            <div className="absolute inset-0 top-[120px] bg-[var(--theme-surface)]/90 flex items-center justify-center pointer-events-none">
                                 <div className="flex flex-col items-center gap-4">
                                     <div className="w-10 h-10 border-4 border-[var(--theme-border)] border-t-[var(--theme-primary)] rounded-full animate-spin" />
                                     <p className="text-[var(--theme-primary)] text-sm font-mono">{loadingText}</p>
@@ -630,7 +962,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport }: GitFileSelectorPr
                         </AnimatePresence>
                     </>
                 )}
+                </motion.div>
             </motion.div>
-        </motion.div>
     );
 };

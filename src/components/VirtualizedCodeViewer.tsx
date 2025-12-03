@@ -36,7 +36,7 @@ const CodeLine = memo(({
         className={`flex ${isHighlighted ? 'bg-[var(--theme-primary)]/20' : ''}`}
     >
         <span 
-            className="w-12 shrink-0 text-right pr-3 text-[var(--theme-text-tertiary)] select-none border-r border-[var(--theme-border)] bg-[var(--theme-surface)]"
+            className="w-12 shrink-0 text-right pr-3 text-[var(--theme-text-tertiary)] select-none"
             style={{ fontFamily: '"JetBrains Mono", "Fira Code", "Roboto Mono", monospace' }}
         >
             {lineNumber}
@@ -182,13 +182,16 @@ export const VirtualizedCodeViewer = memo(({
             {/* Virtual spacer for total scroll height */}
             <div 
                 style={{ 
-                    height: totalHeight,
+                    height: Math.max(totalHeight, containerHeight),
                     position: 'relative',
                     // GPU layer promotion
                     transform: 'translateZ(0)',
                     willChange: 'transform',
                 }}
             >
+                {/* Gutter Background - Full Height */}
+                <div className="absolute top-0 left-0 bottom-0 w-12 bg-[var(--theme-surface)] border-r border-[var(--theme-border)] z-0" />
+
                 {/* Rendered content window */}
                 <div
                     style={{
@@ -199,6 +202,7 @@ export const VirtualizedCodeViewer = memo(({
                         // GPU-accelerated positioning
                         transform: `translate3d(0, ${startIndex * LINE_HEIGHT}px, 0)`,
                         willChange: 'transform',
+                        zIndex: 1,
                     }}
                 >
                     {visibleLines.map((line) => (
