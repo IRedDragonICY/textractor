@@ -18,10 +18,10 @@ concurrency:
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────────
-  # Quality Gate - Lint, Type Check, and Build Validation
+  # Create GitHub Release (Placeholder for Tauri artifacts)
   # ─────────────────────────────────────────────────────────────────────────────
-  quality-gate:
-    name: Quality Gate
+  create-release:
+    name: Create Release
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -39,31 +39,6 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - name: Restore Next.js Build Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.npm
-            .next/cache
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ hashFiles('**/*.ts', '**/*.tsx') }}
-          restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-
-            ${{ runner.os }}-nextjs-
-
-      - name: Install Dependencies
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Type Check
-        run: npx tsc --noEmit
-
-      - name: Build
-        run: npm run build
-        env:
-          NEXT_TELEMETRY_DISABLED: '1'
-
       - name: Extract Version Info
         id: version
         run: |
@@ -74,19 +49,6 @@ jobs:
           echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
           echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Create GitHub Release (Placeholder for Tauri artifacts)
-  # ─────────────────────────────────────────────────────────────────────────────
-  create-release:
-    name: Create Release
-    needs: quality-gate
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Generate Changelog
         id: changelog
         shell: bash
@@ -95,8 +57,8 @@ jobs:
           
           SERVER_URL="${GITHUB_SERVER_URL:-https://github.com}"
           REPO="${GITHUB_REPOSITORY}"
-          VERSION="${{ needs.quality-gate.outputs.version }}"
-          RELEASE_TAG="${{ needs.quality-gate.outputs.release_tag }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          RELEASE_TAG="${{ steps.version.outputs.release_tag }}"
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           
           cat > release_notes.md << HEADER
@@ -109,7 +71,7 @@ jobs:
           | Property | Value |
           |----------|-------|
           | **Version** | \`${VERSION}\` |
-          | **Commit** | \`${{ needs.quality-gate.outputs.short_sha }}\` |
+          | **Commit** | \`${{ steps.version.outputs.short_sha }}\` |
           | **Build** | \`#${{ github.run_number }}\` |
           | **Date** | \`$(date -u +"%Y-%m-%d %H:%M:%S UTC")\` |
           
@@ -202,8 +164,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.quality-gate.outputs.release_tag }}
-          name: "Contextractor v${{ needs.quality-gate.outputs.version }} (Build #${{ github.run_number }})"
+          tag_name: ${{ steps.version.outputs.release_tag }}
+          name: "Contextractor v${{ steps.version.outputs.version }} (Build #${{ github.run_number }})"
           body_path: release_notes.md
           prerelease: false
           make_latest: true
@@ -216,7 +178,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   tauri-windows:
     name: Tauri Windows (${{ matrix.arch }})
-    needs: [quality-gate, create-release]
+    needs: [create-release]
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -267,7 +229,7 @@ jobs:
         shell: pwsh
         run: |
           $arch = if ('${{ matrix.arch }}' -eq 'x86') { 'x86' } else { 'x64' }
-          $ver = "${{ needs.quality-gate.outputs.version }}"
+          $ver = "${{ needs.create-release.outputs.version }}"
           $outDir = if ($arch -eq 'x86') { 'src-tauri/target/i686-pc-windows-msvc/release' } else { 'src-tauri/target/release' }
           
           # Find and copy EXE
@@ -300,11 +262,11 @@ jobs:
       - name: Upload Windows Artifacts
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.quality-gate.outputs.release_tag }}
+          tag_name: ${{ needs.create-release.outputs.release_tag }}
           files: |
-            Contextractor-${{ needs.quality-gate.outputs.version }}-win-${{ matrix.arch }}.exe
-            Contextractor-${{ needs.quality-gate.outputs.version }}-win-${{ matrix.arch }}.msi
-            Contextractor-${{ needs.quality-gate.outputs.version }}-win-${{ matrix.arch }}-setup.exe
+            Contextractor-${{ needs.create-release.outputs.version }}-win-${{ matrix.arch }}.exe
+            Contextractor-${{ needs.create-release.outputs.version }}-win-${{ matrix.arch }}.msi
+            Contextractor-${{ needs.create-release.outputs.version }}-win-${{ matrix.arch }}-setup.exe
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -314,7 +276,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   tauri-linux:
     name: Tauri Linux
-    needs: [quality-gate, create-release]
+    needs: [create-release]
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout Repository
@@ -360,7 +322,7 @@ jobs:
       - name: Rename Artifacts
         run: |
           set -e
-          VER="${{ needs.quality-gate.outputs.version }}"
+          VER="${{ needs.create-release.outputs.version }}"
           
           # Find binary
           BIN=$(find src-tauri/target/release -maxdepth 1 -type f -executable -name "contextractor" 2>/dev/null || true)
@@ -403,12 +365,12 @@ jobs:
       - name: Upload Linux Artifacts
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.quality-gate.outputs.release_tag }}
+          tag_name: ${{ needs.create-release.outputs.release_tag }}
           files: |
-            Contextractor-${{ needs.quality-gate.outputs.version }}-linux-x64
-            Contextractor-${{ needs.quality-gate.outputs.version }}-linux-x64.AppImage
-            Contextractor-${{ needs.quality-gate.outputs.version }}-linux-amd64.deb
-            Contextractor-${{ needs.quality-gate.outputs.version }}-linux-x64.rpm
+            Contextractor-${{ needs.create-release.outputs.version }}-linux-x64
+            Contextractor-${{ needs.create-release.outputs.version }}-linux-x64.AppImage
+            Contextractor-${{ needs.create-release.outputs.version }}-linux-amd64.deb
+            Contextractor-${{ needs.create-release.outputs.version }}-linux-x64.rpm
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -418,7 +380,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   tauri-macos:
     name: Tauri macOS (${{ matrix.target }})
-    needs: [quality-gate, create-release]
+    needs: [create-release]
     runs-on: macos-latest
     strategy:
       fail-fast: false
@@ -464,7 +426,7 @@ jobs:
       - name: Rename Artifacts
         run: |
           set -e
-          VER="${{ needs.quality-gate.outputs.version }}"
+          VER="${{ needs.create-release.outputs.version }}"
           ARCH="${{ matrix.arch }}"
           TARGET="${{ matrix.target }}"
           
@@ -493,10 +455,10 @@ jobs:
       - name: Upload macOS Artifacts
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.quality-gate.outputs.release_tag }}
+          tag_name: ${{ needs.create-release.outputs.release_tag }}
           files: |
-            Contextractor-${{ needs.quality-gate.outputs.version }}-macos-${{ matrix.arch }}.dmg
-            Contextractor-${{ needs.quality-gate.outputs.version }}-macos-${{ matrix.arch }}.app.zip
+            Contextractor-${{ needs.create-release.outputs.version }}-macos-${{ matrix.arch }}.dmg
+            Contextractor-${{ needs.create-release.outputs.version }}-macos-${{ matrix.arch }}.app.zip
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -506,7 +468,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   tauri-android:
     name: Tauri Android
-    needs: [quality-gate, create-release]
+    needs: [create-release]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -584,7 +546,7 @@ jobs:
       - name: Rename Android Artifacts
         run: |
           set -e
-          VER="${{ needs.quality-gate.outputs.version }}"
+          VER="${{ needs.create-release.outputs.version }}"
           OUT="src-tauri/gen/android/app/build/outputs"
           
           map_arch() {
@@ -616,12 +578,12 @@ jobs:
       - name: Upload Android Artifacts
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.quality-gate.outputs.release_tag }}
+          tag_name: ${{ needs.create-release.outputs.release_tag }}
           files: |
-            Contextractor-${{ needs.quality-gate.outputs.version }}-android-arm64-v8a.apk
-            Contextractor-${{ needs.quality-gate.outputs.version }}-android-armeabi-v7a.apk
-            Contextractor-${{ needs.quality-gate.outputs.version }}-android-x86.apk
-            Contextractor-${{ needs.quality-gate.outputs.version }}-android-x86_64.apk
+            Contextractor-${{ needs.create-release.outputs.version }}-android-arm64-v8a.apk
+            Contextractor-${{ needs.create-release.outputs.version }}-android-armeabi-v7a.apk
+            Contextractor-${{ needs.create-release.outputs.version }}-android-x86.apk
+            Contextractor-${{ needs.create-release.outputs.version }}-android-x86_64.apk
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -631,7 +593,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   notify-failure:
     name: Notify on Failure
-    needs: [quality-gate, create-release, tauri-windows, tauri-linux, tauri-macos, tauri-android]
+    needs: [create-release, tauri-windows, tauri-linux, tauri-macos, tauri-android]
     if: failure()
     runs-on: ubuntu-latest
     steps:
