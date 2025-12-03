@@ -2,21 +2,21 @@
 // Professional UI/UX with shimmer animations
 
 import React, { memo } from 'react';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 
 // Pre-computed widths to avoid hydration mismatch (no Math.random())
 const CODE_LINE_WIDTHS = [85, 62, 78, 45, 90, 55, 72, 38, 82, 68, 50, 75, 42, 88, 58];
 const CODE_VIEW_WIDTHS = [75, 88, 45, 92, 60, 78, 35, 85, 52, 70, 40, 95, 55, 80, 48, 72, 38, 65, 82, 58];
 
 // Shimmer animation for skeleton elements
-const shimmer = {
+const shimmer: Variants = {
     initial: { x: '-100%' },
     animate: { 
         x: '100%',
         transition: {
             repeat: Infinity,
             duration: 1.5,
-            ease: 'linear',
+            ease: 'linear' as const,
         }
     }
 };

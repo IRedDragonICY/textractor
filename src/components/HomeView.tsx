@@ -148,52 +148,45 @@ export const HomeView: React.FC<HomeViewProps> = ({
         <div className="h-full bg-[var(--theme-bg)] overflow-auto">
             <div className="max-w-6xl mx-auto px-6 py-8">
                 {/* Header */}
-                <motion.div
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
+                <header
                     className="text-center mb-16"
+                    role="banner"
                 >
-                    {/* App Icon */}
-                    <motion.div 
-                        className="flex justify-center mb-6"
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
-                    >
-                        <div className="relative w-20 h-20 rounded-[28px] bg-gradient-to-br from-[var(--theme-primary)] to-[#6366f1] p-[2px] shadow-lg shadow-[var(--theme-primary)]/20">
+                    {/* App Icon - static for faster LCP */}
+                    <div className="flex justify-center mb-6">
+                        <div 
+                            className="relative w-20 h-20 rounded-[28px] bg-gradient-to-br from-[var(--theme-primary)] to-[#6366f1] p-[2px] shadow-lg shadow-[var(--theme-primary)]/20"
+                            aria-hidden="true"
+                        >
                             <div className="w-full h-full rounded-[26px] bg-[var(--theme-surface)] flex items-center justify-center overflow-hidden">
+                                {/* Use smaller optimized image for better LCP */}
                                 <Image 
-                                    src="/icon.png" 
-                                    alt="Contextractor" 
+                                    src="/icon-192x192.png" 
+                                    alt="" 
                                     width={52} 
                                     height={52}
                                     className="object-contain"
                                     priority
+                                    fetchPriority="high"
                                 />
                             </div>
                         </div>
-                    </motion.div>
+                    </div>
 
-                    {/* Title */}
-                    <motion.h1 
+                    {/* Title - h1 is now properly the first heading */}
+                    <h1 
                         className="text-4xl font-light text-[var(--theme-text-primary)] mb-3 tracking-tight"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.15 }}
                     >
                         Welcome to <span className="font-semibold bg-gradient-to-r from-[var(--theme-primary)] to-[#6366f1] bg-clip-text text-transparent">Contextractor</span>
-                    </motion.h1>
+                    </h1>
 
                     {/* Subtitle */}
-                    <motion.p 
+                    <p 
                         className="text-[var(--theme-text-tertiary)] text-base max-w-md mx-auto"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
                     >
                         Extract clean context from your code for AI & LLMs
-                    </motion.p>
-                </motion.div>
+                    </p>
+                </header>
 
                 {/* Quick Actions - Material You Cards */}
                 <motion.div
@@ -235,11 +228,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         {/* Section Header */}
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-xl bg-[var(--theme-surface-hover)] flex items-center justify-center">
+                                <div className="w-8 h-8 rounded-xl bg-[var(--theme-surface-hover)] flex items-center justify-center" aria-hidden="true">
                                     <GoogleIcon path={ICONS.clock} className="w-4 h-4 text-[var(--theme-text-tertiary)]" />
                                 </div>
-                                <h2 className="text-lg font-medium text-[var(--theme-text-primary)]">Recent Projects</h2>
-                                <span className="text-xs text-[var(--theme-text-muted)] bg-[var(--theme-surface-hover)] px-2.5 py-1 rounded-full font-medium">
+                                <h2 className="text-lg font-medium text-[var(--theme-text-primary)]" id="recent-projects-heading">Recent Projects</h2>
+                                <span className="text-xs text-[var(--theme-text-muted)] bg-[var(--theme-surface-hover)] px-2.5 py-1 rounded-full font-medium" aria-label={`${recentProjects.length} projects`}>
                                     {recentProjects.length}
                                 </span>
                             </div>
@@ -437,10 +430,10 @@ const QuickActionCard: React.FC<QuickActionCardProps> = ({
                 hover:shadow-lg hover:shadow-black/5
             `}
         >
-            <div className={`w-14 h-14 ${styles.iconBg} rounded-2xl flex items-center justify-center mb-5 transition-transform group-hover:scale-110`}>
+            <div className={`w-14 h-14 ${styles.iconBg} rounded-2xl flex items-center justify-center mb-5 transition-transform group-hover:scale-110`} aria-hidden="true">
                 <GoogleIcon path={icon} className={`w-7 h-7 ${styles.iconColor}`} />
             </div>
-            <h3 className="text-[var(--theme-text-primary)] font-semibold text-base mb-1">{title}</h3>
+            <h2 className="text-[var(--theme-text-primary)] font-semibold text-base mb-1">{title}</h2>
             <p className="text-[var(--theme-text-tertiary)] text-sm">{description}</p>
         </motion.button>
     );
@@ -508,6 +501,7 @@ const RecentProjectCard: React.FC<RecentProjectCardProps> = ({
                             <span 
                                 className="text-xs font-medium"
                                 style={{ color: langConfig.color }}
+                                aria-label={`Language: ${langConfig.name}`}
                             >
                                 {langConfig.name}
                             </span>

@@ -174,12 +174,17 @@ export const MenuBar: React.FC<MenuBarProps> = ({
         <div 
             ref={menuBarRef}
             className="bg-[var(--theme-surface)] h-[30px] flex items-center px-2 text-[13px] select-none"
+            role="menubar"
+            aria-label="Application menu"
         >
             {menus.map(menu => (
-                <div key={menu.label} className="relative">
+                <div key={menu.label} className="relative" role="none">
                     <button
                         onClick={() => handleMenuClick(menu.label)}
                         onMouseEnter={() => activeMenu && setActiveMenu(menu.label)}
+                        aria-haspopup="menu"
+                        aria-expanded={activeMenu === menu.label}
+                        role="menuitem"
                         className={`
                             px-3 py-1 rounded-sm transition-colors
                             ${activeMenu === menu.label 
@@ -199,15 +204,20 @@ export const MenuBar: React.FC<MenuBarProps> = ({
                                 exit={{ opacity: 0, y: -5 }}
                                 transition={{ duration: 0.1 }}
                                 className="absolute top-full left-0 mt-0.5 bg-[var(--theme-menu-bg)] border border-[var(--theme-border)] rounded-md shadow-xl py-1 min-w-[220px] z-[100]"
+                                role="menu"
+                                aria-label={`${menu.label} menu`}
                             >
                                 {menu.items.map((item, idx) => (
                                     item.divider ? (
-                                        <div key={`divider-${idx}`} className="h-px bg-[var(--theme-border)] my-1" />
+                                        <div key={`divider-${idx}`} className="h-px bg-[var(--theme-border)] my-1" role="separator" aria-hidden="true" />
                                     ) : (
                                         <button
                                             key={item.id}
                                             onClick={() => handleItemClick(item)}
                                             disabled={item.disabled}
+                                            role={item.checked !== undefined ? "menuitemradio" : "menuitem"}
+                                            aria-disabled={item.disabled}
+                                            aria-checked={item.checked !== undefined ? item.checked : undefined}
                                             className={`
                                                 w-full flex items-center gap-3 px-3 py-1.5 text-left transition-colors
                                                 ${item.disabled 
@@ -217,17 +227,17 @@ export const MenuBar: React.FC<MenuBarProps> = ({
                                             `}
                                         >
                                             {item.checked !== undefined ? (
-                                                <div className="w-4 h-4 shrink-0 flex items-center justify-center">
+                                                <div className="w-4 h-4 shrink-0 flex items-center justify-center" aria-hidden="true">
                                                     {item.checked && (
                                                         <GoogleIcon path={ICONS.check} className="w-4 h-4 text-[var(--theme-primary)]" />
                                                     )}
                                                 </div>
                                             ) : item.icon ? (
-                                                <GoogleIcon path={item.icon} className="w-4 h-4 shrink-0" />
+                                                <GoogleIcon path={item.icon} className="w-4 h-4 shrink-0" aria-hidden="true" />
                                             ) : null}
                                             <span className="flex-1">{item.label}</span>
                                             {item.shortcut && (
-                                                <span className="text-[11px] text-[var(--theme-text-muted)] ml-4">
+                                                <span className="text-[11px] text-[var(--theme-text-muted)] ml-4" aria-label={`Shortcut: ${item.shortcut}`}>
                                                     {item.shortcut}
                                                 </span>
                                             )}

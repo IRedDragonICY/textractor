@@ -6,11 +6,15 @@ import "./globals.css";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap", // Optimize font loading for better LCP
+  preload: true,
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap", // Optimize font loading for better LCP
+  preload: true,
 });
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://contextractor.vercel.app";
@@ -228,10 +232,21 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth dark" dir="ltr" suppressHydrationWarning>
       <head>
+        {/* Critical rendering path optimization */}
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        
+        {/* Preload critical assets for faster LCP */}
+        <link rel="preload" href="/icon-192x192.png" as="image" type="image/png" />
+        
+        {/* Font optimization */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        
+        {/* DNS prefetch for external resources */}
         <link rel="dns-prefetch" href="https://api.github.com" />
+        <link rel="dns-prefetch" href="https://va.vercel-scripts.com" />
+        
+        {/* Structured data for SEO */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

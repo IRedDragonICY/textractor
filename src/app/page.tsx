@@ -453,18 +453,24 @@ function Contextractor() {
 
     return (
         <div {...getRootProps()} className="h-screen bg-[var(--theme-bg)] text-[var(--theme-text-primary)] font-sans flex flex-col selection:bg-[var(--theme-selection-bg)] selection:text-[var(--theme-selection-text)] outline-none overflow-hidden theme-transition">
-            <input {...getInputProps()} />
+            {/* Hidden file input with accessible label */}
+            <label className="sr-only" htmlFor="file-upload-input">Upload files</label>
+            <input {...getInputProps()} id="file-upload-input" aria-label="Upload files for context extraction" />
 
             {/* Modern Menu Bar - VS Code Style */}
-            <div className="flex items-center bg-[var(--theme-surface)] border-b border-[var(--theme-border-subtle)]">
+            <nav className="flex items-center bg-[var(--theme-surface)] border-b border-[var(--theme-border-subtle)]" aria-label="Main navigation">
                 {/* Mobile Menu Button */}
                 <div className="lg:hidden px-2">
-                    <GoogleButton
-                        variant="icon"
+                    <button
+                        type="button"
                         onClick={() => setIsMobileSidebarOpen(prev => !prev)}
-                        icon={UI_ICONS_MAP.menu}
-                        className="w-8 h-8"
-                    />
+                        aria-label={isMobileSidebarOpen ? 'Close sidebar menu' : 'Open sidebar menu'}
+                        aria-expanded={isMobileSidebarOpen}
+                        aria-controls="mobile-sidebar"
+                        className="relative inline-flex items-center justify-center overflow-hidden font-medium transition-all duration-200 rounded-full p-2 hover:bg-[var(--theme-surface-hover)] text-[var(--theme-text-secondary)] w-8 h-8"
+                    >
+                        <GoogleIcon icon={UI_ICONS_MAP.menu} className="w-5 h-5" aria-hidden="true" />
+                    </button>
                 </div>
                 
                 <div className="flex-1">
@@ -485,7 +491,7 @@ function Contextractor() {
                         hasContent={!!combinedText}
                     />
                 </div>
-            </div>
+            </nav>
 
             {/* Tab Bar - VS Code Style */}
             <TabBar
@@ -594,7 +600,11 @@ function Contextractor() {
                 </AnimatePresence>
 
                 {/* Explorer Section - Responsive Sidebar */}
-                <section className={`
+                <aside 
+                    id="mobile-sidebar"
+                    role="complementary"
+                    aria-label="File explorer"
+                    className={`
                     flex flex-col gap-4 h-full shrink-0
                     fixed inset-y-0 left-0 z-40 w-[320px] bg-[var(--theme-surface)] p-4 border-r border-[var(--theme-border)] shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.2,0,0,1)]
                     lg:relative lg:inset-auto lg:z-auto lg:w-[460px] lg:bg-transparent lg:p-0 lg:border-none lg:shadow-none lg:translate-x-0
@@ -742,29 +752,32 @@ function Contextractor() {
                             )}
                         </div>
                     </div>
-                </section>
+                </aside>
 
-                <section className="flex-1 flex flex-col h-full min-w-0">
+                <main className="flex-1 flex flex-col h-full min-w-0" role="main">
                     <div className="bg-[var(--theme-surface)] lg:rounded-3xl lg:border border-[var(--theme-border)] flex flex-col h-full lg:shadow-lg overflow-hidden relative border-t lg:border-t-0">
-                        <div className="px-4 lg:px-6 py-4 border-b border-[var(--theme-border)] flex items-center justify-between bg-[var(--theme-surface)] shrink-0 flex-wrap gap-4">
+                        <div className="px-4 lg:px-6 py-4 border-b border-[var(--theme-border)] flex items-center justify-between bg-[var(--theme-surface)] shrink-0 flex-wrap gap-4" role="toolbar" aria-label="Code viewer controls">
 
-                            <div className="flex-1 min-w-[240px] flex items-center gap-3 bg-[var(--theme-surface-hover)] rounded-full px-5 py-2.5 border border-[var(--theme-border)] focus-within:border-[var(--theme-primary)] focus-within:bg-[var(--theme-surface)] transition-all">
-                                <GoogleIcon icon={UI_ICONS_MAP.search} className="text-[var(--theme-text-tertiary)] w-5 h-5" />
+                            <div className="flex-1 min-w-[240px] flex items-center gap-3 bg-[var(--theme-surface-hover)] rounded-full px-5 py-2.5 border border-[var(--theme-border)] focus-within:border-[var(--theme-primary)] focus-within:bg-[var(--theme-surface)] transition-all" role="search">
+                                <GoogleIcon icon={UI_ICONS_MAP.search} className="text-[var(--theme-text-tertiary)] w-5 h-5" aria-hidden="true" />
+                                <label htmlFor="code-search" className="sr-only">Search in code</label>
                                 <input
-                                    type="text"
+                                    id="code-search"
+                                    type="search"
                                     placeholder="Find in code..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
+                                    aria-describedby={searchTerm ? "search-results-count" : undefined}
                                     className="bg-transparent border-none outline-none text-[var(--theme-text-primary)] text-sm w-full placeholder-[var(--theme-text-tertiary)]"
                                 />
                                 {searchTerm && (
-                                    <div className="flex items-center gap-2 pl-2 border-l border-[var(--theme-border)]">
-                                        <span className="text-xs text-[var(--theme-text-tertiary)] whitespace-nowrap font-mono">
+                                    <div className="flex items-center gap-2 pl-2 border-l border-[var(--theme-border)]" role="group" aria-label="Search navigation">
+                                        <span id="search-results-count" className="text-xs text-[var(--theme-text-tertiary)] whitespace-nowrap font-mono" aria-live="polite">
                                             {searchMatches.length > 0 ? `${currentMatchIdx + 1}/${searchMatches.length}` : '0'}
                                         </span>
-                                        <button onClick={handlePrevMatch} className="p-1 hover:text-[var(--theme-primary)] text-[var(--theme-text-secondary)] disabled:opacity-30"><GoogleIcon icon={UI_ICONS_MAP.arrow_up} className="w-4 h-4"/></button>
-                                        <button onClick={handleNextMatch} className="p-1 hover:text-[var(--theme-primary)] text-[var(--theme-text-secondary)] disabled:opacity-30"><GoogleIcon icon={UI_ICONS_MAP.arrow_down} className="w-4 h-4"/></button>
-                                        <button onClick={() => setSearchTerm("")} className="p-1 hover:text-[var(--theme-error)] text-[var(--theme-text-tertiary)]"><GoogleIcon icon={UI_ICONS_MAP.close} className="w-4 h-4"/></button>
+                                        <button onClick={handlePrevMatch} aria-label="Previous match" className="p-1 hover:text-[var(--theme-primary)] text-[var(--theme-text-secondary)] disabled:opacity-30"><GoogleIcon icon={UI_ICONS_MAP.arrow_up} className="w-4 h-4" aria-hidden="true"/></button>
+                                        <button onClick={handleNextMatch} aria-label="Next match" className="p-1 hover:text-[var(--theme-primary)] text-[var(--theme-text-secondary)] disabled:opacity-30"><GoogleIcon icon={UI_ICONS_MAP.arrow_down} className="w-4 h-4" aria-hidden="true"/></button>
+                                        <button onClick={() => setSearchTerm("")} aria-label="Clear search" className="p-1 hover:text-[var(--theme-error)] text-[var(--theme-text-tertiary)]"><GoogleIcon icon={UI_ICONS_MAP.close} className="w-4 h-4" aria-hidden="true"/></button>
                                     </div>
                                 )}
                             </div>
@@ -818,8 +831,8 @@ function Contextractor() {
                             />
                         </div>
                     </div>
-                </section>
-                    </motion.main>
+                </main>
+                </motion.main>
                 )}
             </AnimatePresence>
 
