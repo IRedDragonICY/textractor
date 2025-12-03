@@ -3,7 +3,7 @@
 
 export interface Session {
     id: string;
-    type: 'editor' | 'settings';
+    type: 'editor' | 'settings' | 'report-issue';
     name: string;
     files: SessionFile[];
     outputStyle: OutputStyleType;
@@ -13,6 +13,14 @@ export interface Session {
     isActive: boolean;
     isPinned: boolean;
     color?: string; // Optional accent color for the tab
+}
+
+export interface ReportIssueData {
+    title: string;
+    description: string;
+    type: 'bug' | 'feature' | 'question' | 'documentation';
+    priority: 'low' | 'medium' | 'high' | 'critical';
+    labels: string[];
 }
 
 export interface SessionFile {

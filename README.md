@@ -1,7 +1,7 @@
 # ✨ Contextractor ✨
 
 <p align="center">
-  <img src="./public/icon.jpg" alt="Contextractor Logo" width="200"/>
+  <img src="./public/icon.png" alt="Contextractor Logo" width="200"/>
   <!-- Add a real screenshot URL once you have one -->
   <br/>
   <i>Combine text files effortlessly. Drag, drop, reorder, and copy.</i>

@@ -496,6 +496,49 @@ export const useSessionManager = () => {
         });
     }, []);
 
+    // Open Report Issue Tab
+    const openReportIssueTab = useCallback(() => {
+        setState(prev => {
+            // Check if report issue tab already exists
+            const existingReportIssue = prev.sessions.find(s => s.type === 'report-issue');
+            
+            if (existingReportIssue) {
+                return {
+                    ...prev,
+                    sessions: prev.sessions.map(s => ({
+                        ...s,
+                        isActive: s.id === existingReportIssue.id,
+                    })),
+                    activeSessionId: existingReportIssue.id,
+                    showHomeView: false,
+                };
+            }
+
+            // Create new report issue session
+            const reportIssueSession: Session = {
+                id: 'report_issue_tab',
+                type: 'report-issue',
+                name: 'Report Issue',
+                files: [],
+                outputStyle: 'standard',
+                viewMode: 'tree',
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                isActive: true,
+                isPinned: false,
+                color: '#EF4444', // Red for issues/bugs
+            };
+
+            const updatedSessions = prev.sessions.map(s => ({ ...s, isActive: false }));
+            return {
+                ...prev,
+                sessions: [...updatedSessions, reportIssueSession],
+                activeSessionId: reportIssueSession.id,
+                showHomeView: false,
+            };
+        });
+    }, []);
+
     // Update session files
     const updateSessionFiles = useCallback((id: string, files: SessionFile[]) => {
         setState(prev => ({
@@ -639,5 +682,6 @@ export const useSessionManager = () => {
         // UI actions
         toggleHomeView,
         openSettingsTab,
+        openReportIssueTab,
     };
 };

@@ -1,10 +1,11 @@
-// Modern Menu Bar Component - VS Code / Electron Style
+// Modern Menu Bar Component - Material You Design
 // Professional-grade menu bar with File, Edit, View, Help menus
 
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Image from 'next/image';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
 import { useTheme } from '@/hooks/useTheme';
 
@@ -28,6 +29,10 @@ const ICONS = {
     system: "M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z",
     palette: "M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z",
     heart: "M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z",
+    bug: "M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z",
+    openInNew: "M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z",
+    send: "M2.01 21L23 12 2.01 3 2 10l15 2-15 2z",
+    settings: "M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z",
 };
 
 interface MenuItem {
@@ -59,6 +64,7 @@ interface MenuBarProps {
     onShowAbout: () => void;
     onShowShortcuts: () => void;
     onShowSettings: () => void;
+    onReportIssue: () => void;
     hasContent: boolean;
 }
 
@@ -75,6 +81,7 @@ export const MenuBar: React.FC<MenuBarProps> = ({
     onShowAbout,
     onShowShortcuts,
     onShowSettings,
+    onReportIssue,
     hasContent,
 }) => {
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -101,7 +108,7 @@ export const MenuBar: React.FC<MenuBarProps> = ({
                 { id: 'open', label: 'Open Files...', icon: ICONS.upload, shortcut: 'Ctrl+O', onClick: onOpenFiles },
                 { id: 'import', label: 'Import Repository...', icon: ICONS.github, onClick: onImportRepo },
                 { id: 'divider2', label: '', divider: true },
-                { id: 'settings', label: 'Settings', icon: ICONS.palette, onClick: onShowSettings },
+                { id: 'settings', label: 'Settings', icon: ICONS.settings, onClick: onShowSettings },
             ],
         },
         {
@@ -145,6 +152,9 @@ export const MenuBar: React.FC<MenuBarProps> = ({
             items: [
                 { id: 'shortcuts', label: 'Keyboard Shortcuts', icon: ICONS.keyboard, shortcut: 'Ctrl+/', onClick: onShowShortcuts },
                 { id: 'divider1', label: '', divider: true },
+                { id: 'report-issue', label: 'Report Issue...', icon: ICONS.bug, onClick: onReportIssue },
+                { id: 'github', label: 'View on GitHub', icon: ICONS.github, onClick: () => window.open('https://github.com/IRedDragonICY/contextractor', '_blank') },
+                { id: 'divider2', label: '', divider: true },
                 { id: 'about', label: 'About Contextractor', icon: ICONS.info, onClick: onShowAbout },
             ],
         },
@@ -233,20 +243,40 @@ export const MenuBar: React.FC<MenuBarProps> = ({
     );
 };
 
-// About Modal Component
+// About Modal Component - Material You Flat Design
 interface AboutModalProps {
     isOpen: boolean;
     onClose: () => void;
 }
 
 export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
+    const openExternalLink = useCallback((url: string) => {
+        window.open(url, '_blank', 'noopener,noreferrer');
+    }, []);
+
     if (!isOpen) return null;
 
-    const socialLinks = [
-        { name: 'GitHub', url: 'https://github.com/IRedDragonICY', icon: 'M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z' },
-        { name: 'Ko-fi', url: 'https://ko-fi.com/ireddragonicy', icon: 'M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z' },
-        { name: 'PayPal', url: 'https://paypal.com/paypalme/IRedDragonICY', icon: 'M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944 3.72a.771.771 0 0 1 .761-.652h6.658c2.205 0 3.97.673 5.055 1.947.925 1.088 1.28 2.574.997 4.174-.015.076-.035.151-.054.227-.653 3.336-2.86 5.482-6.083 5.893-.409.052-.83.078-1.262.078H8.907a.776.776 0 0 0-.765.655l-.934 4.953a.64.64 0 0 1-.632.543z' },
-        { name: 'Saweria', url: 'https://saweria.co/IRedDragonICY', icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.16-1.46-3.27-3.4h1.96c.1 1.05.82 1.87 2.65 1.87 1.96 0 2.4-.98 2.4-1.59 0-.83-.44-1.61-2.67-2.14-2.48-.6-4.18-1.62-4.18-3.67 0-1.72 1.39-2.84 3.11-3.21V4h2.67v1.95c1.86.45 2.79 1.86 2.85 3.39H14.3c-.05-1.11-.64-1.87-2.22-1.87-1.5 0-2.4.68-2.4 1.64 0 .84.65 1.39 2.67 1.91s4.18 1.39 4.18 3.91c-.01 1.83-1.38 2.83-3.12 3.16z' },
+    const GITHUB_REPO_URL = 'https://github.com/IRedDragonICY/contextractor';
+
+    const quickLinks = [
+        { 
+            name: 'View on GitHub', 
+            icon: ICONS.github, 
+            url: GITHUB_REPO_URL,
+            description: 'Star, Fork, Contribute'
+        },
+        { 
+            name: 'Report an Issue', 
+            icon: ICONS.bug, 
+            url: `${GITHUB_REPO_URL}/issues/new`,
+            description: 'Found a bug? Let us know'
+        },
+    ];
+
+    const supportLinks = [
+        { name: 'Ko-fi', url: 'https://ko-fi.com/ireddragonicy', color: '#FF5E5B' },
+        { name: 'PayPal', url: 'https://paypal.com/paypalme/IRedDragonICY', color: '#003087' },
+        { name: 'Saweria', url: 'https://saweria.co/IRedDragonICY', color: '#F59E0B' },
     ];
 
     return (
@@ -254,92 +284,116 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-md flex items-center justify-center p-6"
+            className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6"
             onClick={onClose}
         >
             <motion.div
-                initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                transition={{ type: "spring", duration: 0.5, bounce: 0.3 }}
-                className="bg-[var(--theme-surface-elevated)] rounded-[28px] w-full max-w-sm shadow-2xl overflow-hidden"
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                transition={{ type: "spring", duration: 0.4, bounce: 0.2 }}
+                className="bg-[var(--theme-surface-elevated)] rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-[var(--theme-border)]"
                 onClick={e => e.stopPropagation()}
             >
-                {/* Hero Header with Gradient */}
-                <div className="relative bg-gradient-to-br from-[var(--theme-primary)] via-[#6366f1] to-[var(--theme-accent)] p-6 pb-12">
-                    {/* Decorative circles */}
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-                    <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
-                    
-                    {/* Close button */}
-                    <button
-                        onClick={onClose}
-                        className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
-                    >
-                        <GoogleIcon path={ICONS.close} className="w-5 h-5 text-white" />
-                    </button>
-
+                {/* Minimal Header */}
+                <div className="p-6 pb-4 flex items-start gap-4">
                     {/* App Icon */}
-                    <div className="relative w-16 h-16 mx-auto mb-3 bg-white rounded-2xl flex items-center justify-center shadow-lg">
-                        <svg width="36" height="36" viewBox="0 0 48 48" fill="none">
-                            <path d="M12 8L24 4L36 8V20C36 28 30 35 24 38C18 35 12 28 12 20V8Z" fill="url(#gradient1)"/>
-                            <path d="M20 22L23 25L28 18" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                            <defs>
-                                <linearGradient id="gradient1" x1="12" y1="4" x2="36" y2="38" gradientUnits="userSpaceOnUse">
-                                    <stop stopColor="#3b82f6"/>
-                                    <stop offset="1" stopColor="#8b5cf6"/>
-                                </linearGradient>
-                            </defs>
-                        </svg>
+                    <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-lg flex-shrink-0 bg-[var(--theme-surface)]">
+                        <Image
+                            src="/icon.png"
+                            alt="Contextractor"
+                            width={64}
+                            height={64}
+                            className="w-full h-full object-contain"
+                        />
                     </div>
                     
-                    <h2 className="text-xl font-semibold text-white text-center">Contextractor</h2>
-                    <p className="text-white/70 text-xs text-center mt-1">Version 1.0.0 PRO</p>
-                </div>
-
-                {/* Content */}
-                <div className="p-5 -mt-6 relative">
-                    {/* Description Card */}
-                    <div className="bg-[var(--theme-surface)] rounded-2xl p-4 shadow-sm border border-[var(--theme-border)]">
-                        <p className="text-[var(--theme-text-secondary)] text-sm text-center leading-relaxed">
-                            Extract clean, formatted context from your code for AI & LLMs.
+                    <div className="flex-1 min-w-0">
+                        <h2 className="text-xl font-semibold text-[var(--theme-text-primary)]">Contextractor</h2>
+                        <p className="text-xs text-[var(--theme-text-tertiary)] mt-0.5">Version 1.0.0</p>
+                        <p className="text-sm text-[var(--theme-text-secondary)] mt-2 leading-relaxed">
+                            Extract clean, formatted context from your codebase for AI & LLMs.
                         </p>
                     </div>
 
-                    {/* Developer Section */}
-                    <div className="mt-4 flex items-center gap-3 p-3 rounded-2xl bg-[var(--theme-surface)] border border-[var(--theme-border)]">
-                        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[var(--theme-primary)] to-[var(--theme-accent)] flex items-center justify-center text-white font-bold text-sm shadow-md">
+                    {/* Close button */}
+                    <button
+                        onClick={onClose}
+                        className="w-8 h-8 rounded-full bg-[var(--theme-surface)] hover:bg-[var(--theme-surface-hover)] flex items-center justify-center transition-colors flex-shrink-0"
+                    >
+                        <GoogleIcon path={ICONS.close} className="w-4 h-4 text-[var(--theme-text-tertiary)]" />
+                    </button>
+                </div>
+
+                {/* Quick Links */}
+                <div className="px-6 space-y-2">
+                    {quickLinks.map((link) => (
+                        <motion.button
+                            key={link.name}
+                            onClick={() => openExternalLink(link.url)}
+                            whileHover={{ scale: 1.01 }}
+                            whileTap={{ scale: 0.99 }}
+                            className="w-full flex items-center gap-3 p-3 bg-[var(--theme-surface)] hover:bg-[var(--theme-primary)]/8 rounded-2xl transition-colors group border border-transparent hover:border-[var(--theme-primary)]/20"
+                        >
+                            <div className="w-10 h-10 rounded-xl bg-[var(--theme-primary)]/10 flex items-center justify-center">
+                                <GoogleIcon path={link.icon} className="w-5 h-5 text-[var(--theme-primary)]" />
+                            </div>
+                            <div className="flex-1 text-left">
+                                <p className="text-sm font-medium text-[var(--theme-text-primary)]">{link.name}</p>
+                                <p className="text-xs text-[var(--theme-text-tertiary)]">{link.description}</p>
+                            </div>
+                            <GoogleIcon path={ICONS.openInNew} className="w-4 h-4 text-[var(--theme-text-muted)] group-hover:text-[var(--theme-primary)]" />
+                        </motion.button>
+                    ))}
+                </div>
+
+                {/* Divider */}
+                <div className="mx-6 my-4 h-px bg-[var(--theme-border)]" />
+
+                {/* Developer Info */}
+                <div className="px-6">
+                    <div className="flex items-center gap-3 p-3 rounded-2xl bg-[var(--theme-surface)]">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--theme-primary)] to-[#6366f1] flex items-center justify-center text-white font-semibold text-sm shadow-md">
                             MF
                         </div>
                         <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-[var(--theme-text-primary)] truncate">Mohammad Farid Hendianto</p>
-                            <p className="text-xs text-[var(--theme-text-tertiary)]">Developer • Indonesia</p>
+                            <p className="text-sm font-medium text-[var(--theme-text-primary)]">Mohammad Farid Hendianto</p>
+                            <p className="text-xs text-[var(--theme-text-tertiary)]">Developer • @IRedDragonICY</p>
                         </div>
+                        <motion.button
+                            onClick={() => openExternalLink('https://github.com/IRedDragonICY')}
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            className="w-8 h-8 rounded-full bg-[var(--theme-surface-hover)] hover:bg-[var(--theme-primary)]/10 flex items-center justify-center transition-colors"
+                        >
+                            <GoogleIcon path={ICONS.github} className="w-4 h-4 text-[var(--theme-text-secondary)]" />
+                        </motion.button>
                     </div>
+                </div>
 
-                    {/* Social Links - Compact Pill Style */}
-                    <div className="mt-4 flex flex-wrap gap-2 justify-center">
-                        {socialLinks.map((link) => (
-                            <motion.a
+                {/* Support Section */}
+                <div className="px-6 pt-4 pb-5">
+                    <p className="text-xs text-[var(--theme-text-tertiary)] mb-3 text-center">Support Development</p>
+                    <div className="flex justify-center gap-2">
+                        {supportLinks.map((link) => (
+                            <motion.button
                                 key={link.name}
-                                href={link.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                                onClick={() => openExternalLink(link.url)}
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--theme-surface)] hover:bg-[var(--theme-primary)]/10 border border-[var(--theme-border)] rounded-full transition-colors group"
+                                className="px-4 py-2 bg-[var(--theme-surface)] hover:bg-[var(--theme-surface-hover)] rounded-full text-xs font-medium text-[var(--theme-text-secondary)] border border-[var(--theme-border)] hover:border-[var(--theme-primary)]/30 transition-all flex items-center gap-1.5"
                             >
-                                <svg className="w-3.5 h-3.5 text-[var(--theme-text-tertiary)] group-hover:text-[var(--theme-primary)]" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d={link.icon} />
-                                </svg>
-                                <span className="text-xs font-medium text-[var(--theme-text-secondary)] group-hover:text-[var(--theme-primary)]">{link.name}</span>
-                            </motion.a>
+                                <GoogleIcon path={ICONS.heart} className="w-3 h-3" style={{ color: link.color }} />
+                                {link.name}
+                            </motion.button>
                         ))}
                     </div>
+                </div>
 
-                    {/* Footer */}
-                    <p className="text-center text-[10px] text-[var(--theme-text-muted)] mt-4 flex items-center justify-center gap-1">
-                        © 2025 Contextractor • Made with <GoogleIcon path={ICONS.heart} className="w-3 h-3 text-red-500" />
+                {/* Footer */}
+                <div className="px-6 py-3 bg-[var(--theme-surface)] border-t border-[var(--theme-border)]">
+                    <p className="text-center text-[10px] text-[var(--theme-text-muted)] flex items-center justify-center gap-1">
+                        © 2025 Contextractor • Made with <GoogleIcon path={ICONS.heart} className="w-2.5 h-2.5 text-red-500" /> in Indonesia
                     </p>
                 </div>
             </motion.div>

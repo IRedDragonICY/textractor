@@ -1,20 +1,19 @@
-// Home View Component - Adobe Acrobat Style Recent Files
-// Professional-grade home screen with recent projects, quick actions, and beautiful animations
+// Home View Component - Material You Flat Design
+// Professional-grade home screen with modern Google-inspired aesthetics
 
 'use client';
 
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Image from 'next/image';
 import { RecentProject } from '@/types/session';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
-import { AnimatedLogo } from '@/components/ui/AnimatedLogo';
 import { formatNumber } from '@/lib/format';
 
-// Icons
+// Material You Icons - Clean, minimal paths
 const ICONS = {
     upload: "M11 16V7.85l-2.6 2.6L7 9l5-5 5 5-1.4 1.45-2.6-2.6V16h-2Zm-5 4q-.825 0-1.413-.587Q4 18.825 4 18v-3h2v3h12v-3h2v3q0 .825-.587 1.413Q18.825 20 18 20H6Z",
     github: "M12 1.27a11 11 0 00-3.48 21.46c.55.09.73-.28.73-.55v-1.84c-3.03.64-3.67-1.46-3.67-1.46-.55-1.29-1.28-1.65-1.28-1.65-.92-.65.1-.65.1-.65 1.1 0 1.73 1.1 1.73 1.1.92 1.65 2.57 1.2 3.21.92a2 2 0 01.64-1.47c-2.47-.27-5.04-1.19-5.04-5.24 0-1.16.46-2.11 1.2-2.85a3.8 3.8 0 010-2.94s.95-.26 3.11 1.1a10.2 10.2 0 015.6 0c2.16-1.37 3.11-1.08 3.11-1.08a3.8 3.8 0 01.02 2.92c.74.74 1.2 1.69 1.2 2.85 0 4.06-2.59 4.96-5.05 5.23a1.75 1.75 0 01.5 1.35v2.23c0 .27.2.65.75.55A11 11 0 0012 1.27",
-    folder: "M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z",
     add: "M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z",
     delete: "M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z",
     clock: "M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z",
@@ -24,8 +23,7 @@ const ICONS = {
     lines: "M3 14h4v-4H3v4zm0 5h4v-4H3v4zM3 9h4V5H3v4zm5 5h13v-4H8v4zm0 5h13v-4H8v4zM8 5v4h13V5H8z",
     search: "M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z",
     clearAll: "M5 13h14v-2H5v2zm-2 4h14v-2H3v2zM7 7v2h14V7H7z",
-    star: "M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z",
-    moreVert: "M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z",
+    folder: "M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z",
     openInNew: "M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z",
 };
 
@@ -153,48 +151,77 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="text-center mb-12"
+                    className="text-center mb-16"
                 >
-                    <div className="flex justify-center mb-4">
-                        <div className="scale-150">
-                            <AnimatedLogo />
+                    {/* App Icon */}
+                    <motion.div 
+                        className="flex justify-center mb-6"
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
+                    >
+                        <div className="relative w-20 h-20 rounded-[28px] bg-gradient-to-br from-[var(--theme-primary)] to-[#6366f1] p-[2px] shadow-lg shadow-[var(--theme-primary)]/20">
+                            <div className="w-full h-full rounded-[26px] bg-[var(--theme-surface)] flex items-center justify-center overflow-hidden">
+                                <Image 
+                                    src="/icon.png" 
+                                    alt="Contextractor" 
+                                    width={52} 
+                                    height={52}
+                                    className="object-contain"
+                                    priority
+                                />
+                            </div>
                         </div>
-                    </div>
-                    <h1 className="text-3xl font-light text-[var(--theme-text-primary)] mb-2">
-                        Welcome to <span className="font-medium">Contextractor</span>
-                    </h1>
-                    <p className="text-[var(--theme-text-tertiary)] text-sm">
+                    </motion.div>
+
+                    {/* Title */}
+                    <motion.h1 
+                        className="text-4xl font-light text-[var(--theme-text-primary)] mb-3 tracking-tight"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.15 }}
+                    >
+                        Welcome to <span className="font-semibold bg-gradient-to-r from-[var(--theme-primary)] to-[#6366f1] bg-clip-text text-transparent">Contextractor</span>
+                    </motion.h1>
+
+                    {/* Subtitle */}
+                    <motion.p 
+                        className="text-[var(--theme-text-tertiary)] text-base max-w-md mx-auto"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                    >
                         Extract clean context from your code for AI & LLMs
-                    </p>
+                    </motion.p>
                 </motion.div>
 
-                {/* Quick Actions */}
+                {/* Quick Actions - Material You Cards */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                    className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12"
+                    transition={{ delay: 0.25 }}
+                    className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-16"
                 >
                     <QuickActionCard
                         icon={ICONS.add}
                         title="New Session"
                         description="Start with a blank workspace"
                         onClick={onCreateSession}
-                        color="#A8C7FA"
+                        variant="primary"
                     />
                     <QuickActionCard
                         icon={ICONS.upload}
                         title="Upload Files"
                         description="Drop files, folders, or ZIPs"
                         onClick={onOpenFilePicker}
-                        color="#7FCFB6"
+                        variant="secondary"
                     />
                     <QuickActionCard
                         icon={ICONS.github}
                         title="Import Repository"
                         description="Clone from GitHub or GitLab"
                         onClick={onOpenGitImport}
-                        color="#C8ACF6"
+                        variant="tertiary"
                     />
                 </motion.div>
 
@@ -203,39 +230,42 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
+                        transition={{ delay: 0.3 }}
                     >
                         {/* Section Header */}
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
-                                <GoogleIcon path={ICONS.clock} className="w-5 h-5 text-[var(--theme-text-tertiary)]" />
-                                <h2 className="text-lg font-medium text-[var(--theme-text-primary)]">Recent</h2>
-                                <span className="text-xs text-[var(--theme-text-tertiary)] bg-[var(--theme-surface-hover)] px-2 py-0.5 rounded-full">
+                                <div className="w-8 h-8 rounded-xl bg-[var(--theme-surface-hover)] flex items-center justify-center">
+                                    <GoogleIcon path={ICONS.clock} className="w-4 h-4 text-[var(--theme-text-tertiary)]" />
+                                </div>
+                                <h2 className="text-lg font-medium text-[var(--theme-text-primary)]">Recent Projects</h2>
+                                <span className="text-xs text-[var(--theme-text-muted)] bg-[var(--theme-surface-hover)] px-2.5 py-1 rounded-full font-medium">
                                     {recentProjects.length}
                                 </span>
                             </div>
 
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
                                 {/* Search */}
-                                <div className="relative">
+                                <div className="relative hidden sm:block">
                                     <GoogleIcon 
                                         path={ICONS.search} 
                                         className="w-4 h-4 text-[var(--theme-text-tertiary)] absolute left-3 top-1/2 -translate-y-1/2" 
                                     />
                                     <input
                                         type="text"
-                                        placeholder="Search recent..."
+                                        placeholder="Search..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="bg-[var(--theme-input-bg)] border border-[var(--theme-border)] rounded-lg pl-9 pr-3 py-1.5 text-sm text-[var(--theme-text-primary)] placeholder-[var(--theme-text-tertiary)] w-48 focus:outline-none focus:border-[var(--theme-primary)] transition-colors"
+                                        className="bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-xl pl-9 pr-3 py-2 text-sm text-[var(--theme-text-primary)] placeholder-[var(--theme-text-muted)] w-44 focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary)]/30 focus:border-[var(--theme-primary)] transition-all"
                                     />
                                 </div>
 
-                                {/* Sort Dropdown */}
+                                {/* Sort */}
                                 <select
                                     value={sortBy}
                                     onChange={(e) => setSortBy(e.target.value as SortBy)}
-                                    className="bg-[var(--theme-input-bg)] border border-[var(--theme-border)] rounded-lg px-3 py-1.5 text-sm text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-primary)] transition-colors cursor-pointer"
+                                    className="bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-xl px-3 py-2 text-sm text-[var(--theme-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary)]/30 cursor-pointer appearance-none pr-8 hidden sm:block"
+                                    style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%23999' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', backgroundSize: '16px' }}
                                 >
                                     <option value="lastOpened">Last Opened</option>
                                     <option value="name">Name</option>
@@ -244,13 +274,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
                                 </select>
 
                                 {/* View Toggle */}
-                                <div className="flex bg-[var(--theme-surface-hover)] rounded-lg p-0.5">
+                                <div className="flex bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-xl p-1">
                                     <button
                                         onClick={() => setViewMode('grid')}
-                                        className={`p-1.5 rounded transition-colors ${
+                                        className={`p-2 rounded-lg transition-all ${
                                             viewMode === 'grid' 
-                                                ? 'bg-[var(--theme-border)] text-[var(--theme-text-primary)]' 
-                                                : 'text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)]'
+                                                ? 'bg-[var(--theme-primary)]/10 text-[var(--theme-primary)]' 
+                                                : 'text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-surface-hover)]'
                                         }`}
                                     >
                                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -259,10 +289,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
                                     </button>
                                     <button
                                         onClick={() => setViewMode('list')}
-                                        className={`p-1.5 rounded transition-colors ${
+                                        className={`p-2 rounded-lg transition-all ${
                                             viewMode === 'list' 
-                                                ? 'bg-[var(--theme-border)] text-[var(--theme-text-primary)]' 
-                                                : 'text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)]'
+                                                ? 'bg-[var(--theme-primary)]/10 text-[var(--theme-primary)]' 
+                                                : 'text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-surface-hover)]'
                                         }`}
                                     >
                                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -274,7 +304,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                                 {/* Clear All */}
                                 <button
                                     onClick={onClearRecentProjects}
-                                    className="text-[var(--theme-text-tertiary)] hover:text-[var(--theme-error)] transition-colors p-1.5"
+                                    className="p-2 text-[var(--theme-text-tertiary)] hover:text-[var(--theme-error)] hover:bg-[var(--theme-error)]/10 rounded-xl transition-all"
                                     title="Clear all recent"
                                 >
                                     <GoogleIcon path={ICONS.clearAll} className="w-4 h-4" />
@@ -288,7 +318,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                                 viewMode === 'grid' ? (
                                     <motion.div
                                         layout
-                                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+                                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
                                     >
                                         {filteredProjects.map((project, index) => (
                                             <RecentProjectCard
@@ -320,9 +350,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
                                 <motion.div
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
-                                    className="text-center py-12"
+                                    className="text-center py-16"
                                 >
-                                    <GoogleIcon path={ICONS.search} className="w-12 h-12 text-[var(--theme-border)] mx-auto mb-4" />
+                                    <div className="w-16 h-16 bg-[var(--theme-surface-hover)] rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                        <GoogleIcon path={ICONS.search} className="w-8 h-8 text-[var(--theme-text-muted)]" />
+                                    </div>
                                     <p className="text-[var(--theme-text-tertiary)]">No projects match your search</p>
                                 </motion.div>
                             )}
@@ -335,13 +367,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
-                        className="text-center py-16"
+                        transition={{ delay: 0.3 }}
+                        className="text-center py-20"
                     >
-                        <div className="w-20 h-20 bg-[var(--theme-surface-hover)] rounded-full flex items-center justify-center mx-auto mb-6">
-                            <GoogleIcon path={ICONS.folder} className="w-10 h-10 text-[var(--theme-border)]" />
+                        <div className="w-24 h-24 bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-3xl flex items-center justify-center mx-auto mb-6">
+                            <GoogleIcon path={ICONS.folder} className="w-12 h-12 text-[var(--theme-text-muted)]" />
                         </div>
-                        <h3 className="text-xl text-[var(--theme-text-primary)] mb-2">No recent projects</h3>
+                        <h3 className="text-xl text-[var(--theme-text-primary)] font-medium mb-2">No recent projects</h3>
                         <p className="text-[var(--theme-text-tertiary)] text-sm max-w-md mx-auto">
                             Your recent projects will appear here. Start by uploading files or importing a repository.
                         </p>
@@ -352,13 +384,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
     );
 };
 
-// Quick Action Card Component
+// Quick Action Card - Material You Style
 interface QuickActionCardProps {
     icon: string;
     title: string;
     description: string;
     onClick: () => void;
-    color: string;
+    variant: 'primary' | 'secondary' | 'tertiary';
 }
 
 const QuickActionCard: React.FC<QuickActionCardProps> = ({
@@ -366,26 +398,55 @@ const QuickActionCard: React.FC<QuickActionCardProps> = ({
     title,
     description,
     onClick,
-    color,
-}) => (
-    <motion.button
-        whileHover={{ scale: 1.02, y: -2 }}
-        whileTap={{ scale: 0.98 }}
-        onClick={onClick}
-        className="bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-2xl p-6 text-left group hover:border-[var(--theme-text-tertiary)] transition-all duration-200"
-    >
-        <div 
-            className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110"
-            style={{ backgroundColor: `${color}20` }}
-        >
-            <GoogleIcon path={icon} className="w-6 h-6" style={{ color }} />
-        </div>
-        <h3 className="text-[var(--theme-text-primary)] font-medium mb-1">{title}</h3>
-        <p className="text-[var(--theme-text-tertiary)] text-sm">{description}</p>
-    </motion.button>
-);
+    variant,
+}) => {
+    const variantStyles = {
+        primary: {
+            bg: 'bg-[var(--theme-primary)]/8',
+            border: 'border-[var(--theme-primary)]/20',
+            iconBg: 'bg-[var(--theme-primary)]/15',
+            iconColor: 'text-[var(--theme-primary)]',
+            hoverBorder: 'hover:border-[var(--theme-primary)]/40',
+        },
+        secondary: {
+            bg: 'bg-[#7FCFB6]/8',
+            border: 'border-[#7FCFB6]/20',
+            iconBg: 'bg-[#7FCFB6]/15',
+            iconColor: 'text-[#7FCFB6]',
+            hoverBorder: 'hover:border-[#7FCFB6]/40',
+        },
+        tertiary: {
+            bg: 'bg-[#C8ACF6]/8',
+            border: 'border-[#C8ACF6]/20',
+            iconBg: 'bg-[#C8ACF6]/15',
+            iconColor: 'text-[#C8ACF6]',
+            hoverBorder: 'hover:border-[#C8ACF6]/40',
+        },
+    };
 
-// Recent Project Card Component (Grid View)
+    const styles = variantStyles[variant];
+
+    return (
+        <motion.button
+            whileHover={{ scale: 1.02, y: -4 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={onClick}
+            className={`
+                ${styles.bg} ${styles.border} ${styles.hoverBorder}
+                border rounded-3xl p-6 text-left group transition-all duration-300 
+                hover:shadow-lg hover:shadow-black/5
+            `}
+        >
+            <div className={`w-14 h-14 ${styles.iconBg} rounded-2xl flex items-center justify-center mb-5 transition-transform group-hover:scale-110`}>
+                <GoogleIcon path={icon} className={`w-7 h-7 ${styles.iconColor}`} />
+            </div>
+            <h3 className="text-[var(--theme-text-primary)] font-semibold text-base mb-1">{title}</h3>
+            <p className="text-[var(--theme-text-tertiary)] text-sm">{description}</p>
+        </motion.button>
+    );
+};
+
+// Recent Project Card (Grid View)
 interface RecentProjectCardProps {
     project: RecentProject;
     index: number;
@@ -417,77 +478,79 @@ const RecentProjectCard: React.FC<RecentProjectCardProps> = ({
             onMouseEnter={onHover}
             onMouseLeave={onLeave}
             onClick={onOpen}
-            className="group bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-xl overflow-hidden cursor-pointer hover:border-[var(--theme-text-tertiary)] transition-all duration-200"
+            className="group bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-2xl overflow-hidden cursor-pointer hover:border-[var(--theme-primary)]/30 hover:shadow-lg hover:shadow-black/5 transition-all duration-300"
         >
-            {/* Thumbnail/Preview Area */}
+            {/* Header with language color */}
             <div 
-                className="h-24 flex items-center justify-center relative"
-                style={{ backgroundColor: `${langConfig.color}15` }}
-            >
-                <GoogleIcon 
-                    path={ICONS.code} 
-                    className="w-12 h-12 opacity-30"
-                    style={{ color: langConfig.color }}
-                />
-                
-                {/* Language Badge */}
-                <div 
-                    className="absolute top-3 left-3 text-xs px-2 py-0.5 rounded-full font-medium"
-                    style={{ 
-                        backgroundColor: `${langConfig.color}30`,
-                        color: langConfig.color,
-                    }}
-                >
-                    {langConfig.name}
-                </div>
-
-                {/* Remove Button */}
-                <AnimatePresence>
-                    {isHovered && (
-                        <motion.button
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.8 }}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onRemove();
-                            }}
-                            className="absolute top-2 right-2 w-7 h-7 bg-[var(--theme-surface-hover)] rounded-full flex items-center justify-center text-[var(--theme-text-tertiary)] hover:text-[var(--theme-error)] hover:bg-[var(--theme-surface-elevated)] transition-colors"
-                        >
-                            <GoogleIcon path={ICONS.delete} className="w-4 h-4" />
-                        </motion.button>
-                    )}
-                </AnimatePresence>
-            </div>
+                className="h-2"
+                style={{ backgroundColor: langConfig.color }}
+            />
 
             {/* Content */}
-            <div className="p-4">
-                <h3 className="text-[var(--theme-text-primary)] font-medium truncate mb-2 group-hover:text-[var(--theme-primary)] transition-colors">
-                    {project.name}
-                </h3>
+            <div className="p-5">
+                {/* Title Row */}
+                <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div 
+                            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                            style={{ backgroundColor: `${langConfig.color}20` }}
+                        >
+                            <GoogleIcon 
+                                path={ICONS.code} 
+                                className="w-5 h-5"
+                                style={{ color: langConfig.color }}
+                            />
+                        </div>
+                        <div className="min-w-0">
+                            <h3 className="text-[var(--theme-text-primary)] font-medium truncate group-hover:text-[var(--theme-primary)] transition-colors">
+                                {project.name}
+                            </h3>
+                            <span 
+                                className="text-xs font-medium"
+                                style={{ color: langConfig.color }}
+                            >
+                                {langConfig.name}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Remove Button */}
+                    <AnimatePresence>
+                        {isHovered && (
+                            <motion.button
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.8 }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onRemove();
+                                }}
+                                className="w-8 h-8 bg-[var(--theme-surface-hover)] rounded-lg flex items-center justify-center text-[var(--theme-text-tertiary)] hover:text-[var(--theme-error)] hover:bg-[var(--theme-error)]/10 transition-all shrink-0"
+                            >
+                                <GoogleIcon path={ICONS.delete} className="w-4 h-4" />
+                            </motion.button>
+                        )}
+                    </AnimatePresence>
+                </div>
 
                 {/* Stats */}
-                <div className="flex items-center gap-3 text-xs text-[var(--theme-text-tertiary)]">
-                    <div className="flex items-center gap-1">
-                        <GoogleIcon path={ICONS.file} className="w-3 h-3" />
-                        <span>{project.fileCount}</span>
+                <div className="flex items-center gap-4 text-xs text-[var(--theme-text-tertiary)] mb-4">
+                    <div className="flex items-center gap-1.5">
+                        <GoogleIcon path={ICONS.file} className="w-3.5 h-3.5" />
+                        <span>{project.fileCount} files</span>
                     </div>
-                    <div className="flex items-center gap-1">
-                        <GoogleIcon path={ICONS.token} className="w-3 h-3" />
+                    <div className="flex items-center gap-1.5">
+                        <GoogleIcon path={ICONS.token} className="w-3.5 h-3.5" />
                         <span>{formatNumber(project.totalTokens)}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                        <GoogleIcon path={ICONS.lines} className="w-3 h-3" />
-                        <span>{formatNumber(project.totalLines)}</span>
                     </div>
                 </div>
 
-                {/* Time */}
+                {/* Footer */}
                 <div 
-                    className="mt-3 text-xs text-[var(--theme-text-muted)] flex items-center gap-1"
+                    className="flex items-center gap-1.5 text-xs text-[var(--theme-text-muted)]"
                     title={formatFullDate(project.lastOpened)}
                 >
-                    <GoogleIcon path={ICONS.clock} className="w-3 h-3" />
+                    <GoogleIcon path={ICONS.clock} className="w-3.5 h-3.5" />
                     {formatRelativeTime(project.lastOpened)}
                 </div>
             </div>
@@ -495,7 +558,7 @@ const RecentProjectCard: React.FC<RecentProjectCardProps> = ({
     );
 };
 
-// Recent Project Row Component (List View)
+// Recent Project Row (List View)
 interface RecentProjectRowProps {
     project: RecentProject;
     index: number;
@@ -519,11 +582,11 @@ const RecentProjectRow: React.FC<RecentProjectRowProps> = ({
             exit={{ opacity: 0, x: 20 }}
             transition={{ delay: index * 0.03 }}
             onClick={onOpen}
-            className="group flex items-center gap-4 bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-lg p-3 cursor-pointer hover:border-[var(--theme-text-tertiary)] hover:bg-[var(--theme-surface-elevated)] transition-all duration-200"
+            className="group flex items-center gap-4 bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-xl p-4 cursor-pointer hover:border-[var(--theme-primary)]/30 hover:bg-[var(--theme-surface-hover)] transition-all duration-200"
         >
             {/* Icon */}
             <div 
-                className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
                 style={{ backgroundColor: `${langConfig.color}20` }}
             >
                 <GoogleIcon 
@@ -538,22 +601,18 @@ const RecentProjectRow: React.FC<RecentProjectRowProps> = ({
                 <h3 className="text-[var(--theme-text-primary)] font-medium truncate group-hover:text-[var(--theme-primary)] transition-colors">
                     {project.name}
                 </h3>
-                <p className="text-xs text-[var(--theme-text-tertiary)]">{langConfig.name}</p>
+                <p className="text-xs" style={{ color: langConfig.color }}>{langConfig.name}</p>
             </div>
 
             {/* Stats */}
-            <div className="hidden sm:flex items-center gap-4 text-xs text-[var(--theme-text-tertiary)]">
-                <div className="flex items-center gap-1 min-w-[60px]">
-                    <GoogleIcon path={ICONS.file} className="w-3 h-3" />
+            <div className="hidden sm:flex items-center gap-6 text-xs text-[var(--theme-text-tertiary)]">
+                <div className="flex items-center gap-1.5 min-w-[70px]">
+                    <GoogleIcon path={ICONS.file} className="w-3.5 h-3.5" />
                     <span>{project.fileCount} files</span>
                 </div>
-                <div className="flex items-center gap-1 min-w-[80px]">
-                    <GoogleIcon path={ICONS.token} className="w-3 h-3" />
+                <div className="flex items-center gap-1.5 min-w-[80px]">
+                    <GoogleIcon path={ICONS.token} className="w-3.5 h-3.5" />
                     <span>{formatNumber(project.totalTokens)} tokens</span>
-                </div>
-                <div className="flex items-center gap-1 min-w-[70px]">
-                    <GoogleIcon path={ICONS.lines} className="w-3 h-3" />
-                    <span>{formatNumber(project.totalLines)} lines</span>
                 </div>
             </div>
 
@@ -572,7 +631,7 @@ const RecentProjectRow: React.FC<RecentProjectRowProps> = ({
                         e.stopPropagation();
                         onOpen();
                     }}
-                    className="p-1.5 text-[var(--theme-text-tertiary)] hover:text-[var(--theme-primary)] hover:bg-[var(--theme-surface-elevated)] rounded transition-colors"
+                    className="p-2 text-[var(--theme-text-tertiary)] hover:text-[var(--theme-primary)] hover:bg-[var(--theme-primary)]/10 rounded-lg transition-all"
                     title="Open"
                 >
                     <GoogleIcon path={ICONS.openInNew} className="w-4 h-4" />
@@ -582,7 +641,7 @@ const RecentProjectRow: React.FC<RecentProjectRowProps> = ({
                         e.stopPropagation();
                         onRemove();
                     }}
-                    className="p-1.5 text-[var(--theme-text-tertiary)] hover:text-[var(--theme-error)] hover:bg-[var(--theme-surface-elevated)] rounded transition-colors"
+                    className="p-2 text-[var(--theme-text-tertiary)] hover:text-[var(--theme-error)] hover:bg-[var(--theme-error)]/10 rounded-lg transition-all"
                     title="Remove from recent"
                 >
                     <GoogleIcon path={ICONS.delete} className="w-4 h-4" />

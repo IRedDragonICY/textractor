@@ -33,6 +33,7 @@ import { TabBar } from '@/components/TabBar';
 import { HomeView } from '@/components/HomeView';
 import { MenuBar, AboutModal, ShortcutsModal } from '@/components/MenuBar';
 import { SettingsView } from '@/components/SettingsView';
+import { ReportIssueView } from '@/components/ReportIssueView';
 import { SecurityWarningModal } from '@/components/SecurityWarningModal';
 import { VirtualizedCodeViewer } from '@/components/VirtualizedCodeViewer';
 import { WorkspaceSkeleton, LoadingProgress } from '@/components/LoadingSkeleton';
@@ -93,6 +94,7 @@ function Contextractor() {
         clearRecentProjects,
         toggleHomeView,
         openSettingsTab,
+        openReportIssueTab,
     } = useSessionManager();
 
     // Derived state from active session - uses cached batch conversion
@@ -479,6 +481,7 @@ function Contextractor() {
                         onShowAbout={() => setAboutModalOpen(true)}
                         onShowShortcuts={() => setShortcutsModalOpen(true)}
                         onShowSettings={openSettingsTab}
+                        onReportIssue={openReportIssueTab}
                         hasContent={!!combinedText}
                     />
                 </div>
@@ -554,6 +557,18 @@ function Contextractor() {
                             onUpdateSecurity={updateSecuritySettings}
                             onUpdateFilters={updateFilterSettings}
                             onReset={resetSettings}
+                        />
+                    </motion.div>
+                ) : activeSession?.type === 'report-issue' ? (
+                    <motion.div
+                        key="report-issue"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="flex-1 overflow-hidden"
+                    >
+                        <ReportIssueView
+                            onClose={() => activeSessionId && closeSession(activeSessionId)}
                         />
                     </motion.div>
                 ) : (
