@@ -166,6 +166,17 @@ const SortableTab = memo<SortableTabProps>(function SortableTab({
         e.stopPropagation();
     }, []);
 
+    const handleInputPointerDown = useCallback((e: React.PointerEvent) => {
+        // Prevent drag activation while editing
+        e.stopPropagation();
+    }, []);
+
+    const handleInputKeyDown = useCallback((e: React.KeyboardEvent) => {
+        // Stop bubbling so the keyboard drag sensor isn't triggered by the space key
+        e.stopPropagation();
+        onKeyDown(e);
+    }, [onKeyDown]);
+
     return (
         <div
             ref={setNodeRef}
@@ -215,7 +226,8 @@ const SortableTab = memo<SortableTabProps>(function SortableTab({
                     value={editValue}
                     onChange={(e) => onEditChange(e.target.value)}
                     onBlur={onFinishEdit}
-                    onKeyDown={onKeyDown}
+                    onKeyDown={handleInputKeyDown}
+                    onPointerDown={handleInputPointerDown}
                     className="flex-1 bg-[var(--theme-surface-hover)] text-[var(--theme-text-primary)] text-xs px-1 py-0.5 rounded outline-none border border-[var(--theme-primary)] min-w-0"
                     onClick={handleInputClick}
                 />
