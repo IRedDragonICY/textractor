@@ -4,6 +4,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
 
@@ -569,9 +570,12 @@ export const ChangelogView: React.FC<ChangelogViewProps> = ({ onClose }) => {
                                                                 {change.author && (
                                                                     <span className="text-[10px] text-[var(--theme-text-muted)] flex items-center gap-1">
                                                                         {change.authorAvatar && (
-                                                                            <img
+                                                                            <Image
                                                                                 src={change.authorAvatar}
-                                                                                alt={change.author}
+                                                                                alt={change.author || 'Author avatar'}
+                                                                                width={12}
+                                                                                height={12}
+                                                                                sizes="12px"
                                                                                 className="w-3 h-3 rounded-full"
                                                                             />
                                                                         )}

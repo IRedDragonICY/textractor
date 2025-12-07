@@ -134,14 +134,12 @@ function removeCommentsCSyle(content: string): string {
   let state: TokenizerState = 'code';
   let i = 0;
   const len = content.length;
-  
-  // Track if we're potentially in a regex context
-  let lastSignificantChar = '';
+  const regexPrecederChars = new Set(['=', '(', ',', ':', '[', '!', '&', '|', '?', ';', '{', '}']);
+  const regexPrecederKeywords = /\b(return|typeof|void|delete|new|case|throw)\b/;
   
   while (i < len) {
     const char = content[i];
     const nextChar = content[i + 1] ?? '';
-    const prevChar = content[i - 1] ?? '';
     
     switch (state) {
       case 'code': {
@@ -187,11 +185,16 @@ function removeCommentsCSyle(content: string): string {
         // Regex can appear after: ( , = [ ! & | ? : ; { } return typeof void delete ~ + - 
         // But NOT after: ) ] } identifier number string
         if (char === '/') {
-          const regexPreceders = /[=(:,\[!&|?;{}]|\breturn\b|\btypeof\b|\bvoid\b|\bdelete\b|\bnew\b|\bcase\b|\bthrow\b/;
-          // Look back for the last significant token
-          const lookback = result.slice(-20).trim();
+          const rawLookback = result.slice(-20);
+          const lookback = rawLookback.trimEnd();
+          const lastChar = lookback.slice(-1);
           
-          if (regexPreceders.test(lookback) || lookback === '' || lookback.endsWith('\n')) {
+          if (
+            regexPrecederKeywords.test(lookback) ||
+            regexPrecederChars.has(lastChar) ||
+            lookback === '' ||
+            rawLookback.endsWith('\n')
+          ) {
             // This could be a regex
             state = 'regex';
             result += char;
@@ -200,10 +203,6 @@ function removeCommentsCSyle(content: string): string {
           }
         }
         
-        // Regular character, keep track of significant chars for regex detection
-        if (!/\s/.test(char)) {
-          lastSignificantChar = char;
-        }
         result += char;
         i++;
         break;

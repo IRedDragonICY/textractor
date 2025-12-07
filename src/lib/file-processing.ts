@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { calculateTokens, calculateTokensBatch, estimateTokens } from '@/lib/tokenWorker';
+import { calculateTokens } from '@/lib/tokenWorker';
 import { FileData } from "@/types";
 import { TEXT_FILE_EXTENSIONS } from "@/constants";
 

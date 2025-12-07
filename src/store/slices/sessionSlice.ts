@@ -11,11 +11,6 @@ import {
     copySessionContent,
 } from '@/lib/storage';
 import type { FileData } from '@/types';
-import type {
-    OutputStyleType,
-    ViewModeType,
-    CodeProcessingModeType
-} from '@/types/session';
 import type { StoreSlice, SessionSlice, SessionMeta, SessionFileMeta } from '../types';
 
 // ============================================

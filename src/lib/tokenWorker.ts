@@ -155,7 +155,7 @@ class TokenWorkerService {
 
             try {
                 this.worker!.postMessage(request);
-            } catch (error) {
+            } catch {
                 this.pendingRequests.delete(id);
                 // Fallback to estimation if posting fails
                 resolve(this.estimateTokens(text));
@@ -209,7 +209,7 @@ class TokenWorkerService {
 
             try {
                 this.worker!.postMessage(request);
-            } catch (error) {
+            } catch {
                 this.pendingBatchRequests.delete(requestId);
                 // Fallback to estimation
                 resolve(texts.map(item => ({

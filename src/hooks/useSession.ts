@@ -10,7 +10,6 @@
  * 3. Uses selectors to prevent unnecessary re-renders
  */
 
-import { useMemo } from 'react';
 import {
     useSessionStore,
     useSessions,

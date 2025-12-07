@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useRef, useCallback, useEffect, useDeferredValue, memo } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect, useDeferredValue } from 'react';
 import { useDropzone } from 'react-dropzone';
 import {
     DndContext,
