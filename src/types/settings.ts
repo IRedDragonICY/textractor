@@ -20,7 +20,7 @@ export interface AppSettings {
 export const DEFAULT_SETTINGS: AppSettings = {
     security: {
         enablePreFlightCheck: true,
-        enableEntropyScanning: true,
+        enableEntropyScanning: false,
         entropyThreshold: 4.5,
         blockedFilePatterns: [
             '.env', '.env.*', '*.pem', '*.key', 'id_rsa', 'id_dsa', 

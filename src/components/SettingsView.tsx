@@ -276,6 +276,49 @@ export const SettingsView = ({
                                         />
                                     </button>
                                 </div>
+
+                                {/* Entropy Scanning */}
+                                <div className="pl-3 border-l border-[var(--theme-border)] space-y-3">
+                                    <div className="flex items-start justify-between">
+                                        <div className="pr-4">
+                                            <h4 className="text-sm font-medium text-[var(--theme-text-primary)]">High-Entropy Secret Detection</h4>
+                                            <p className="text-xs text-[var(--theme-text-tertiary)] mt-1 max-w-md">
+                                                Flags tokens that look random (API keys, private keys) using Shannon entropy. Disable if you see too many false positives.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => onUpdateSecurity({ enableEntropyScanning: !settings.security.enableEntropyScanning })}
+                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--theme-primary)] focus:ring-offset-2 focus:ring-offset-[var(--theme-bg)] ${
+                                                settings.security.enableEntropyScanning ? 'bg-[var(--theme-primary)]' : 'bg-[var(--theme-border)]'
+                                            }`}
+                                        >
+                                            <span
+                                                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                                                    settings.security.enableEntropyScanning ? 'translate-x-5' : 'translate-x-1'
+                                                }`}
+                                            />
+                                        </button>
+                                    </div>
+
+                                    <div className="flex items-center gap-3 text-xs text-[var(--theme-text-secondary)]">
+                                        <label htmlFor="entropy-threshold" className="font-medium text-[var(--theme-text-primary)]">
+                                            Entropy Threshold
+                                        </label>
+                                        <input
+                                            id="entropy-threshold"
+                                            type="number"
+                                            min={0}
+                                            max={8}
+                                            step={0.1}
+                                            value={settings.security.entropyThreshold}
+                                            onChange={(e) => onUpdateSecurity({ entropyThreshold: Number(e.target.value) || 0 })}
+                                            className="w-20 px-2 py-1 rounded border border-[var(--theme-border)] bg-[var(--theme-input-bg)] text-[var(--theme-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--theme-primary)] focus:border-[var(--theme-primary)]"
+                                        />
+                                        <span className="text-[var(--theme-text-tertiary)]">
+                                            Higher = stricter (default 4.5)
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Blocked Filenames */}
