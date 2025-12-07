@@ -1,5 +1,7 @@
 export interface SecuritySettings {
     enablePreFlightCheck: boolean;
+    enableEntropyScanning: boolean;
+    entropyThreshold: number;
     blockedFilePatterns: string[];
     blockedContentPatterns: string[];
 }
@@ -18,6 +20,8 @@ export interface AppSettings {
 export const DEFAULT_SETTINGS: AppSettings = {
     security: {
         enablePreFlightCheck: true,
+        enableEntropyScanning: true,
+        entropyThreshold: 4.5,
         blockedFilePatterns: [
             '.env', '.env.*', '*.pem', '*.key', 'id_rsa', 'id_dsa', 
             'credentials.json', 'secrets.yaml', '*.p12', '*.pfx'
