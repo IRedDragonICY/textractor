@@ -11,6 +11,8 @@ interface VirtualizedCodeViewerProps {
     searchMatches?: number[]; // Line indices that contain matches
     currentMatchIdx?: number;
     className?: string;
+    scrollToLine?: number | null;
+    scrollRequestId?: number;
 }
 
 // Memoized line component for maximum performance
@@ -64,6 +66,8 @@ export const VirtualizedCodeViewer = memo(({
     searchMatches = [],
     currentMatchIdx,
     className = '',
+    scrollToLine,
+    scrollRequestId,
 }: VirtualizedCodeViewerProps) => {
     const virtuosoRef = useRef<VirtuosoHandle>(null);
 
@@ -101,6 +105,23 @@ export const VirtualizedCodeViewer = memo(({
             });
         }
     }, [currentMatchLine]);
+
+    // Scroll to a specific line when requested (e.g., clicking a file)
+    useEffect(() => {
+        if (
+            scrollToLine !== undefined &&
+            scrollToLine !== null &&
+            scrollToLine >= 0 &&
+            scrollToLine < lines.length &&
+            virtuosoRef.current
+        ) {
+            virtuosoRef.current.scrollIntoView({
+                index: scrollToLine,
+                behavior: 'smooth',
+                align: 'start',
+            });
+        }
+    }, [scrollToLine, scrollRequestId, lines.length]);
 
     // Memoized row renderer
     const rowRenderer = useCallback((index: number) => {

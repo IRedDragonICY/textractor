@@ -9,24 +9,30 @@ import { FileCard } from './FileCard';
 interface VirtualizedFileListProps {
     files: FileData[];
     onRemove: (id: string) => void;
+    onSelect?: (id: string, e: React.MouseEvent) => void;
+    selectedIds?: Set<string>;
 }
 
 // Memoized file item wrapper
 const VirtualFileItem = memo(({ 
     file, 
-    onRemove 
+    onRemove,
+    onSelect,
+    isSelected
 }: { 
     file: FileData; 
     onRemove: (id: string) => void;
+    onSelect?: (id: string, e: React.MouseEvent) => void;
+    isSelected?: boolean;
 }) => (
     <div className="px-2 pb-2">
-        <FileCard file={file} onRemove={onRemove} />
+        <FileCard file={file} onRemove={onRemove} onClick={onSelect} isSelected={isSelected} />
     </div>
-), (prev, next) => prev.file.id === next.file.id);
+), (prev, next) => prev.file.id === next.file.id && prev.isSelected === next.isSelected);
 
 VirtualFileItem.displayName = 'VirtualFileItem';
 
-export const VirtualizedFileList: React.FC<VirtualizedFileListProps> = memo(({ files, onRemove }) => {
+export const VirtualizedFileList: React.FC<VirtualizedFileListProps> = memo(({ files, onRemove, onSelect, selectedIds }) => {
     // Memoized row renderer
     const rowRenderer = useCallback((index: number) => {
         const file = files[index];
@@ -34,9 +40,11 @@ export const VirtualizedFileList: React.FC<VirtualizedFileListProps> = memo(({ f
             <VirtualFileItem
                 file={file}
                 onRemove={onRemove}
+                onSelect={onSelect}
+                isSelected={selectedIds?.has(file.id)}
             />
         );
-    }, [files, onRemove]);
+    }, [files, onRemove, onSelect, selectedIds]);
 
     // Empty state
     if (files.length === 0) {

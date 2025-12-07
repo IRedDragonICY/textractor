@@ -128,6 +128,12 @@ function Contextractor() {
     const [currentRepoName, setCurrentRepoName] = useState<string>('');
     const [processing, setProcessing] = useState(false);
     const [activeId, setActiveId] = useState<string | null>(null);
+    const [processedScrollToLine, setProcessedScrollToLine] = useState<number | null>(null);
+    const [processedScrollRequestId, setProcessedScrollRequestId] = useState(0);
+    const [rawScrollToLine, setRawScrollToLine] = useState<number | null>(null);
+    const [rawScrollRequestId, setRawScrollRequestId] = useState(0);
+    const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
+    const [lastSelectedFileId, setLastSelectedFileId] = useState<string | null>(null);
     const [aboutModalOpen, setAboutModalOpen] = useState(false);
     const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
     const [exportModalOpen, setExportModalOpen] = useState(false);
@@ -227,6 +233,53 @@ function Contextractor() {
         return lines;
     }, [textFiles, outputStyle]);
 
+    // Map each file ID to the starting line index in the current preview
+    const buildLineIndexMap = useCallback((lines: string[]) => {
+        const map = new Map<string, number>();
+        if (lines.length === 0 || textFiles.length === 0) return map;
+
+        let searchStart = 0;
+        for (const f of textFiles) {
+            const pathLabel = f.path || f.name;
+            let headerLine: string;
+            switch (outputStyle) {
+                case 'hash':
+                    headerLine = `# --- ${pathLabel} ---`;
+                    break;
+                case 'minimal':
+                    headerLine = `--- ${pathLabel} ---`;
+                    break;
+                case 'xml':
+                    headerLine = `<file name="${pathLabel}">`;
+                    break;
+                case 'markdown':
+                    headerLine = `### ${pathLabel}`;
+                    break;
+                case 'standard':
+                default:
+                    headerLine = `/* --- ${pathLabel} --- */`;
+                    break;
+            }
+
+            const foundIndex = lines.indexOf(headerLine, searchStart);
+            if (foundIndex !== -1) {
+                map.set(f.id, foundIndex);
+                searchStart = foundIndex + 1;
+            }
+        }
+
+        return map;
+    }, [textFiles, outputStyle]);
+
+    const processedLineIndexMap = useMemo(
+        () => buildLineIndexMap(deferredCombinedLines),
+        [buildLineIndexMap, deferredCombinedLines]
+    );
+    const rawLineIndexMap = useMemo(
+        () => buildLineIndexMap(rawOutputLines),
+        [buildLineIndexMap, rawOutputLines]
+    );
+
     // INSTANT: Set content immediately on session/style change
     // For 'raw' mode, this is the final result
     // For other modes, this shows raw first, then updates with processed
@@ -309,6 +362,71 @@ function Contextractor() {
             abortController.abort();
         };
     }, [textFiles, outputStyle, codeProcessingMode, activeSessionId, rawOutputLines]);
+
+    // Jump code preview to a file's header when clicked in explorer/list
+    const handleFocusFile = useCallback((fileId: string) => {
+        const targetProcessedLine = processedLineIndexMap.get(fileId);
+        const targetRawLine = rawLineIndexMap.get(fileId);
+
+        if (targetProcessedLine !== undefined) {
+            setProcessedScrollToLine(targetProcessedLine);
+            setProcessedScrollRequestId(prev => prev + 1);
+        }
+
+        if (targetRawLine !== undefined) {
+            setRawScrollToLine(targetRawLine);
+            setRawScrollRequestId(prev => prev + 1);
+        }
+
+        if (targetProcessedLine !== undefined || targetRawLine !== undefined) {
+            setIsMobileSidebarOpen(false);
+        }
+    }, [processedLineIndexMap, rawLineIndexMap]);
+
+    // Selection handling with Ctrl/Cmd and Shift range
+    const handleSelectFile = useCallback((fileId: string, e?: React.MouseEvent) => {
+        const isMeta = !!(e?.metaKey || e?.ctrlKey);
+        const isShift = !!e?.shiftKey;
+
+        setSelectedFileIds((prev) => {
+            const next = new Set(prev);
+            const idsInOrder = files.map(f => f.id);
+
+            if (isShift && lastSelectedFileId) {
+                const start = idsInOrder.indexOf(lastSelectedFileId);
+                const end = idsInOrder.indexOf(fileId);
+
+                if (start !== -1 && end !== -1) {
+                    const [from, to] = start < end ? [start, end] : [end, start];
+                    for (let i = from; i <= to; i++) {
+                        next.add(idsInOrder[i]);
+                    }
+                } else {
+                    next.clear();
+                    next.add(fileId);
+                }
+            } else if (isMeta) {
+                if (next.has(fileId)) {
+                    next.delete(fileId);
+                } else {
+                    next.add(fileId);
+                }
+            } else {
+                next.clear();
+                next.add(fileId);
+            }
+
+            return next;
+        });
+
+        if (!isShift) {
+            setLastSelectedFileId(fileId);
+        }
+
+        if (!isMeta && !isShift) {
+            handleFocusFile(fileId);
+        }
+    }, [files, handleFocusFile, lastSelectedFileId]);
 
     // Compute combinedText ONLY when needed for clipboard (lazy join)
     // This avoids the expensive join on every render
@@ -418,15 +536,30 @@ function Contextractor() {
     }, [activeSessionId, createSession, files, updateSessionFiles, updateSessionSettings]);
 
     const removeFile = useCallback((id: string) => {
+        setSelectedFileIds((prev) => {
+            if (!prev.has(id)) return prev;
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+        });
         setFiles(prev => prev.filter(f => f.id !== id));
     }, [setFiles]);
 
     const removeNode = useCallback((node: TreeNode) => {
         if (node.type === 'folder') {
+            const removedIds = new Set<string>();
             setFiles(prev => prev.filter(f => {
                 const isMatch = f.path === node.path || f.path.startsWith(node.path + '/');
+                if (isMatch) removedIds.add(f.id);
                 return !isMatch;
             }));
+            if (removedIds.size > 0) {
+                setSelectedFileIds(prev => {
+                    const next = new Set(prev);
+                    removedIds.forEach(id => next.delete(id));
+                    return next;
+                });
+            }
         } else {
             removeFile(node.id);
         }
@@ -434,7 +567,17 @@ function Contextractor() {
 
     const clearWorkspace = useCallback(() => {
         setFiles([]);
+        setSelectedFileIds(new Set());
+        setLastSelectedFileId(null);
     }, [setFiles]);
+
+    const handleRemoveSelected = useCallback(() => {
+        if (selectedFileIds.size === 0) return;
+        const idsToDelete = new Set(selectedFileIds);
+        setFiles(prev => prev.filter(f => !idsToDelete.has(f.id)));
+        setSelectedFileIds(new Set());
+        setLastSelectedFileId(null);
+    }, [selectedFileIds, setFiles]);
 
     // Search Hook - uses lines-based search for performance
     const { 
@@ -479,6 +622,7 @@ function Contextractor() {
             tokens: target.reduce((a, b) => a + b.tokenCount, 0)
         };
     }, [files]);
+    const selectedCount = selectedFileIds.size;
 
     // Git Import Handler - Updated for background import
     const handleStartImport = useCallback((taskId: string, repoName: string) => {
@@ -917,14 +1061,24 @@ function Contextractor() {
 
                                         {/* File Explorer */}
                                         <div className="flex-1 flex flex-col min-h-0">
-                                            <div className="px-3 py-2 flex items-center justify-between border-b border-[var(--theme-border)]">
-                                                <span className="text-[10px] font-semibold text-[var(--theme-text-tertiary)] uppercase tracking-wider">Files</span>
+                                            <div className="px-3 py-2 flex items-center justify-between border-b border-[var(--theme-border)] gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-semibold text-[var(--theme-text-tertiary)] uppercase tracking-wider">Files</span>
+                                                    {selectedCount > 0 && (
+                                                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--theme-primary)]/10 text-[var(--theme-primary)] border border-[var(--theme-primary)]/40">
+                                                            {selectedCount} selected
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <div className="flex items-center gap-1">
                                                     {files.length > 0 && (
                                                         <button
-                                                            onClick={() => setDeleteConfirmOpen(true)}
-                                                            className="p-1 rounded hover:bg-[var(--theme-surface-hover)] text-[var(--theme-text-tertiary)] hover:text-[var(--theme-error)]"
-                                                            title="Clear all files"
+                                                            onClick={() => selectedCount > 0 ? handleRemoveSelected() : setDeleteConfirmOpen(true)}
+                                                            className={`p-1 rounded transition-colors ${selectedCount > 0
+                                                                ? 'hover:bg-[var(--theme-error)]/10 text-[var(--theme-text-tertiary)] hover:text-[var(--theme-error)]'
+                                                                : 'hover:bg-[var(--theme-surface-hover)] text-[var(--theme-text-tertiary)] hover:text-[var(--theme-error)]'
+                                                            }`}
+                                                            title={selectedCount > 0 ? 'Delete selected files' : 'Clear all files'}
                                                         >
                                                             <GoogleIcon icon={UI_ICONS_MAP.delete} className="w-3.5 h-3.5" />
                                                         </button>
@@ -959,7 +1113,7 @@ function Contextractor() {
                                                     </div>
                                                 ) : viewMode === 'list' ? (
                                                     files.length > 50 ? (
-                                                        <VirtualizedFileList files={files} onRemove={removeFile} />
+                                                        <VirtualizedFileList files={files} onRemove={removeFile} onSelect={handleSelectFile} selectedIds={selectedFileIds} />
                                                     ) : (
                                                         <DndContext
                                                             sensors={sensors}
@@ -970,7 +1124,14 @@ function Contextractor() {
                                                             <SortableContext items={files.map(f => f.id)} strategy={verticalListSortingStrategy}>
                                                                 <ul className="flex flex-col">
                                                                     {files.map(file => (
-                                                                        <SortableItem key={file.id} file={file} onRemove={removeFile} isDragging={activeId === file.id} />
+                                                                        <SortableItem
+                                                                            key={file.id}
+                                                                            file={file}
+                                                                            onRemove={removeFile}
+                                                                            onClick={handleSelectFile}
+                                                                            isSelected={selectedFileIds.has(file.id)}
+                                                                            isDragging={activeId === file.id}
+                                                                        />
                                                                     ))}
                                                                 </ul>
                                                             </SortableContext>
@@ -982,7 +1143,14 @@ function Contextractor() {
                                                 ) : (
                                                     <div className="py-1">
                                                         {fileTree.map(node => (
-                                                            <TreeItem key={node.id} node={node} level={0} onRemove={removeNode} />
+                                                            <TreeItem
+                                                                key={node.id}
+                                                                node={node}
+                                                                level={0}
+                                                                onRemove={removeNode}
+                                                                onSelectFile={handleSelectFile}
+                                                                selectedIds={selectedFileIds}
+                                                            />
                                                         ))}
                                                     </div>
                                                 )}
@@ -1085,7 +1253,27 @@ function Contextractor() {
                                     <GoogleIcon icon={UI_ICONS_MAP.github} className="w-4 h-4" />
                                     Import Repository
                                 </button>
-                                <div className="text-[10px] font-semibold text-[var(--theme-text-tertiary)] uppercase tracking-wider mb-2 px-1">Files</div>
+                                <div className="flex items-center justify-between mb-2 px-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-semibold text-[var(--theme-text-tertiary)] uppercase tracking-wider">Files</span>
+                                        {selectedCount > 0 && (
+                                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--theme-primary)]/10 text-[var(--theme-primary)] border border-[var(--theme-primary)]/40">
+                                                {selectedCount} selected
+                                            </span>
+                                        )}
+                                    </div>
+                                    {files.length > 0 && (
+                                        <button
+                                                onClick={() => selectedCount > 0 ? handleRemoveSelected() : setDeleteConfirmOpen(true)}
+                                                className={`text-[10px] px-2 py-1 rounded-lg border transition-colors ${selectedCount > 0
+                                                    ? 'text-[var(--theme-error)] border-[var(--theme-border)] hover:bg-[var(--theme-error)]/10'
+                                                    : 'text-[var(--theme-text-tertiary)] border-[var(--theme-border)] hover:bg-[var(--theme-surface-hover)]'
+                                                }`}
+                                        >
+                                                {selectedCount > 0 ? 'Delete selected' : 'Clear all'}
+                                        </button>
+                                    )}
+                                </div>
                                 {files.length === 0 ? (
                                     <div className="text-center py-8 text-[var(--theme-text-tertiary)] opacity-60">
                                         <GoogleIcon icon={UI_ICONS_MAP.folder_open} className="w-10 h-10 mx-auto mb-2 opacity-30" />
@@ -1094,7 +1282,14 @@ function Contextractor() {
                                 ) : (
                                     <div className="space-y-0.5">
                                         {fileTree.map(node => (
-                                            <TreeItem key={node.id} node={node} level={0} onRemove={removeNode} />
+                                            <TreeItem
+                                                key={node.id}
+                                                node={node}
+                                                level={0}
+                                                onRemove={removeNode}
+                                                onSelectFile={handleSelectFile}
+                                                selectedIds={selectedFileIds}
+                                            />
                                         ))}
                                     </div>
                                 )}
@@ -1207,6 +1402,8 @@ function Contextractor() {
                                                 searchTerm={searchTerm}
                                                 currentMatchIdx={currentMatchIdx}
                                                 searchMatches={searchMatches}
+                                                scrollToLine={rawScrollToLine}
+                                                scrollRequestId={rawScrollRequestId}
                                             />
                                         </div>
                                     </div>
@@ -1222,6 +1419,8 @@ function Contextractor() {
                                                 searchTerm={searchTerm}
                                                 currentMatchIdx={currentMatchIdx}
                                                 searchMatches={searchMatches}
+                                                scrollToLine={processedScrollToLine}
+                                                scrollRequestId={processedScrollRequestId}
                                             />
                                         </div>
                                     </div>
@@ -1232,6 +1431,8 @@ function Contextractor() {
                                     searchTerm={searchTerm}
                                     currentMatchIdx={currentMatchIdx}
                                     searchMatches={searchMatches}
+                                    scrollToLine={processedScrollToLine}
+                                    scrollRequestId={processedScrollRequestId}
                                 />
                             )}
                         </div>

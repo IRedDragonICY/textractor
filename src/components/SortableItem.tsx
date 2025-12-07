@@ -4,7 +4,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { FileData } from '@/types';
 import { FileCard } from './FileCard';
 
-const SortableItemInner = ({ file, onRemove, isDragging }: { file: FileData, onRemove: (id: string) => void, isDragging: boolean }) => {
+const SortableItemInner = ({ file, onRemove, onClick, isSelected, isDragging }: { file: FileData, onRemove: (id: string) => void, onClick?: (id: string, e: React.MouseEvent) => void, isSelected: boolean, isDragging: boolean }) => {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
         id: file.id,
         animateLayoutChanges: (args) => defaultAnimateLayoutChanges({ ...args, wasDragging: true })
@@ -17,7 +17,7 @@ const SortableItemInner = ({ file, onRemove, isDragging }: { file: FileData, onR
     };
     return (
         <li ref={setNodeRef} style={style} {...attributes} {...listeners} className="mb-2 touch-none">
-            <FileCard file={file} onRemove={onRemove} />
+            <FileCard file={file} onRemove={onRemove} onClick={onClick} isSelected={isSelected} />
         </li>
     );
 };
@@ -26,7 +26,9 @@ const SortableItemInner = ({ file, onRemove, isDragging }: { file: FileData, onR
 export const SortableItem = memo(SortableItemInner, (prev, next) => {
     return prev.file.id === next.file.id && 
            prev.isDragging === next.isDragging &&
-           prev.file.name === next.file.name;
+           prev.file.name === next.file.name &&
+           prev.onClick === next.onClick &&
+           prev.isSelected === next.isSelected;
 });
 SortableItem.displayName = 'SortableItem';
 
