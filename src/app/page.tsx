@@ -159,6 +159,7 @@ function Contextractor() {
     // Processed lines state - lines array for zero main-thread blocking
     const [combinedLines, setCombinedLines] = useState<string[]>([]);
     const [tokenSavings, setTokenSavings] = useState<number | undefined>(undefined);
+    const [viewLayout, setViewLayout] = useState<'single' | 'split'>('single');
     // Track which session is currently processing (null = none)
     const [processingSessionId, setProcessingSessionId] = useState<string | null>(null);
     
@@ -1149,6 +1150,20 @@ function Contextractor() {
                                     />
                                 </div>
 
+                                <button
+                                    type="button"
+                                    onClick={() => setViewLayout(prev => prev === 'single' ? 'split' : 'single')}
+                                    aria-pressed={viewLayout === 'split'}
+                                    className={`
+                                        hidden md:inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border
+                                        ${viewLayout === 'split' 
+                                            ? 'border-[var(--theme-primary)] bg-[var(--theme-primary)]/10 text-[var(--theme-primary)]' 
+                                            : 'border-[var(--theme-border)] text-[var(--theme-text-secondary)] hover:border-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)]'}
+                                    `}
+                                >
+                                    {viewLayout === 'split' ? 'Split view' : 'Single view'}
+                                </button>
+
                                 <GoogleButton
                                     onClick={copyToClipboard}
                                     variant="filled"
@@ -1161,7 +1176,7 @@ function Contextractor() {
                         </div>
 
                         {/* Code Viewer */}
-                        <div className="relative flex-1 min-h-0 bg-[var(--theme-bg)] overflow-hidden">
+                        <div className={`relative flex-1 min-h-0 bg-[var(--theme-bg)] overflow-hidden ${viewLayout === 'split' ? 'p-3' : ''}`}>
                             {/* Hidden textarea for clipboard fallback - value computed lazily */}
                             <textarea
                                 ref={textAreaRef}
@@ -1178,13 +1193,47 @@ function Contextractor() {
                                     <span className="text-xs text-[var(--theme-primary)]">Processing...</span>
                                 </div>
                             )}
-                            
-                            <VirtualizedCodeViewer
-                                lines={deferredCombinedLines}
-                                searchTerm={searchTerm}
-                                currentMatchIdx={currentMatchIdx}
-                                searchMatches={searchMatches}
-                            />
+
+                            {viewLayout === 'split' ? (
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 h-full">
+                                    <div className="flex flex-col min-h-0 border border-[var(--theme-border)] rounded-xl bg-[var(--theme-surface)]/40 shadow-[0_2px_10px_rgba(0,0,0,0.08)]">
+                                        <div className="px-3 py-2 border-b border-[var(--theme-border)] flex items-center justify-between">
+                                            <span className="text-xs font-semibold text-[var(--theme-text-secondary)] uppercase tracking-wide">Original</span>
+                                            <span className="text-[10px] text-[var(--theme-text-tertiary)]">Raw content</span>
+                                        </div>
+                                        <div className="flex-1 min-h-0">
+                                            <VirtualizedCodeViewer
+                                                lines={rawOutputLines}
+                                                searchTerm={searchTerm}
+                                                currentMatchIdx={currentMatchIdx}
+                                                searchMatches={searchMatches}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col min-h-0 border border-[var(--theme-border)] rounded-xl bg-[var(--theme-surface)]/40 shadow-[0_2px_10px_rgba(0,0,0,0.08)]">
+                                        <div className="px-3 py-2 border-b border-[var(--theme-border)] flex items-center justify-between">
+                                            <span className="text-xs font-semibold text-[var(--theme-text-secondary)] uppercase tracking-wide">Processed</span>
+                                            <span className="text-[10px] text-[var(--theme-text-tertiary)]">{codeProcessingMode === 'raw' ? 'Raw output' : codeProcessingMode === 'minify' ? 'Minified' : 'Comments removed'}</span>
+                                        </div>
+                                        <div className="flex-1 min-h-0">
+                                            <VirtualizedCodeViewer
+                                                lines={deferredCombinedLines}
+                                                searchTerm={searchTerm}
+                                                currentMatchIdx={currentMatchIdx}
+                                                searchMatches={searchMatches}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <VirtualizedCodeViewer
+                                    lines={deferredCombinedLines}
+                                    searchTerm={searchTerm}
+                                    currentMatchIdx={currentMatchIdx}
+                                    searchMatches={searchMatches}
+                                />
+                            )}
                         </div>
                     </div>
                 </div>

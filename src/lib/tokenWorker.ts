@@ -14,6 +14,22 @@
 
 import type { TokenizerRequest, TokenizerResponse } from '@/workers/tokenizer.worker';
 
+type TauriInvoke = <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
+
+interface TauriWindow {
+    __TAURI__?: {
+        core?: {
+            invoke: TauriInvoke;
+        };
+    };
+}
+
+function getTauriInvoker(): TauriInvoke | null {
+    if (typeof window === 'undefined') return null;
+    const invoke = (window as unknown as TauriWindow).__TAURI__?.core?.invoke;
+    return typeof invoke === 'function' ? invoke : null;
+}
+
 type PendingRequest = {
     resolve: (value: number) => void;
     reject: (error: Error) => void;
@@ -32,11 +48,15 @@ class TokenWorkerService {
     private pendingRequests = new Map<string, PendingRequest>();
     private pendingBatchRequests = new Map<string, PendingBatchRequest>();
     private requestCounter = 0;
+    private tauriInvoke: TauriInvoke | null = null;
 
     constructor() {
         // Only initialize in browser environment
         if (typeof window !== 'undefined') {
-            this.initWorker();
+            this.tauriInvoke = getTauriInvoker();
+            if (!this.tauriInvoke) {
+                this.initWorker();
+            }
         }
     }
 
@@ -113,6 +133,12 @@ class TokenWorkerService {
         }
     }
 
+    private ensureWorker(): void {
+        if (!this.worker && typeof window !== 'undefined') {
+            this.initWorker();
+        }
+    }
+
     private generateRequestId(): string {
         return `req_${Date.now()}_${++this.requestCounter}`;
     }
@@ -127,6 +153,28 @@ class TokenWorkerService {
      * Non-blocking - runs in web worker
      */
     async calculateTokens(text: string): Promise<number> {
+        if (!text || text.length === 0) {
+            return 0;
+        }
+
+        if (!this.tauriInvoke) {
+            this.tauriInvoke = getTauriInvoker();
+        }
+
+        if (this.tauriInvoke) {
+            try {
+                const count = await this.tauriInvoke<number>('count_tokens', { text });
+                if (typeof count === 'number' && Number.isFinite(count)) {
+                    return count;
+                }
+            } catch (error) {
+                console.warn('Tauri count_tokens failed, falling back to worker', error);
+                this.tauriInvoke = null;
+            }
+        }
+
+        this.ensureWorker();
+
         // Handle SSR or worker unavailable
         if (typeof window === 'undefined' || !this.worker) {
             return this.estimateTokens(text);
@@ -135,11 +183,6 @@ class TokenWorkerService {
         // Wait for worker to be ready
         if (!this.isReady && this.readyPromise) {
             await this.readyPromise;
-        }
-
-        // Empty text check
-        if (!text || text.length === 0) {
-            return 0;
         }
 
         const id = this.generateRequestId();
@@ -178,6 +221,30 @@ class TokenWorkerService {
     async calculateTokensBatch(
         texts: Array<{ id: string; text: string }>
     ): Promise<Array<{ id: string; count: number }>> {
+        if (!this.tauriInvoke) {
+            this.tauriInvoke = getTauriInvoker();
+        }
+
+        if (this.tauriInvoke) {
+            try {
+                const results = await Promise.all(
+                    texts.map(async (item) => ({
+                        id: item.id,
+                        count: await this.tauriInvoke!<number>('count_tokens', { text: item.text })
+                    }))
+                );
+                return results.map((r, idx) => ({
+                    id: r.id,
+                    count: Number.isFinite(r.count) ? r.count : this.estimateTokens(texts[idx].text)
+                }));
+            } catch (error) {
+                console.warn('Tauri count_tokens batch failed, falling back to worker', error);
+                this.tauriInvoke = null;
+            }
+        }
+
+        this.ensureWorker();
+
         // Handle SSR or worker unavailable
         if (typeof window === 'undefined' || !this.worker) {
             return texts.map(item => ({

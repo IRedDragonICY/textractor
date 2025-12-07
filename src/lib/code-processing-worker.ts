@@ -156,6 +156,100 @@ export function clearAllCaches(): void {
     processingCache.clear();
 }
 
+type TauriInvoke = <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
+
+interface TauriWindow {
+    __TAURI__?: {
+        core?: {
+            invoke: TauriInvoke;
+        };
+    };
+}
+
+function getTauriInvoker(): TauriInvoke | null {
+    if (typeof window === 'undefined') return null;
+    const invoke = (window as unknown as TauriWindow).__TAURI__?.core?.invoke;
+    return typeof invoke === 'function' ? invoke : null;
+}
+
+function appendFileLines(
+    lines: string[],
+    outputStyle: string,
+    pathLabel: string,
+    ext: string,
+    content: string,
+    isFirst: boolean
+): void {
+    if (!isFirst) {
+        lines.push('');
+    }
+
+    switch (outputStyle) {
+        case 'hash':
+            lines.push(`# --- ${pathLabel} ---`);
+            break;
+        case 'minimal':
+            lines.push(`--- ${pathLabel} ---`);
+            break;
+        case 'xml':
+            lines.push(`<file name="${pathLabel}">`);
+            break;
+        case 'markdown':
+            lines.push(`### ${pathLabel}`);
+            lines.push(`\`\`\`${ext}`);
+            break;
+        case 'standard':
+        default:
+            lines.push(`/* --- ${pathLabel} --- */`);
+            break;
+    }
+
+    const contentLines = content.split('\n');
+    for (const line of contentLines) {
+        lines.push(line);
+    }
+
+    if (outputStyle === 'xml') {
+        lines.push('</file>');
+    } else if (outputStyle === 'markdown') {
+        lines.push('```');
+    }
+}
+
+async function processWithTauri(
+    files: Array<{ id: string; name: string; path: string; content: string; isText: boolean }>,
+    outputStyle: string,
+    mode: CodeProcessingMode,
+    invoke: TauriInvoke
+): Promise<{ lines: string[]; tokenSavings: number }> {
+    const textFiles = files.filter(f => f.isText);
+    const lines: string[] = [];
+    let originalLength = 0;
+    let processedLength = 0;
+
+    for (let i = 0; i < textFiles.length; i++) {
+        const f = textFiles[i];
+        const pathLabel = f.path || f.name;
+        const ext = f.name.split('.').pop() || 'txt';
+        const processedContent = await invoke<string>('process_code', {
+            code: f.content,
+            mode,
+            extension: ext
+        });
+
+        const finalContent = processedContent ?? f.content;
+        appendFileLines(lines, outputStyle, pathLabel, ext, finalContent, i === 0);
+        originalLength += f.content.length;
+        processedLength += finalContent.length;
+    }
+
+    const tokenSavings = mode === 'raw' || originalLength === 0
+        ? 0
+        : Math.max(0, Math.round(((originalLength - processedLength) / originalLength) * 100));
+
+    return { lines, tokenSavings };
+}
+
 // Worker code as string - will be converted to Blob URL
 export const workerCode = `
 const MAX_PROCESS_SIZE = 500 * 1024;
@@ -559,6 +653,44 @@ export function processCodeAsync(
     mode: CodeProcessingMode
 ): Promise<{ lines: string[]; tokenSavings: number }> {
     return new Promise((resolve, reject) => {
+        const runWorker = () => {
+            try {
+                const w = getCodeProcessingWorker();
+                const id = crypto.randomUUID();
+                
+                // Cancel previous request
+                if (pendingRequest) {
+                    pendingRequest.reject(new Error('Cancelled'));
+                }
+                
+                pendingRequest = { id, resolve, reject };
+                
+                w.postMessage({
+                    type: 'process',
+                    id,
+                    files: files.map(f => ({
+                        id: f.id,
+                        name: f.name,
+                        path: f.path,
+                        content: f.content,
+                        isText: f.isText
+                    })),
+                    outputStyle,
+                    mode
+                });
+                
+                // Timeout after 30 seconds
+                setTimeout(() => {
+                    if (pendingRequest?.id === id) {
+                        pendingRequest.reject(new Error('Processing timeout'));
+                        pendingRequest = null;
+                    }
+                }, 30000);
+            } catch (error) {
+                reject(error);
+            }
+        };
+
         // Fast path for raw mode - no worker needed, build lines directly
         if (mode === 'raw') {
             const textFiles = files.filter(f => f.isText);
@@ -612,42 +744,19 @@ export function processCodeAsync(
             resolve({ lines, tokenSavings: 0 });
             return;
         }
-        
-        try {
-            const w = getCodeProcessingWorker();
-            const id = crypto.randomUUID();
-            
-            // Cancel previous request
-            if (pendingRequest) {
-                pendingRequest.reject(new Error('Cancelled'));
-            }
-            
-            pendingRequest = { id, resolve, reject };
-            
-            w.postMessage({
-                type: 'process',
-                id,
-                files: files.map(f => ({
-                    id: f.id,
-                    name: f.name,
-                    path: f.path,
-                    content: f.content,
-                    isText: f.isText
-                })),
-                outputStyle,
-                mode
-            });
-            
-            // Timeout after 30 seconds
-            setTimeout(() => {
-                if (pendingRequest?.id === id) {
-                    pendingRequest.reject(new Error('Processing timeout'));
-                    pendingRequest = null;
-                }
-            }, 30000);
-        } catch (error) {
-            reject(error);
+
+        const tauriInvoke = getTauriInvoker();
+        if (tauriInvoke) {
+            processWithTauri(files, outputStyle, mode, tauriInvoke)
+                .then(resolve)
+                .catch((error) => {
+                    console.warn('Tauri process_code failed, falling back to worker', error);
+                    runWorker();
+                });
+            return;
         }
+
+        runWorker();
     });
 }
 
