@@ -81,9 +81,9 @@ class GitImportManager {
     private lastBytesDownloaded = 0;
     private lastSpeedUpdate = 0;
     
-    // Configuration - reduced for smoother UI
-    private readonly CONCURRENT_REQUESTS = 4; // Reduced from 6
-    private readonly BATCH_SIZE = 10; // Reduced from 20
+    // Configuration - adaptive for speed and UI responsiveness
+    private readonly BASE_CONCURRENCY = 6;
+    private readonly MAX_CONCURRENCY = 12;
     private readonly SPEED_SAMPLE_SIZE = 5;
     private readonly SPEED_UPDATE_INTERVAL = 300; // ms
 
@@ -199,6 +199,7 @@ class GitImportManager {
         // Initialize progress
         task.progress.phase = 'fetching';
         task.progress.total = selectedPaths.length;
+        task.progress.bytesTotal = this.estimateTotalBytes(task.tree, selectedPaths);
         task.progress.startTime = Date.now();
         task.onProgress({ ...task.progress });
 
@@ -211,20 +212,19 @@ class GitImportManager {
             url: `${task.metadata?.baseUrl}/${path}`
         }));
 
-        // Estimate total size (rough estimate: avg 3KB per file)
-        task.progress.bytesTotal = selectedPaths.length * 3000;
-
         const completedFiles: FileData[] = [];
         const errors: string[] = [];
+        let processed = 0;
+        let cursor = 0;
+        const total = filesToFetch.length;
+        const workerCount = Math.min(this.getConcurrency(total), total);
+        const batchSize = this.getBatchSize(workerCount);
 
-        // Process files one by one with yielding
-        for (let i = 0; i < filesToFetch.length; i++) {
+        const processItem = async (item: { name: string; path: string; url: string }) => {
             if (task.status === 'cancelled' || task.abortController.signal.aborted) {
                 return;
             }
 
-            const item = filesToFetch[i];
-            
             try {
                 const result = await this.fetchFileLightweight(item, task);
                 if (result.success && result.file) {
@@ -236,17 +236,36 @@ class GitImportManager {
                 errors.push(`Failed: ${item.path}`);
             }
 
-            // Update progress
-            task.progress.current = i + 1;
+            processed += 1;
+            task.progress.currentFile = item.path;
+            task.progress.current = processed;
             task.progress.completedFiles = completedFiles;
             task.progress.errors = errors;
             this.updateSpeed(task);
-            
-            // Update UI every file
-            task.onProgress({ ...task.progress });
 
-            // Yield every file to keep UI responsive
-            await this.yieldToMain();
+            // Throttle yielding but keep UI informed
+            task.onProgress({ ...task.progress });
+            if (processed % batchSize === 0) {
+                await this.yieldToMain();
+            }
+        };
+
+        const worker = async () => {
+            while (true) {
+                if (task.status === 'cancelled' || task.abortController.signal.aborted) {
+                    break;
+                }
+                const nextIndex = cursor++;
+                if (nextIndex >= total) break;
+                const item = filesToFetch[nextIndex];
+                await processItem(item);
+            }
+        };
+
+        await Promise.all(Array.from({ length: workerCount }, worker));
+
+        if (task.status === 'cancelled' || task.abortController.signal.aborted) {
+            return;
         }
 
         // Processing phase - count tokens in background
@@ -368,6 +387,35 @@ class GitImportManager {
         }
         
         return paths;
+    }
+
+    private estimateTotalBytes(nodes: GitTreeNode[], selectedPaths: string[]): number {
+        const sizeMap = new Map<string, number>();
+        const stack = [...nodes];
+        
+        while (stack.length > 0) {
+            const node = stack.pop()!;
+            if (node.type === 'file' && typeof node.size === 'number') {
+                sizeMap.set(node.path, node.size);
+            }
+            if (node.children.length > 0) {
+                stack.push(...node.children);
+            }
+        }
+
+        const fallback = 3000; // Rough average per file when size is unknown
+        return selectedPaths.reduce((total, path) => total + (sizeMap.get(path) ?? fallback), 0);
+    }
+
+    private getConcurrency(totalFiles: number): number {
+        if (totalFiles >= 200) return this.MAX_CONCURRENCY;
+        if (totalFiles >= 80) return Math.min(this.MAX_CONCURRENCY, 10);
+        if (totalFiles >= 30) return Math.min(this.MAX_CONCURRENCY, 8);
+        return this.BASE_CONCURRENCY;
+    }
+
+    private getBatchSize(concurrency: number): number {
+        return Math.max(8, Math.min(24, concurrency * 2));
     }
 
     private yieldToMain(): Promise<void> {
