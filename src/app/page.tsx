@@ -135,6 +135,7 @@ function Contextractor() {
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [gitModalOpen, setGitModalOpen] = useState(false);
+    const [pastedGitUrl, setPastedGitUrl] = useState('');
     const [currentImportTaskId, setCurrentImportTaskId] = useState<string | null>(null);
     const [currentRepoName, setCurrentRepoName] = useState<string>('');
     const [processing, setProcessing] = useState(false);
@@ -684,16 +685,21 @@ function Contextractor() {
         setCurrentRepoName(repoName);
     }, []);
 
+    const handleCloseGitModal = useCallback(() => {
+        setGitModalOpen(false);
+        setPastedGitUrl('');
+    }, []);
+
     const handleGitImport = useCallback((newFiles: FileData[]) => {
         // Create session if none exists
         if (!activeSessionId) {
             createSession();
         }
         setFiles(prev => [...prev, ...newFiles]);
-        setGitModalOpen(false);
+        handleCloseGitModal();
         setViewMode('tree');
         setIsMobileSidebarOpen(false);
-    }, [activeSessionId, createSession, setFiles, setViewMode]);
+    }, [activeSessionId, createSession, setFiles, handleCloseGitModal, setViewMode]);
 
     // Dropzone
     const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
@@ -728,6 +734,14 @@ function Contextractor() {
             } else {
                 const text = e.clipboardData?.getData('text');
                 if (text) {
+                    const trimmedText = text.trim();
+                    const gitRepoRegex = /^https:\/\/(github\.com|gitlab\.com)\/[\w-]+\/[\w-.]+(?:\.git)?\/?$/i;
+                    if (!processing && gitRepoRegex.test(trimmedText)) {
+                        e.preventDefault();
+                        setPastedGitUrl(trimmedText);
+                        setGitModalOpen(true);
+                        return;
+                    }
                     let sessionId: string | undefined;
                     if (showHomeView) {
                         const newSession = createSession();
@@ -742,7 +756,7 @@ function Contextractor() {
         };
         document.addEventListener('paste', handlePaste);
         return () => document.removeEventListener('paste', handlePaste);
-    }, [addFiles, showHomeView, createSession, toggleHomeView]);
+    }, [addFiles, showHomeView, createSession, toggleHomeView, processing]);
 
     // Keyboard shortcuts
     useEffect(() => {
@@ -1587,11 +1601,12 @@ function Contextractor() {
                 {gitModalOpen && (
                     <GitFileSelector
                         isOpen={gitModalOpen}
-                        onClose={() => setGitModalOpen(false)}
+                        onClose={handleCloseGitModal}
                         onImport={handleGitImport}
                         onStartImport={handleStartImport}
                         onOpenSettings={openSettingsTab}
                         settings={settings}
+                        initialUrl={pastedGitUrl}
                     />
                 )}
             </AnimatePresence>

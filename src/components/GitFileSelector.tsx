@@ -20,6 +20,7 @@ interface GitFileSelectorProps {
     onStartImport: (taskId: string, repoName: string) => void;
     onOpenSettings: () => void;
     settings: AppSettings;
+    initialUrl?: string;
 }
 
 interface TreeItemProps {
@@ -186,7 +187,7 @@ TreeItemComponent.displayName = 'TreeItemComponent';
 
 
 
-export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOpenSettings, settings }: GitFileSelectorProps) => {
+export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOpenSettings, settings, initialUrl }: GitFileSelectorProps) => {
     const [step, setStep] = useState<'url' | 'select'>('url');
     const [gitUrl, setGitUrl] = useState('');
     const [fullTree, setFullTree] = useState<GitTreeNode[]>([]);
@@ -212,6 +213,13 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
     // GitHub import history
     const gitHubImportHistory = useGitHubImportHistory();
     const addToGitHubHistory = useSessionStore((state) => state.addToGitHubHistory);
+    
+    // Prefill URL when modal opens with initialUrl
+    useEffect(() => {
+        if (isOpen && initialUrl) {
+            setGitUrl(initialUrl);
+        }
+    }, [isOpen, initialUrl]);
     
     // Reset state when modal closes
     useEffect(() => {
