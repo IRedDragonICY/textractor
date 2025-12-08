@@ -50,3 +50,17 @@ export const buildFileTree = (files: FileData[]): TreeNode[] => {
     sortNodes(root);
     return root;
 };
+
+export const generateAsciiTree = (nodes: TreeNode[], prefix = ''): string => {
+    return nodes.map((node, index) => {
+        const isLast = index === nodes.length - 1;
+        const marker = isLast ? '└── ' : '├── ';
+        const childPrefix = prefix + (isLast ? '    ' : '│   ');
+
+        let result = `${prefix}${marker}${node.name}\n`;
+        if (node.children && node.children.length > 0) {
+            result += generateAsciiTree(node.children, childPrefix);
+        }
+        return result;
+    }).join('');
+};

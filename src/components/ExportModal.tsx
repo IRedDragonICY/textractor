@@ -7,6 +7,7 @@ import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
 import { FileData, OutputStyle } from '@/types';
+import { buildFileTree, generateAsciiTree } from '@/lib/file-tree';
 
 // Icons
 const ICONS = {
@@ -15,6 +16,7 @@ const ICONS = {
     copy: "M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z",
     check: "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z",
     openInNew: "M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z",
+    view_tree: "M7 7h4V4h3v3h3v13h-3v-5h-3v5H7v-5H4V7h3z",
     file_txt: "M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z",
     file_md: "M20.56 18H3.44C2.65 18 2 17.37 2 16.59V7.41C2 6.63 2.65 6 3.44 6h17.12c.79 0 1.44.63 1.44 1.41v9.18c0 .78-.65 1.41-1.44 1.41zM6 8v8h2v-4l1.5 2 1.5-2v4h2V8H11l-1.5 2.5L8 8H6zm10 0v8h3v-2h-1.5v-1H19V11h-1.5v-1H19V8h-3z",
     file_json: "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm2.5 13a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm9-5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm-1.41 4.41L14 14.33l-1.09 1.08 1.41 1.42 2.17-2.17-1.41-1.41-1.41 1.41.41.75-.99-.99-1.41 1.42 2.17 2.17 1.41-1.42-1.08-1.09 1.08-1.09z",
@@ -51,6 +53,14 @@ const EXPORT_FORMATS = [
         icon: ICONS.file_json,
         description: 'Structured data format for programmatic use',
         color: '#F59E0B',
+    },
+    {
+        id: 'tree',
+        name: 'Project Tree',
+        ext: '.tree.txt',
+        icon: ICONS.view_tree,
+        description: 'Lightweight directory structure representation.',
+        color: '#10B981',
     },
 ];
 
@@ -116,6 +126,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                     })),
                 };
                 return JSON.stringify(jsonData, null, 2);
+            }
+            
+            case 'tree': {
+                const tree = buildFileTree(files);
+                return generateAsciiTree(tree);
             }
             
             case 'html': {

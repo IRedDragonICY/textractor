@@ -52,7 +52,7 @@ import { useSettings } from '@/hooks/useSettings';
 
 // Services & Utils
 import { processFileObject, unzipAndProcess } from '@/lib/file-processing';
-import { buildFileTree } from '@/lib/file-tree';
+import { buildFileTree, generateAsciiTree } from '@/lib/file-tree';
 import { scanForSecrets, SecurityIssue } from '@/lib/security';
 import { 
     processCodeAsync, 
@@ -491,6 +491,7 @@ function Contextractor() {
     
     // For checking if there's content (cheap length check)
     const hasContent = combinedLines.length > 0;
+    const hasFiles = files.length > 0;
 
     // Cleanup worker on unmount
     useEffect(() => {
@@ -814,6 +815,13 @@ function Contextractor() {
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [activeSessionId, sessions, createSession, handleCloseSession, switchSession, toggleHomeView, handleUndo, handleRedo]);
 
+    const copyFileTree = useCallback(() => {
+        if (!files.length) return;
+        const tree = buildFileTree(files);
+        const asciiTree = generateAsciiTree(tree);
+        navigator.clipboard.writeText(asciiTree).catch(console.error);
+    }, [files]);
+
     const copyToClipboard = () => {
         if (!hasContent) return;
 
@@ -893,6 +901,7 @@ function Contextractor() {
                         canUndo={canUndo}
                         canRedo={canRedo}
                         onCopyOutput={copyToClipboard}
+                        onCopyFileTree={copyFileTree}
                         onSelectAll={() => textAreaRef.current?.select()}
                         onShowAbout={() => setAboutModalOpen(true)}
                         onShowShortcuts={() => setShortcutsModalOpen(true)}
@@ -901,6 +910,7 @@ function Contextractor() {
                         onShowChangelog={openChangelogTab}
                         onExport={() => setExportModalOpen(true)}
                         hasContent={hasContent}
+                        hasFiles={hasFiles}
                     />
                 </div>
             </nav>
@@ -1156,6 +1166,15 @@ function Contextractor() {
                                                             title={selectedCount > 0 ? 'Delete selected files' : 'Clear all files'}
                                                         >
                                                             <GoogleIcon icon={UI_ICONS_MAP.delete} className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                    {files.length > 0 && (
+                                                        <button
+                                                            onClick={copyFileTree}
+                                                            className="p-1 rounded hover:bg-[var(--theme-surface-hover)] text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)]"
+                                                            title="Copy file tree"
+                                                        >
+                                                            <GoogleIcon icon={UI_ICONS_MAP.copy} className="w-3.5 h-3.5" />
                                                         </button>
                                                     )}
                                                     <button

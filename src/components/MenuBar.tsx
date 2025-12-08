@@ -18,6 +18,7 @@ const ICONS = {
     undo: "M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z",
     redo: "M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z",
     copy: "M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z",
+    view_tree: "M7 7h4V4h3v3h3v13h-3v-5h-3v5H7v-5H4V7h3z",
     selectAll: "M3 5h2V3c-1.1 0-2 .9-2 2zm0 8h2v-2H3v2zm4 8h2v-2H7v2zM3 9h2V7H3v2zm10-6h-2v2h2V3zm6 0v2h2c0-1.1-.9-2-2-2zM5 21v-2H3c0 1.1.9 2 2 2zm-2-4h2v-2H3v2zM9 3H7v2h2V3zm2 18h2v-2h-2v2zm8-8h2v-2h-2v2zm0 8c1.1 0 2-.9 2-2h-2v2zm0-12h2V7h-2v2zm0 8h2v-2h-2v2zm-4 4h2v-2h-2v2zm0-16h2V3h-2v2z",
     export: "M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z",
     help: "M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z",
@@ -62,6 +63,7 @@ interface MenuBarProps {
     canUndo: boolean;
     canRedo: boolean;
     onCopyOutput: () => void;
+    onCopyFileTree: () => void;
     onSelectAll: () => void;
     onShowAbout: () => void;
     onShowShortcuts: () => void;
@@ -70,6 +72,7 @@ interface MenuBarProps {
     onShowChangelog: () => void;
     onExport: () => void;
     hasContent: boolean;
+    hasFiles: boolean;
 }
 
 export const MenuBar: React.FC<MenuBarProps> = ({
@@ -81,6 +84,7 @@ export const MenuBar: React.FC<MenuBarProps> = ({
     canUndo,
     canRedo,
     onCopyOutput,
+    onCopyFileTree,
     onSelectAll,
     onShowAbout,
     onShowShortcuts,
@@ -89,6 +93,7 @@ export const MenuBar: React.FC<MenuBarProps> = ({
     onShowChangelog,
     onExport,
     hasContent,
+    hasFiles,
 }) => {
     const [activeMenu, setActiveMenu] = useState<string | null>(null);
     const menuBarRef = useRef<HTMLDivElement>(null);
@@ -126,6 +131,7 @@ export const MenuBar: React.FC<MenuBarProps> = ({
                 { id: 'redo', label: 'Redo', icon: ICONS.redo, shortcut: 'Ctrl+Shift+Z', onClick: onRedo, disabled: !canRedo },
                 { id: 'divider1', label: '', divider: true },
                 { id: 'copy', label: 'Copy Output', icon: ICONS.copy, shortcut: 'Ctrl+Shift+C', onClick: onCopyOutput, disabled: !hasContent },
+                { id: 'copy-tree', label: 'Copy File Tree', icon: ICONS.view_tree, onClick: onCopyFileTree, disabled: !hasFiles },
                 { id: 'selectAll', label: 'Select All', icon: ICONS.selectAll, shortcut: 'Ctrl+A', onClick: onSelectAll, disabled: !hasContent },
             ],
         },
