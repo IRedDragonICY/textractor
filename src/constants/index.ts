@@ -114,3 +114,6 @@ export const OUTPUT_STYLES_CONFIG = [
         preview: '### src/utils.ts\n```typescript\nexport const add = (a, b) => a + b;\n```'
     }
 ] as const;
+
+export { DEFAULT_PROMPT_TEMPLATES, TEMPLATE_PLACEHOLDER } from './templates';
+export type { PromptTemplate } from './templates';

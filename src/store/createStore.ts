@@ -9,7 +9,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 
 import type { AppStore } from './types';
-import { createUISlice, createProjectSlice, createSessionSlice } from './slices';
+import { createUISlice, createProjectSlice, createSessionSlice, createTemplateSlice } from './slices';
 
 // ============================================
 // Store Creation with Combined Slices
@@ -22,6 +22,7 @@ export const useSessionStore = create<AppStore>()(
             ...createUISlice(...args),
             ...createProjectSlice(...args),
             ...createSessionSlice(...args),
+            ...createTemplateSlice(...args),
         })),
         {
             name: 'contextractor-session-store',
@@ -33,6 +34,8 @@ export const useSessionStore = create<AppStore>()(
                 recentProjects: state.recentProjects,
                 gitHubImportHistory: state.gitHubImportHistory,
                 showHomeView: state.showHomeView,
+                customTemplates: state.customTemplates,
+                selectedTemplateId: state.selectedTemplateId,
             }),
             onRehydrateStorage: () => (state) => {
                 state?.setHasHydrated(true);

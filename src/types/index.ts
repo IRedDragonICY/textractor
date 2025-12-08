@@ -82,3 +82,5 @@ export interface GitRepoMetadata {
 export type OutputStyle = 'standard' | 'hash' | 'minimal' | 'xml' | 'markdown';
 export type ViewMode = 'list' | 'tree';
 export type CodeProcessingMode = 'raw' | 'remove-comments' | 'minify';
+
+export type { PromptTemplate } from '@/constants/templates';

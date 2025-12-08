@@ -8,6 +8,9 @@
 // Re-export the store
 export { useSessionStore } from './createStore';
 
+import { useShallow } from 'zustand/react/shallow';
+import type { AppStore } from './types';
+
 // Re-export types
 export type {
     SessionFileMeta,
@@ -16,6 +19,7 @@ export type {
     UISlice,
     ProjectSlice,
     SessionSlice,
+    TemplateSlice,
     AppStore,
     StoreSlice,
 } from './types';
@@ -78,6 +82,13 @@ export const useSessionTabs = () => useSessionStore((state) =>
     }))
 );
 
+/** Get template state */
+export const useTemplateState = () => {
+    const customTemplates = useSessionStore((state: AppStore) => state.customTemplates);
+    const selectedTemplateId = useSessionStore((state: AppStore) => state.selectedTemplateId);
+    return { customTemplates, selectedTemplateId };
+};
+
 // ============================================
 // Actions (stable references, no re-renders)
 // ============================================
@@ -108,6 +119,19 @@ export const useSessionActions = () => useSessionStore((state) => ({
     // UI actions
     toggleHomeView: state.toggleHomeView,
 }));
+
+export const useTemplateActions = () => {
+    const addCustomTemplate = useSessionStore((state: AppStore) => state.addCustomTemplate);
+    const updateCustomTemplate = useSessionStore((state: AppStore) => state.updateCustomTemplate);
+    const removeCustomTemplate = useSessionStore((state: AppStore) => state.removeCustomTemplate);
+    const setSelectedTemplate = useSessionStore((state: AppStore) => state.setSelectedTemplate);
+    return {
+        addCustomTemplate,
+        updateCustomTemplate,
+        removeCustomTemplate,
+        setSelectedTemplate,
+    };
+};
 
 // ============================================
 // Granular Action Hooks (for components that only need specific actions)

@@ -10,7 +10,7 @@ import type {
     ViewModeType, 
     CodeProcessingModeType 
 } from '@/types/session';
-import type { FileData } from '@/types';
+import type { FileData, PromptTemplate } from '@/types';
 
 // ============================================
 // Data Types (Metadata Only - No Content!)
@@ -137,10 +137,28 @@ export interface SessionSliceActions {
 export type SessionSlice = SessionSliceState & SessionSliceActions;
 
 // ============================================
+// Templates Slice
+// ============================================
+
+export interface TemplateSliceState {
+    customTemplates: PromptTemplate[];
+    selectedTemplateId: string | null;
+}
+
+export interface TemplateSliceActions {
+    addCustomTemplate: (template: PromptTemplate) => void;
+    removeCustomTemplate: (id: string) => void;
+    updateCustomTemplate: (id: string, updated: Partial<PromptTemplate>) => void;
+    setSelectedTemplate: (id: string | null) => void;
+}
+
+export type TemplateSlice = TemplateSliceState & TemplateSliceActions;
+
+// ============================================
 // Combined App Store
 // ============================================
 
-export type AppStore = UISlice & ProjectSlice & SessionSlice;
+export type AppStore = UISlice & ProjectSlice & SessionSlice & TemplateSlice;
 
 // ============================================
 // Slice Creator Type Helper

@@ -3,7 +3,7 @@
 // Accepts pre-split lines array to avoid main thread string operations
 
 import React, { useRef, useEffect, useCallback, useMemo, memo } from 'react';
-import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
+import { GroupedVirtuoso, GroupedVirtuosoHandle } from 'react-virtuoso';
 
 interface VirtualizedCodeViewerProps {
     lines: string[];
@@ -13,6 +13,7 @@ interface VirtualizedCodeViewerProps {
     className?: string;
     scrollToLine?: number | null;
     scrollRequestId?: number;
+    fileGroups?: { id: string; label: string; count: number }[];
 }
 
 // Memoized line component for maximum performance
@@ -43,14 +44,14 @@ const CodeLine = memo(({
         {/* Line number gutter - fixed width, non-selectable, stretches with content */}
         <span 
             className="w-12 shrink-0 text-right pr-3 text-[var(--theme-text-tertiary)] select-none bg-[var(--theme-surface)] border-r border-[var(--theme-border)] sticky left-0"
-            style={{ fontFamily: '"JetBrains Mono", "Fira Code", "Roboto Mono", monospace' }}
+            style={{ fontFamily: 'var(--font-geist-mono), monospace' }}
         >
             {lineNumber}
         </span>
         {/* Code content - allows wrapping for dynamic height */}
         <span 
             className="pl-4 whitespace-pre-wrap break-all text-[var(--theme-text-secondary)] flex-1"
-            style={{ fontFamily: '"JetBrains Mono", "Fira Code", "Roboto Mono", monospace' }}
+            style={{ fontFamily: 'var(--font-geist-mono), monospace' }}
         >
             {content || ' '} {/* Render space for empty lines to maintain height */}
         </span>
@@ -68,8 +69,44 @@ export const VirtualizedCodeViewer = memo(({
     className = '',
     scrollToLine,
     scrollRequestId,
+    fileGroups,
 }: VirtualizedCodeViewerProps) => {
-    const virtuosoRef = useRef<VirtuosoHandle>(null);
+    const virtuosoRef = useRef<GroupedVirtuosoHandle>(null);
+
+    const groupCounts = useMemo(() => {
+        if (fileGroups?.length) {
+            const counts = fileGroups.map(group => Math.max(0, group.count));
+            const total = counts.reduce((sum, count) => sum + count, 0);
+
+            if (total === lines.length) {
+                return counts;
+            }
+
+            if (counts.length > 0) {
+                const adjustedCounts = [...counts];
+                adjustedCounts[adjustedCounts.length - 1] = Math.max(
+                    0,
+                    adjustedCounts[adjustedCounts.length - 1] + (lines.length - total)
+                );
+                return adjustedCounts;
+            }
+        }
+
+        return [lines.length];
+    }, [fileGroups, lines.length]);
+
+    const renderGroupHeader = useCallback((groupIndex: number) => {
+        if (!fileGroups || !fileGroups[groupIndex]) return null;
+        const group = fileGroups[groupIndex];
+
+        return (
+            <div className="px-4 py-2 bg-[var(--theme-surface)] border-b border-[var(--theme-border)]">
+                <span className="font-mono text-xs text-[var(--theme-text-secondary)]">
+                    {group.label}
+                </span>
+            </div>
+        );
+    }, [fileGroups]);
 
     // Find which lines contain search matches - searchMatches now contains line indices directly
     const matchLineMap = useMemo(() => {
@@ -144,7 +181,7 @@ export const VirtualizedCodeViewer = memo(({
             <div className={`flex items-center justify-center h-full text-[var(--theme-text-tertiary)] ${className}`}>
                 <pre 
                     className="text-[13px] opacity-50"
-                    style={{ fontFamily: '"JetBrains Mono", "Fira Code", "Roboto Mono", monospace' }}
+                    style={{ fontFamily: 'var(--font-geist-mono), monospace' }}
                 >
                     {'// Output preview...'}
                 </pre>
@@ -159,9 +196,10 @@ export const VirtualizedCodeViewer = memo(({
                 contain: 'strict',
             }}
         >
-            <Virtuoso
+            <GroupedVirtuoso
                 ref={virtuosoRef}
-                totalCount={lines.length}
+                groupCounts={groupCounts}
+                groupContent={renderGroupHeader}
                 itemContent={rowRenderer}
                 overscan={200}
                 className="scrollbar-thin scrollbar-thumb-[var(--theme-border)] scrollbar-track-transparent"

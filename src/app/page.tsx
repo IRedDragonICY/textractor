@@ -27,6 +27,7 @@ import { SortableItem } from '@/components/SortableItem';
 import { TreeItem } from '@/components/TreeItem';
 import { OutputStyleSelector } from '@/components/OutputStyleSelector';
 import { CodeProcessingSelector } from '@/components/CodeProcessingSelector';
+import { PromptTemplateSelector } from '@/components/PromptTemplateSelector';
 import { GitFileSelector } from '@/components/GitFileSelector';
 import { GlobalImportIndicator } from '@/components/GlobalImportIndicator';
 import { TabBar } from '@/components/TabBar';
@@ -65,6 +66,8 @@ import {
 import { OutputStyle, FileData, ViewMode, TreeNode, CodeProcessingMode as CodeProcessingModeType } from '@/types';
 import { UI_ICONS_MAP } from '@/lib/icon-mapping';
 import { OutputStyleType, ViewModeType, CodeProcessingModeType as SessionCodeProcessingModeType } from '@/types/session';
+import { DEFAULT_PROMPT_TEMPLATES, TEMPLATE_PLACEHOLDER } from '@/constants/templates';
+import { useTemplateState } from '@/store';
 
 // Main App Wrapper with Theme Provider
 export default function ContextractorApp() {
@@ -119,8 +122,16 @@ function Contextractor() {
     const viewMode = activeSession?.viewMode || 'tree';
     const codeProcessingMode = activeSession?.codeProcessingMode || 'raw';
 
+    const { customTemplates, selectedTemplateId } = useTemplateState();
+    const templates = useMemo(() => [...DEFAULT_PROMPT_TEMPLATES, ...customTemplates], [customTemplates]);
+    const selectedTemplate = useMemo(
+        () => templates.find((tpl) => tpl.id === selectedTemplateId) ?? null,
+        [templates, selectedTemplateId]
+    );
+
     // Local UI State
     const [isCopied, setIsCopied] = useState(false);
+    const [copiedTemplateName, setCopiedTemplateName] = useState<string | null>(null);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [gitModalOpen, setGitModalOpen] = useState(false);
@@ -178,6 +189,22 @@ function Contextractor() {
     
     // Memoized text files to prevent unnecessary re-renders
     const textFiles = useMemo(() => files.filter(f => f.isText), [files]);
+
+    const getHeaderLine = useCallback((pathLabel: string) => {
+        switch (outputStyle) {
+            case 'hash':
+                return `# --- ${pathLabel} ---`;
+            case 'minimal':
+                return `--- ${pathLabel} ---`;
+            case 'xml':
+                return `<file name="${pathLabel}">`;
+            case 'markdown':
+                return `### ${pathLabel}`;
+            case 'standard':
+            default:
+                return `/* --- ${pathLabel} --- */`;
+        }
+    }, [outputStyle]);
     
     // Generate raw output as lines array synchronously (instant, no processing)
     const rawOutputLines = useMemo((): string[] => {
@@ -196,24 +223,10 @@ function Contextractor() {
             }
             
             // Add header based on output style
-            switch (outputStyle) {
-                case 'hash':
-                    lines.push(`# --- ${pathLabel} ---`);
-                    break;
-                case 'minimal':
-                    lines.push(`--- ${pathLabel} ---`);
-                    break;
-                case 'xml':
-                    lines.push(`<file name="${pathLabel}">`);
-                    break;
-                case 'markdown':
-                    lines.push(`### ${pathLabel}`);
-                    lines.push(`\`\`\`${ext}`);
-                    break;
-                case 'standard':
-                default:
-                    lines.push(`/* --- ${pathLabel} --- */`);
-                    break;
+            const headerLine = getHeaderLine(pathLabel);
+            lines.push(headerLine);
+            if (outputStyle === 'markdown') {
+                lines.push(`\`\`\`${ext}`);
             }
             
             // Push each content line
@@ -231,7 +244,7 @@ function Contextractor() {
         }
         
         return lines;
-    }, [textFiles, outputStyle]);
+    }, [textFiles, getHeaderLine]);
 
     // Map each file ID to the starting line index in the current preview
     const buildLineIndexMap = useCallback((lines: string[]) => {
@@ -241,25 +254,7 @@ function Contextractor() {
         let searchStart = 0;
         for (const f of textFiles) {
             const pathLabel = f.path || f.name;
-            let headerLine: string;
-            switch (outputStyle) {
-                case 'hash':
-                    headerLine = `# --- ${pathLabel} ---`;
-                    break;
-                case 'minimal':
-                    headerLine = `--- ${pathLabel} ---`;
-                    break;
-                case 'xml':
-                    headerLine = `<file name="${pathLabel}">`;
-                    break;
-                case 'markdown':
-                    headerLine = `### ${pathLabel}`;
-                    break;
-                case 'standard':
-                default:
-                    headerLine = `/* --- ${pathLabel} --- */`;
-                    break;
-            }
+            const headerLine = getHeaderLine(pathLabel);
 
             const foundIndex = lines.indexOf(headerLine, searchStart);
             if (foundIndex !== -1) {
@@ -269,7 +264,7 @@ function Contextractor() {
         }
 
         return map;
-    }, [textFiles, outputStyle]);
+    }, [textFiles, getHeaderLine]);
 
     const processedLineIndexMap = useMemo(
         () => buildLineIndexMap(deferredCombinedLines),
@@ -278,6 +273,53 @@ function Contextractor() {
     const rawLineIndexMap = useMemo(
         () => buildLineIndexMap(rawOutputLines),
         [buildLineIndexMap, rawOutputLines]
+    );
+
+    const buildFileGroups = useCallback((lines: string[]) => {
+        if (lines.length === 0 || textFiles.length === 0) return [];
+
+        const starts: { id: string; label: string; start: number }[] = [];
+        let searchStart = 0;
+
+        for (const f of textFiles) {
+            const pathLabel = f.path || f.name;
+            const headerLine = getHeaderLine(pathLabel);
+            const foundIndex = lines.indexOf(headerLine, searchStart);
+
+            if (foundIndex !== -1) {
+                starts.push({ id: f.id, label: headerLine, start: foundIndex });
+                searchStart = foundIndex + 1;
+            }
+        }
+
+        if (starts.length === 0) {
+            return [{ id: 'combined', label: 'Combined', count: lines.length }];
+        }
+
+        const groups = starts.map((entry, idx) => {
+            const nextStart = idx + 1 < starts.length ? starts[idx + 1].start : lines.length;
+            const count = Math.max(0, nextStart - entry.start);
+            return { id: entry.id, label: entry.label, count };
+        });
+
+        const total = groups.reduce((sum, group) => sum + group.count, 0);
+        if (total !== lines.length && groups.length > 0) {
+            groups[groups.length - 1].count = Math.max(
+                0,
+                groups[groups.length - 1].count + (lines.length - total)
+            );
+        }
+
+        return groups;
+    }, [textFiles, getHeaderLine]);
+
+    const processedFileGroups = useMemo(
+        () => buildFileGroups(deferredCombinedLines),
+        [buildFileGroups, deferredCombinedLines]
+    );
+    const rawFileGroups = useMemo(
+        () => buildFileGroups(rawOutputLines),
+        [buildFileGroups, rawOutputLines]
     );
 
     // INSTANT: Set content immediately on session/style change
@@ -428,11 +470,23 @@ function Contextractor() {
         }
     }, [files, handleFocusFile, lastSelectedFileId]);
 
+    const applyTemplateToText = useCallback((text: string) => {
+        if (!selectedTemplate) return text;
+        const body = selectedTemplate.template.includes(TEMPLATE_PLACEHOLDER)
+            ? selectedTemplate.template
+            : `${selectedTemplate.template.trim()}\n\n${TEMPLATE_PLACEHOLDER}`;
+        return body.split(TEMPLATE_PLACEHOLDER).join(text);
+    }, [selectedTemplate]);
+
     // Compute combinedText ONLY when needed for clipboard (lazy join)
     // This avoids the expensive join on every render
-    const getCombinedText = useCallback(() => {
-        return combinedLines.join('\n');
-    }, [combinedLines]);
+    const getCombinedText = useCallback((options?: { applyTemplate?: boolean }) => {
+        const base = combinedLines.join('\n');
+        if (options?.applyTemplate && selectedTemplate) {
+            return applyTemplateToText(base);
+        }
+        return base;
+    }, [combinedLines, selectedTemplate, applyTemplateToText]);
     
     // For checking if there's content (cheap length check)
     const hasContent = combinedLines.length > 0;
@@ -764,10 +818,17 @@ function Contextractor() {
 
     const performCopy = () => {
         if (!hasContent) return;
-        navigator.clipboard.writeText(getCombinedText())
+        const contentToCopy = getCombinedText({ applyTemplate: true });
+        const appliedTemplate = selectedTemplate?.name ?? null;
+
+        navigator.clipboard.writeText(contentToCopy)
             .then(() => {
+                setCopiedTemplateName(appliedTemplate);
                 setIsCopied(true);
-                setTimeout(() => setIsCopied(false), 3000);
+                setTimeout(() => {
+                    setIsCopied(false);
+                    setCopiedTemplateName(null);
+                }, 3000);
             });
         setSecurityWarningOpen(false);
     };
@@ -1237,6 +1298,7 @@ function Contextractor() {
                                         onChange={setCodeProcessingMode}
                                         savingsPercent={tokenSavings}
                                     />
+                                    <PromptTemplateSelector />
                                 </div>
                                 <motion.div
                                     onClick={open}
@@ -1345,6 +1407,10 @@ function Contextractor() {
                                     />
                                 </div>
 
+                                <div className="relative hidden md:block">
+                                    <PromptTemplateSelector />
+                                </div>
+
                                 <button
                                     type="button"
                                     onClick={() => setViewLayout(prev => prev === 'single' ? 'split' : 'single')}
@@ -1404,6 +1470,7 @@ function Contextractor() {
                                                 searchMatches={searchMatches}
                                                 scrollToLine={rawScrollToLine}
                                                 scrollRequestId={rawScrollRequestId}
+                                                fileGroups={rawFileGroups}
                                             />
                                         </div>
                                     </div>
@@ -1421,6 +1488,7 @@ function Contextractor() {
                                                 searchMatches={searchMatches}
                                                 scrollToLine={processedScrollToLine}
                                                 scrollRequestId={processedScrollRequestId}
+                                                fileGroups={processedFileGroups}
                                             />
                                         </div>
                                     </div>
@@ -1433,6 +1501,7 @@ function Contextractor() {
                                     searchMatches={searchMatches}
                                     scrollToLine={processedScrollToLine}
                                     scrollRequestId={processedScrollRequestId}
+                                    fileGroups={processedFileGroups}
                                 />
                             )}
                         </div>
@@ -1470,7 +1539,7 @@ function Contextractor() {
                         className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-[var(--theme-primary)] text-[var(--theme-primary-contrast)] px-6 py-3.5 rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.4)] text-sm font-medium flex items-center gap-3"
                     >
                         <GoogleIcon icon={UI_ICONS_MAP.check} className="w-5 h-5" />
-                        Content copied to clipboard
+                        {copiedTemplateName ? `Copied with "${copiedTemplateName}" template` : 'Content copied to clipboard'}
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -1575,7 +1644,7 @@ function Contextractor() {
                     <ExportModal
                         isOpen={exportModalOpen}
                         onClose={() => setExportModalOpen(false)}
-                        content={getCombinedText()}
+                        content={getCombinedText({ applyTemplate: true })}
                         files={files}
                         outputStyle={outputStyle}
                         sessionName={activeSession?.name || 'export'}
