@@ -60,7 +60,7 @@ export interface SessionManagerState {
 
 export type OutputStyleType = 'standard' | 'hash' | 'minimal' | 'xml' | 'markdown';
 export type ViewModeType = 'list' | 'tree';
-export type CodeProcessingModeType = 'raw' | 'remove-comments' | 'minify';
+export type CodeProcessingModeType = 'raw' | 'remove-comments' | 'minify' | 'signatures-only' | 'interfaces-only';
 
 // Tab actions
 export type TabAction = 

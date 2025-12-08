@@ -8,7 +8,6 @@
 // Re-export the store
 export { useSessionStore } from './createStore';
 
-import { useShallow } from 'zustand/react/shallow';
 import type { AppStore } from './types';
 
 // Re-export types

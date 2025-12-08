@@ -1025,6 +1025,10 @@ export function processCode(
   if (mode === 'minify') {
     return smartMinify(content, languageType);
   }
+
+  if (mode === 'signatures-only' || mode === 'interfaces-only') {
+    return content;
+  }
   
   // Fallback - return as-is for unknown modes
   return content;

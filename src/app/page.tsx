@@ -1492,7 +1492,17 @@ function Contextractor() {
                                     <div className="flex flex-col min-h-0 border border-[var(--theme-border)] rounded-xl bg-[var(--theme-surface)]/40 shadow-[0_2px_10px_rgba(0,0,0,0.08)]">
                                         <div className="px-3 py-2 border-b border-[var(--theme-border)] flex items-center justify-between">
                                             <span className="text-xs font-semibold text-[var(--theme-text-secondary)] uppercase tracking-wide">Processed</span>
-                                            <span className="text-[10px] text-[var(--theme-text-tertiary)]">{codeProcessingMode === 'raw' ? 'Raw output' : codeProcessingMode === 'minify' ? 'Minified' : 'Comments removed'}</span>
+                                            <span className="text-[10px] text-[var(--theme-text-tertiary)]">
+                                                {codeProcessingMode === 'raw'
+                                                    ? 'Raw output'
+                                                    : codeProcessingMode === 'minify'
+                                                        ? 'Minified'
+                                                        : codeProcessingMode === 'remove-comments'
+                                                            ? 'Comments removed'
+                                                            : codeProcessingMode === 'signatures-only'
+                                                                ? 'Signatures only'
+                                                                : 'Interfaces only'}
+                                            </span>
                                         </div>
                                         <div className="flex-1 min-h-0">
                                             <VirtualizedCodeViewer

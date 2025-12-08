@@ -2,10 +2,10 @@
 // Professional-grade comment removal and minification for token optimization
 // Optimized for large files with safe regex patterns and error handling
 
-export type CodeProcessingMode = 'raw' | 'remove-comments' | 'minify';
+export type CodeProcessingMode = 'raw' | 'remove-comments' | 'minify' | 'signatures-only' | 'interfaces-only';
 
-// Maximum file size to process (500KB) - larger files skip processing to prevent crashes
-const MAX_PROCESS_SIZE = 500 * 1024;
+// Maximum file size to process (2MB) - larger files skip processing to prevent crashes
+const MAX_PROCESS_SIZE = 2 * 1024 * 1024;
 
 /**
  * Language-specific comment patterns for accurate removal
@@ -364,9 +364,17 @@ export function processCode(code: string, extension: string, mode: CodeProcessin
     if (mode === 'raw' || !code) return code || '';
     
     try {
-        return mode === 'remove-comments' 
-            ? removeComments(code, extension)
-            : minifyCode(code, extension);
+        if (mode === 'remove-comments') {
+            return removeComments(code, extension);
+        }
+        if (mode === 'minify') {
+            return minifyCode(code, extension);
+        }
+        // AST-only modes fall back to no-op here; handled by tree-sitter pipeline elsewhere.
+        if (mode === 'signatures-only' || mode === 'interfaces-only') {
+            return code;
+        }
+        return code;
     } catch {
         return code;
     }

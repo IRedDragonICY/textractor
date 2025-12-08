@@ -1,4 +1,6 @@
 import type { NextConfig } from "next";
+const PATH_BROWSERIFY = "path-browserify";
+const EMPTY_SHIM_REL = "./src/lib/shims/empty.js";
 
 const isProd = process.env.NODE_ENV === "production";
 const isTauri = process.env.TAURI_ENV_PLATFORM !== undefined;
@@ -25,9 +27,11 @@ const nextConfig: NextConfig = {
   
   // Turbopack configuration (now top-level in Next.js 16)
   turbopack: {
-    // Resolve aliases if needed
+    // Resolve aliases for Turbopack (dev)
     resolveAlias: {
-      // Add any module aliases here if needed
+      fs: EMPTY_SHIM_REL,
+      path: PATH_BROWSERIFY,
+      module: EMPTY_SHIM_REL,
     },
   },
   
@@ -43,6 +47,28 @@ const nextConfig: NextConfig = {
     ],
     // Enable Turbopack filesystem caching for faster dev startup
     turbopackFileSystemCacheForDev: true,
+  },
+  webpack: (config, { isServer }) => {
+    config.resolve = config.resolve || {};
+
+    // Only polyfill/alias for client bundles; keep server with real modules.
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...(config.resolve.fallback || {}),
+        fs: false,
+        path: require.resolve(PATH_BROWSERIFY),
+        module: false,
+      };
+
+      config.resolve.alias = {
+        ...(config.resolve.alias || {}),
+        fs: EMPTY_SHIM_REL,
+        path: PATH_BROWSERIFY,
+        module: EMPTY_SHIM_REL,
+      };
+    }
+
+    return config;
   },
 };
 

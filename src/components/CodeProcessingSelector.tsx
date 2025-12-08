@@ -42,6 +42,22 @@ const PROCESSING_MODES = [
         icon: 'compress' as const,
         color: '#C8ACF6',
     },
+    {
+        id: 'signatures-only' as const,
+        label: 'Signatures Only',
+        shortLabel: 'Sigs',
+        description: 'Strip bodies, keep function/class signatures for structure',
+        icon: 'signatures' as const,
+        color: '#F5A524',
+    },
+    {
+        id: 'interfaces-only' as const,
+        label: 'Interfaces Only',
+        shortLabel: 'Types',
+        description: 'Export only interfaces/types/enums for fast schema sharing',
+        icon: 'interfaces' as const,
+        color: '#5BC0F8',
+    },
 ] as const;
 
 // Custom icons for processing modes
@@ -49,6 +65,8 @@ const PROCESSING_ICONS = {
     code: "M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z",
     comment_off: "M2.81 2.81L1.39 4.22l2.27 2.27C2.61 7.61 2 9.18 2 10.91v6.36c0 1.28.48 2.26 1.32 2.82.39.26.82.39 1.27.39.35 0 .71-.08 1.07-.24l1.17-.52c.38-.17.82-.17 1.21-.01l1.21.54c.64.28 1.41.28 2.05 0l1.21-.54c.38-.17.82-.16 1.21.01l1.17.52c.36.16.71.24 1.07.24.45 0 .88-.13 1.27-.39.31-.21.58-.49.79-.85l2.45 2.45 1.41-1.41L2.81 2.81zM4 17.27v-6.36c0-1.12.39-2.14 1.02-2.95l1.55 1.55c-.35.47-.57 1.04-.57 1.67v5.64L4 17.27zm4 .55v-5.64c0-.28.22-.5.5-.5h.59l5.5 5.5-.43.19c-.39.17-.83.17-1.22 0l-1.21-.54c-.63-.28-1.39-.28-2.01 0l-1.21.54c-.18.08-.35.11-.51.11v-.02-.18zm10.98-7.64c.63.81 1.02 1.83 1.02 2.95v6.36l-2-.88v-5.64c0-.63-.22-1.2-.57-1.67l1.55-1.12zM12 2C6.48 2 2 6.48 2 12c0 .34.02.68.05 1.01l1.46-1.05C3.51 11.64 3.51 11.32 3.51 11c0-4.69 3.8-8.49 8.49-8.49 4.69 0 8.49 3.8 8.49 8.49 0 .32 0 .64-.03.95l1.46 1.05c.03-.33.05-.66.05-1.01 0-5.52-4.48-10-10-10z",
     compress: "M8 19h3v3h2v-3h3l-4-4-4 4zm8-15h-3V1h-2v3H8l4 4 4-4zM4 9v2h16V9H4zm0 4v2h16v-2H4z",
+    signatures: "M11 5h2v14h-2V5zm-4 3h2v8H7c-1.1 0-2-.9-2-2V10c0-1.1.9-2 2-2zm8 0h2c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2h-2v-2h2v-4h-2V8z",
+    interfaces: "M5 6h6v2H5v4h6v2H5c-1.1 0-2-.9-2-2V8c0-1.1.9-2 2-2zm8 0h6v2h-4v8h4v2h-6V6z",
 };
 
 export const CodeProcessingSelector: React.FC<CodeProcessingSelectorProps> = ({
