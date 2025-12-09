@@ -78,14 +78,14 @@ export interface GitRepoMetadata {
     baseUrl: string;
     provider: 'github' | 'gitlab' | 'huggingface';
     /**
-     * Optional namespace for providers that differentiate by resource type
-     * (e.g., Hugging Face models / datasets / spaces)
+     * Optional namespace for providers that differentiate resources
+     * (e.g., Hugging Face: models, datasets, spaces)
      */
     resource?: 'models' | 'datasets' | 'spaces';
+    /** Optional initial path when the URL points to a subfolder */
+    initialPath?: string;
 }
 
 export type OutputStyle = 'standard' | 'hash' | 'minimal' | 'xml' | 'markdown';
 export type ViewMode = 'list' | 'tree';
-export type CodeProcessingMode = 'raw' | 'remove-comments' | 'minify' | 'signatures-only' | 'interfaces-only';
-
-export type { PromptTemplate } from '@/constants/templates';
+export type CodeProcessingMode = 'raw' | 'remove-comments' | 'minify';

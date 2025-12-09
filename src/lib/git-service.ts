@@ -16,6 +16,14 @@ interface GitHubCommit {
     };
 }
 
+interface HFEntry {
+    type: 'file' | 'directory';
+    path: string;
+    size?: number;
+    oid?: string;
+    lfs?: { size: number };
+}
+
 type HuggingFaceRepoType = 'models' | 'datasets' | 'spaces';
 
 const buildBaseUrlForProvider = (metadata: GitRepoMetadata, branch: string): string => {
@@ -74,6 +82,98 @@ const detectHuggingFaceDefaultBranch = async (
     return branches.find(b => b === 'main') || branches.find(b => b === 'master') || branches[0];
 };
 
+const MAX_HF_ITEMS = 50000;
+
+const fetchHuggingFaceTreeRecursive = async (
+    metadata: GitRepoMetadata,
+    setLoadingText: (text: string) => void
+): Promise<GitHubTreeItem[]> => {
+    const resource = metadata.resource || 'models';
+    const apiBase = `https://huggingface.co/api/${resource === 'models' ? 'models' : resource}/${metadata.owner}/${metadata.repo}`;
+
+    // BFS queue of relative paths ('' = repo root)
+    const queue: string[] = [metadata.initialPath || ''];
+    const items: GitHubTreeItem[] = [];
+    const visited = new Set<string>();
+
+    const normalizeFullPath = (parent: string, child: string): string => {
+        const cleanChild = child.replace(/^\/+/, '');
+        if (!parent) return cleanChild;
+        // If HF already returned parent-prefixed path, keep as-is; otherwise join
+        return cleanChild.startsWith(`${parent}/`) ? cleanChild : `${parent}/${cleanChild}`;
+    };
+
+    while (queue.length > 0) {
+        const currentPath = queue.shift()!;
+        if (visited.has(currentPath)) continue;
+        visited.add(currentPath);
+
+        const pathSuffix = currentPath
+            ? `/${currentPath.split('/').map(encodeURIComponent).join('/')}`
+            : '';
+        const treeApiUrl = `${apiBase}/tree/${encodeURIComponent(metadata.branch)}${pathSuffix}`;
+
+        setLoadingText(`Scanning ${currentPath || 'root'} (${items.length} files)...`);
+
+        let entries: HFEntry[];
+        try {
+            const res = await fetch(treeApiUrl);
+            if (!res.ok) {
+                if (res.status === 401) {
+                    throw new Error("Access denied. The repository may be private or gated.");
+                }
+                // skip missing/forbidden folders so other branches continue
+                if (res.status === 403 || res.status === 404) {
+                    console.warn(`Skipping ${currentPath}: ${res.status} ${res.statusText}`);
+                    continue;
+                }
+                const errorMessage = await res.text().catch(() => '');
+                throw new Error(errorMessage || "Failed to fetch repository structure");
+            }
+            entries = await res.json() as HFEntry[];
+        } catch (error) {
+            console.error(`Error scanning ${currentPath}:`, error);
+            continue;
+        }
+
+        if (!Array.isArray(entries)) continue;
+
+        for (const entry of entries) {
+            if (!entry?.path || typeof entry.path !== 'string') continue;
+
+            const fullPath = normalizeFullPath(currentPath, entry.path);
+            const isDirectory = entry.type === 'directory';
+            const size = typeof entry.size === 'number' ? entry.size : entry.lfs?.size;
+
+            items.push({
+                path: fullPath,
+                mode: '100644',
+                type: isDirectory ? 'tree' : 'blob',
+                sha: entry.oid || '',
+                size,
+                url: ''
+            } as GitHubTreeItem);
+
+            if (isDirectory) {
+                queue.push(fullPath);
+            }
+
+            if (items.length >= MAX_HF_ITEMS) {
+                setLoadingText(`Limit reached (${MAX_HF_ITEMS} items). Stopping scan.`);
+                break;
+            }
+        }
+
+        if (items.length >= MAX_HF_ITEMS) break;
+    }
+
+    if (items.length === 0) {
+        throw new Error("Repository appears empty or access may be restricted.");
+    }
+
+    return items;
+};
+
 // Cache for parsed metadata to avoid redundant parsing
 const metadataCache = new Map<string, GitRepoMetadata>();
 
@@ -85,18 +185,29 @@ export const parseGitUrl = async (gitUrl: string): Promise<GitRepoMetadata> => {
     }
 
     const rawUrl = gitUrl.replace(/\.git\/?$/, "");
-    const urlObj = new URL(rawUrl);
+    let urlObj: URL;
+
+    try {
+        urlObj = new URL(rawUrl);
+    } catch {
+        throw new Error("Invalid URL format");
+    }
+
     const hostname = urlObj.hostname.toLowerCase();
     const pathParts = urlObj.pathname.split('/').filter(Boolean);
-    
+
     if (hostname.includes('github.com')) {
         const owner = pathParts[0];
         const repo = pathParts[1];
         if (!owner || !repo) throw new Error("Invalid GitHub repository URL");
         let branch = "";
+        let initialPath = "";
 
         if (pathParts[2] === 'tree' || pathParts[2] === 'blob') {
             branch = pathParts[3];
+            if (pathParts.length > 4) {
+                initialPath = pathParts.slice(4).join('/');
+            }
         }
 
         if (!branch) {
@@ -111,7 +222,8 @@ export const parseGitUrl = async (gitUrl: string): Promise<GitRepoMetadata> => {
             repo,
             branch,
             baseUrl: '',
-            provider: 'github'
+            provider: 'github',
+            initialPath
         };
         metadata.baseUrl = buildBaseUrlForProvider(metadata, branch);
 
@@ -121,15 +233,25 @@ export const parseGitUrl = async (gitUrl: string): Promise<GitRepoMetadata> => {
     }
 
     if (hostname.includes('huggingface.co')) {
-        const { resource, ownerIndex } = getHuggingFacePathInfo(pathParts);
-        const owner = pathParts[ownerIndex];
-        const repo = pathParts[ownerIndex + 1];
-        if (!owner || !repo) throw new Error("Invalid Hugging Face repository URL");
+        const trimmedParts = pathParts[0] === 'api' ? pathParts.slice(1) : pathParts;
+        const pathString = trimmedParts.join('/');
 
-        let branch = urlObj.searchParams.get('revision') || '';
-        const refIndicator = pathParts[ownerIndex + 2];
-        if (refIndicator === 'tree' || refIndicator === 'resolve' || refIndicator === 'blob') {
-            branch = pathParts[ownerIndex + 3] || branch || '';
+        const hfMatch = /^(?:(datasets|spaces)\/)?([^/]+)\/([^/]+)(?:\/(tree|blob|resolve)\/([^/]+)(?:\/(.+))?)?$/.exec(pathString);
+        if (!hfMatch) {
+            throw new Error("Invalid Hugging Face repository URL");
+        }
+
+        const [, resourceRaw, owner, repo, action, revisionFromPath, remainingPath] = hfMatch;
+        const resource: HuggingFaceRepoType =
+            (resourceRaw as HuggingFaceRepoType)
+            || (trimmedParts[0] === 'datasets' ? 'datasets'
+                : trimmedParts[0] === 'spaces' ? 'spaces' : 'models');
+
+        let branch = urlObj.searchParams.get('revision') || revisionFromPath || '';
+        let initialPath = '';
+
+        if (action && remainingPath) {
+            initialPath = remainingPath;
         }
 
         if (!branch) {
@@ -142,7 +264,8 @@ export const parseGitUrl = async (gitUrl: string): Promise<GitRepoMetadata> => {
             branch,
             provider: 'huggingface',
             resource,
-            baseUrl: ''
+            baseUrl: '',
+            initialPath
         };
         metadata.baseUrl = buildBaseUrlForProvider(metadata, branch);
 
@@ -233,49 +356,7 @@ export const fetchGitTree = async (
     metadata.baseUrl = buildBaseUrlForProvider(metadata, metadata.branch);
 
     if (metadata.provider === 'huggingface') {
-        const resource = metadata.resource || 'models';
-        setLoadingText(`Scanning repository structure (${metadata.branch})...`);
-        const treeApiUrl = `${getHuggingFaceApiBase(resource, metadata.owner, metadata.repo)}/tree/${metadata.branch}?recursive=1&expand=true`;
-        const treeRes = await fetch(treeApiUrl);
-
-        if (!treeRes.ok) {
-            const errorData = await treeRes.json().catch(() => ({}));
-            if (treeRes.status === 401 || treeRes.status === 403) {
-                throw new Error("Access denied. The repository may be private or gated.");
-            }
-            throw new Error(errorData?.error || errorData?.message || "Failed to fetch repository structure");
-        }
-
-        const treeData = await treeRes.json();
-        const rawItems = Array.isArray(treeData)
-            ? treeData
-            : Array.isArray(treeData?.tree)
-                ? treeData.tree
-                : Array.isArray(treeData?.entries)
-                    ? treeData.entries
-                    : Array.isArray(treeData?.files)
-                        ? treeData.files
-                        : [];
-
-        const normalizedItems = (rawItems as any[]).map((item) => {
-            const path = item?.path || item?.rfilename || item?.file;
-            if (!path) return null;
-            const isDirectory = item?.type === 'directory' || item?.type === 'tree';
-            const size = typeof item?.size === 'number' ? item.size : (item?.lfs?.size ?? undefined);
-            return {
-                path,
-                mode: '100644',
-                type: isDirectory ? 'tree' : 'blob',
-                sha: item?.sha || item?.oid || '',
-                size,
-                url: ''
-            } as GitHubTreeItem;
-        }).filter(Boolean) as GitHubTreeItem[];
-
-        if (normalizedItems.length === 0) {
-            throw new Error("Repository appears empty or access may be restricted.");
-        }
-
+        const normalizedItems = await fetchHuggingFaceTreeRecursive(metadata, setLoadingText);
         setLoadingText("Building file tree...");
         const tree = buildGitTree(normalizedItems, metadata);
         return { tree, metadata };

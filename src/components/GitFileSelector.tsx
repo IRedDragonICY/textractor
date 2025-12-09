@@ -260,21 +260,23 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
     useEffect(() => {
         if (fullTree.length === 0) return;
 
+        // Hugging Face datasets often contain binaries (e.g., zip); show them even if filtered elsewhere
+        if (metadata?.provider === 'huggingface') {
+            setTree(fullTree);
+            return;
+        }
+
         const filterNodes = (nodes: GitTreeNode[]): GitTreeNode[] => {
             return nodes.filter(node => {
                 if (node.type === 'folder') {
                     if (settings.filters.ignoredFolders.includes(node.name)) return false;
                     const filteredChildren = filterNodes(node.children);
-                    // If all children are filtered out and it's a folder, should we keep it?
-                    // Maybe keep it if it's not explicitly ignored, but it will be empty.
-                    // Let's keep it but update children.
                     node.children = filteredChildren;
                     return true;
                 } else {
                     const parts = node.name.split('.');
                     if (parts.length > 1) {
                         const ext = parts.pop()?.toLowerCase() || '';
-                        // Check against "lock" and ".lock"
                         if (settings.filters.ignoredExtensions.includes(ext)) return false;
                         if (settings.filters.ignoredExtensions.includes('.' + ext)) return false;
                     }
@@ -283,10 +285,9 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
             });
         };
 
-        // Deep copy to avoid mutating fullTree directly in a way that affects future filters
         const treeCopy = JSON.parse(JSON.stringify(fullTree));
         setTree(filterNodes(treeCopy));
-    }, [fullTree, settings.filters]);
+    }, [fullTree, settings.filters, metadata?.provider]);
 
     // Filtered lists
     const filteredBranches = useMemo(() => 
