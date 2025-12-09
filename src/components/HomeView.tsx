@@ -189,7 +189,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     <QuickActionCard
                         icon={ICONS.github}
                         title="Import Repository"
-                        description="Clone from GitHub or GitLab"
+                        description="Clone from GitHub or Hugging Face"
                         onClick={onOpenGitImport}
                         variant="tertiary"
                     />

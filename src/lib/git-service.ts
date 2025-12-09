@@ -16,6 +16,64 @@ interface GitHubCommit {
     };
 }
 
+type HuggingFaceRepoType = 'models' | 'datasets' | 'spaces';
+
+const buildBaseUrlForProvider = (metadata: GitRepoMetadata, branch: string): string => {
+    if (metadata.provider === 'huggingface') {
+        const resource = metadata.resource || 'models';
+        const prefix = resource === 'models' ? '' : `${resource}/`;
+        return `https://huggingface.co/${prefix}${metadata.owner}/${metadata.repo}/resolve/${branch}`;
+    }
+
+    // Default: GitHub-style raw URL
+    return `https://raw.githubusercontent.com/${metadata.owner}/${metadata.repo}/${branch}`;
+};
+
+const getHuggingFacePathInfo = (pathParts: string[]): { resource: HuggingFaceRepoType; ownerIndex: number } => {
+    if (pathParts[0] === 'datasets') return { resource: 'datasets', ownerIndex: 1 };
+    if (pathParts[0] === 'spaces') return { resource: 'spaces', ownerIndex: 1 };
+    return { resource: 'models', ownerIndex: 0 };
+};
+
+const getHuggingFaceApiBase = (resource: HuggingFaceRepoType, owner: string, repo: string) =>
+    `https://huggingface.co/api/${resource}/${owner}/${repo}`;
+
+const normalizeHuggingFaceRefName = (ref?: string): string => {
+    if (!ref) return '';
+    return ref.replace(/^refs\/heads\//, '').replace(/^refs\/tags\//, '');
+};
+
+const fetchHuggingFaceRefs = async (
+    resource: HuggingFaceRepoType,
+    owner: string,
+    repo: string
+): Promise<{ branches: string[]; tags: string[] }> => {
+    try {
+        const res = await fetch(`${getHuggingFaceApiBase(resource, owner, repo)}/refs`);
+        if (!res.ok) return { branches: [], tags: [] };
+        const data = await res.json();
+        const branches = Array.isArray(data?.branches)
+            ? data.branches.map((b: any) => normalizeHuggingFaceRefName(b?.name ?? b?.ref ?? b)).filter(Boolean)
+            : [];
+        const tags = Array.isArray(data?.tags)
+            ? data.tags.map((t: any) => normalizeHuggingFaceRefName(t?.name ?? t?.ref ?? t)).filter(Boolean)
+            : [];
+        return { branches, tags };
+    } catch {
+        return { branches: [], tags: [] };
+    }
+};
+
+const detectHuggingFaceDefaultBranch = async (
+    resource: HuggingFaceRepoType,
+    owner: string,
+    repo: string
+): Promise<string> => {
+    const { branches } = await fetchHuggingFaceRefs(resource, owner, repo);
+    if (branches.length === 0) return '';
+    return branches.find(b => b === 'main') || branches.find(b => b === 'master') || branches[0];
+};
+
 // Cache for parsed metadata to avoid redundant parsing
 const metadataCache = new Map<string, GitRepoMetadata>();
 
@@ -27,12 +85,14 @@ export const parseGitUrl = async (gitUrl: string): Promise<GitRepoMetadata> => {
     }
 
     const rawUrl = gitUrl.replace(/\.git\/?$/, "");
+    const urlObj = new URL(rawUrl);
+    const hostname = urlObj.hostname.toLowerCase();
+    const pathParts = urlObj.pathname.split('/').filter(Boolean);
     
-    if (rawUrl.includes('github.com')) {
-        const urlObj = new URL(rawUrl);
-        const pathParts = urlObj.pathname.split('/').filter(Boolean);
+    if (hostname.includes('github.com')) {
         const owner = pathParts[0];
         const repo = pathParts[1];
+        if (!owner || !repo) throw new Error("Invalid GitHub repository URL");
         let branch = "";
 
         if (pathParts[2] === 'tree' || pathParts[2] === 'blob') {
@@ -50,16 +110,48 @@ export const parseGitUrl = async (gitUrl: string): Promise<GitRepoMetadata> => {
             owner,
             repo,
             branch,
-            baseUrl: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}`,
+            baseUrl: '',
             provider: 'github'
         };
+        metadata.baseUrl = buildBaseUrlForProvider(metadata, branch);
 
         // Cache the result
         metadataCache.set(gitUrl, metadata);
         return metadata;
     }
 
-    throw new Error("Unsupported Git provider. Currently only GitHub is supported.");
+    if (hostname.includes('huggingface.co')) {
+        const { resource, ownerIndex } = getHuggingFacePathInfo(pathParts);
+        const owner = pathParts[ownerIndex];
+        const repo = pathParts[ownerIndex + 1];
+        if (!owner || !repo) throw new Error("Invalid Hugging Face repository URL");
+
+        let branch = urlObj.searchParams.get('revision') || '';
+        const refIndicator = pathParts[ownerIndex + 2];
+        if (refIndicator === 'tree' || refIndicator === 'resolve' || refIndicator === 'blob') {
+            branch = pathParts[ownerIndex + 3] || branch || '';
+        }
+
+        if (!branch) {
+            branch = await detectHuggingFaceDefaultBranch(resource, owner, repo) || 'main';
+        }
+
+        const metadata: GitRepoMetadata = {
+            owner,
+            repo,
+            branch,
+            provider: 'huggingface',
+            resource,
+            baseUrl: ''
+        };
+        metadata.baseUrl = buildBaseUrlForProvider(metadata, branch);
+
+        // Cache the result
+        metadataCache.set(gitUrl, metadata);
+        return metadata;
+    }
+
+    throw new Error("Unsupported Git provider. Supported providers: GitHub and Hugging Face.");
 };
 
 // Build tree structure from flat file list - Optimized with Map-based lookup
@@ -137,9 +229,59 @@ export const fetchGitTree = async (
     // Override branch if ref is provided
     if (ref) {
         metadata.branch = ref;
-        metadata.baseUrl = `https://raw.githubusercontent.com/${metadata.owner}/${metadata.repo}/${ref}`;
+    }
+    metadata.baseUrl = buildBaseUrlForProvider(metadata, metadata.branch);
+
+    if (metadata.provider === 'huggingface') {
+        const resource = metadata.resource || 'models';
+        setLoadingText(`Scanning repository structure (${metadata.branch})...`);
+        const treeApiUrl = `${getHuggingFaceApiBase(resource, metadata.owner, metadata.repo)}/tree/${metadata.branch}?recursive=1&expand=true`;
+        const treeRes = await fetch(treeApiUrl);
+
+        if (!treeRes.ok) {
+            const errorData = await treeRes.json().catch(() => ({}));
+            if (treeRes.status === 401 || treeRes.status === 403) {
+                throw new Error("Access denied. The repository may be private or gated.");
+            }
+            throw new Error(errorData?.error || errorData?.message || "Failed to fetch repository structure");
+        }
+
+        const treeData = await treeRes.json();
+        const rawItems = Array.isArray(treeData)
+            ? treeData
+            : Array.isArray(treeData?.tree)
+                ? treeData.tree
+                : Array.isArray(treeData?.entries)
+                    ? treeData.entries
+                    : Array.isArray(treeData?.files)
+                        ? treeData.files
+                        : [];
+
+        const normalizedItems = (rawItems as any[]).map((item) => {
+            const path = item?.path || item?.rfilename || item?.file;
+            if (!path) return null;
+            const isDirectory = item?.type === 'directory' || item?.type === 'tree';
+            const size = typeof item?.size === 'number' ? item.size : (item?.lfs?.size ?? undefined);
+            return {
+                path,
+                mode: '100644',
+                type: isDirectory ? 'tree' : 'blob',
+                sha: item?.sha || item?.oid || '',
+                size,
+                url: ''
+            } as GitHubTreeItem;
+        }).filter(Boolean) as GitHubTreeItem[];
+
+        if (normalizedItems.length === 0) {
+            throw new Error("Repository appears empty or access may be restricted.");
+        }
+
+        setLoadingText("Building file tree...");
+        const tree = buildGitTree(normalizedItems, metadata);
+        return { tree, metadata };
     }
 
+    // Default to GitHub-style API
     setLoadingText(`Scanning repository structure (${metadata.branch})...`);
     const treeApiUrl = `https://api.github.com/repos/${metadata.owner}/${metadata.repo}/git/trees/${metadata.branch}?recursive=1`;
     const treeRes = await fetch(treeApiUrl);
@@ -164,20 +306,33 @@ export const fetchGitTree = async (
 };
 
 // Fetch branches and tags for a repository
-export const fetchGitRefs = async (owner: string, repo: string): Promise<{ branches: string[], tags: string[] }> => {
+export const fetchGitRefs = async (metadata: GitRepoMetadata): Promise<{ branches: string[], tags: string[] }> => {
+    // Hugging Face refs
+    if (metadata.provider === 'huggingface') {
+        const resource = metadata.resource || 'models';
+        const refs = await fetchHuggingFaceRefs(resource, metadata.owner, metadata.repo);
+        const branches = Array.from(new Set([...(refs.branches ?? []), metadata.branch].filter(Boolean)));
+        return { branches, tags: refs.tags ?? [] };
+    }
+
+    // Default: GitHub
     try {
         const [branchesRes, tagsRes] = await Promise.all([
-            fetch(`https://api.github.com/repos/${owner}/${repo}/branches`),
-            fetch(`https://api.github.com/repos/${owner}/${repo}/tags`)
+            fetch(`https://api.github.com/repos/${metadata.owner}/${metadata.repo}/branches`),
+            fetch(`https://api.github.com/repos/${metadata.owner}/${metadata.repo}/tags`)
         ]);
 
         const branches = branchesRes.ok ? await branchesRes.json() : [];
         const tags = tagsRes.ok ? await tagsRes.json() : [];
 
-        return {
-            branches: Array.isArray(branches) ? branches.map((b: GitHubRef) => b.name) : [],
-            tags: Array.isArray(tags) ? tags.map((t: GitHubRef) => t.name) : []
-        };
+        const branchList = branchesRes.ok && Array.isArray(branches)
+            ? branches.map((b: GitHubRef) => b.name)
+            : [];
+        const tagList = tagsRes.ok && Array.isArray(tags)
+            ? tags.map((t: GitHubRef) => t.name)
+            : [];
+
+        return { branches: branchList, tags: tagList };
     } catch (error) {
         console.error("Failed to fetch refs:", error);
         return { branches: [], tags: [] };
@@ -185,9 +340,14 @@ export const fetchGitRefs = async (owner: string, repo: string): Promise<{ branc
 };
 
 // Fetch commits for a specific branch/tag
-export const fetchGitCommits = async (owner: string, repo: string, ref: string): Promise<{ sha: string, message: string, date: string, author: string }[]> => {
+export const fetchGitCommits = async (metadata: GitRepoMetadata, ref: string): Promise<{ sha: string, message: string, date: string, author: string }[]> => {
+    if (metadata.provider === 'huggingface') {
+        // Commit listing not exposed via public Hugging Face API; skip gracefully
+        return [];
+    }
+
     try {
-        const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits?sha=${ref}&per_page=20`);
+        const res = await fetch(`https://api.github.com/repos/${metadata.owner}/${metadata.repo}/commits?sha=${ref}&per_page=20`);
         if (!res.ok) return [];
         const data = await res.json();
         return Array.isArray(data) ? data.map((item: GitHubCommit) => ({

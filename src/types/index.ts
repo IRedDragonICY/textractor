@@ -76,7 +76,12 @@ export interface GitRepoMetadata {
     repo: string;
     branch: string;
     baseUrl: string;
-    provider: 'github' | 'gitlab';
+    provider: 'github' | 'gitlab' | 'huggingface';
+    /**
+     * Optional namespace for providers that differentiate by resource type
+     * (e.g., Hugging Face models / datasets / spaces)
+     */
+    resource?: 'models' | 'datasets' | 'spaces';
 }
 
 export type OutputStyle = 'standard' | 'hash' | 'minimal' | 'xml' | 'markdown';

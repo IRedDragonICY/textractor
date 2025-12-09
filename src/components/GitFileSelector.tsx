@@ -426,13 +426,17 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
             addToGitHubHistory(gitUrl);
             
             // Fetch refs
-            fetchGitRefs(result.metadata.owner, result.metadata.repo).then(refs => {
+            fetchGitRefs(result.metadata).then(refs => {
                 setBranches(refs.branches);
                 setTags(refs.tags);
             });
 
             // Fetch commits for default branch
-            fetchGitCommits(result.metadata.owner, result.metadata.repo, result.metadata.branch).then(setCommits);
+            if (result.metadata.provider === 'github') {
+                fetchGitCommits(result.metadata, result.metadata.branch).then(setCommits);
+            } else {
+                setCommits([]);
+            }
             
             // Expand first level by default
             const firstLevelFolders = result.tree.filter(n => n.type === 'folder').map(n => n.path);
@@ -460,7 +464,11 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
             setSelectedCommit(''); // Reset selected commit when branch changes
             
             // Fetch commits for new ref
-            fetchGitCommits(metadata.owner, metadata.repo, newRef).then(setCommits);
+            if (metadata.provider === 'github') {
+                fetchGitCommits(metadata, newRef).then(setCommits);
+            } else {
+                setCommits([]);
+            }
             
             // Expand first level
             const firstLevelFolders = result.tree.filter(n => n.type === 'folder').map(n => n.path);
@@ -583,10 +591,10 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
                 {/* Header */}
                 <div className="flex items-center gap-4 p-6 border-b border-[var(--theme-border)]">
                     <div className="w-12 h-12 rounded-2xl bg-[var(--theme-surface-elevated)] flex items-center justify-center shrink-0">
-                        <GoogleIcon icon={UI_ICONS_MAP.github} className="w-7 h-7 text-[var(--theme-text-primary)]" />
+                        <GoogleIcon icon={UI_ICONS_MAP.git} className="w-7 h-7 text-[var(--theme-text-primary)]" />
                     </div>
                     <div className="flex-1 min-w-0">
-                        <h3 className="text-xl text-[var(--theme-text-primary)] font-medium">Import from GitHub</h3>
+                        <h3 className="text-xl text-[var(--theme-text-primary)] font-medium">Import from Git</h3>
                         <div className="flex items-center gap-2">
                             <p className="text-sm text-[var(--theme-text-tertiary)] truncate">
                                 {step === 'url' ? 'Enter repository URL' : `${metadata?.owner}/${metadata?.repo}`}
@@ -786,7 +794,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
                                     onChange={(e) => setGitUrl(e.target.value)}
                                     onFocus={() => setIsInputFocused(true)}
                                     onBlur={() => setTimeout(() => setIsInputFocused(false), 150)}
-                                    placeholder="https://github.com/username/repo"
+                                    placeholder="https://github.com/owner/repo or https://huggingface.co/owner/repo"
                                     className="w-full bg-[var(--theme-surface-hover)] border border-[var(--theme-border)] rounded-xl pl-12 pr-4 py-3.5 text-[var(--theme-text-primary)] placeholder-[var(--theme-text-tertiary)] focus:outline-none focus:border-[var(--theme-primary)] focus:ring-1 focus:ring-[var(--theme-primary)] transition-all"
                                     disabled={loading}
                                     autoFocus
@@ -836,7 +844,7 @@ export const GitFileSelector = ({ isOpen, onClose, onImport, onStartImport, onOp
                                                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 hover:bg-zinc-800/50 transition-colors duration-150 cursor-pointer group"
                                                     >
                                                         <GoogleIcon 
-                                                            icon={UI_ICONS_MAP.github} 
+                                                            icon={UI_ICONS_MAP.git} 
                                                             className="w-4 h-4 text-zinc-500 group-hover:text-zinc-400 transition-colors shrink-0" 
                                                         />
                                                         <span className="text-sm text-[var(--theme-text-secondary)] group-hover:text-[var(--theme-text-primary)] transition-colors truncate flex-1 text-left">
