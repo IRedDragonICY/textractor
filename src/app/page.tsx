@@ -349,6 +349,9 @@ function Contextractor() {
         if (textFiles.length === 0) {
             setCombinedLines([]);
             setTokenSavings(undefined);
+            // Safety: Ensure processing state is cleared if files are empty
+            // This fixes a visual bug where processing gets stuck if files are cleared rapidly
+            endProcessing([]);
             return;
         }
 
@@ -523,7 +526,7 @@ function Contextractor() {
             // Clear global processing status when effect is cleaned up (e.g. switching tabs/modes)
             endProcessing([]);
         };
-    }, [textFiles, outputStyle, codeProcessingMode, activeSessionId, rawOutputLines, startProcessing, updateProgress]);
+    }, [textFiles, outputStyle, codeProcessingMode, activeSessionId, rawOutputLines, startProcessing, updateProgress, endProcessing]);
 
     // Jump code preview to a file's header when clicked in explorer/list
 
