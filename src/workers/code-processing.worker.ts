@@ -16,12 +16,15 @@ export interface WorkerMessage {
     mode: CodeProcessingMode;
 }
 
+import { ProcessingProgress } from '@/types/processing';
+
 export interface WorkerResponse {
     type: 'result' | 'progress' | 'error';
     id: string;
     result?: string;
     lines?: string[];
     progress?: number;
+    progressPayload?: ProcessingProgress;
     tokenSavings?: number;
     error?: string;
 }
@@ -108,38 +111,78 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
     if (type !== 'process') return;
 
     const textFiles = files.filter(f => f.isText);
-    const total = textFiles.length;
+    const total_files_count = textFiles.length;
+    let total_bytes = 0;
+    for (const f of textFiles) {
+        total_bytes += f.content.length;
+    }
+
+    // Emit initial STARTING progress immediately
+    self.postMessage({
+        type: 'progress',
+        id,
+        progress: 0,
+        progressPayload: {
+            current_file_name: 'Starting...',
+            processed_files_count: 0,
+            total_files_count,
+            processed_bytes: 0,
+            total_bytes,
+            tokens_saved: 0
+        }
+    } satisfies WorkerResponse);
+
     const lines: string[] = [];
 
-    let processed = 0;
-    let originalLength = 0;
-    let processedLength = 0;
+    let processed_files_count = 0;
+    let processed_bytes = 0;
+    let tokens_saved = 0; // tracking chars saved
+
+    let originalLengthTotal = 0;
+    let processedLengthTotal = 0;
 
     for (let i = 0; i < textFiles.length; i++) {
         const file = textFiles[i];
         const ext = file.name.split('.').pop() || 'txt';
         const pathLabel = file.path || file.name;
+        const originalLen = file.content.length;
 
-        originalLength += file.content.length;
+        originalLengthTotal += originalLen;
 
         const processedContent = await processFile(file.content, ext, mode);
-        processedLength += processedContent.length;
+        const processedLen = processedContent.length;
+        processedLengthTotal += processedLen;
+
+        tokens_saved += (originalLen - processedLen);
+        processed_bytes += originalLen; // tracking input progress
 
         appendFileLines(lines, outputStyle, pathLabel, ext, processedContent, i === 0);
 
-        processed++;
-        if (processed % 10 === 0 || processed === total) {
+        processed_files_count++;
+
+        // Emit progress periodically or on every file if total is small
+        if (total_files_count < 100 || processed_files_count % 5 === 0 || processed_files_count === total_files_count) {
+            const payload: ProcessingProgress = {
+                current_file_name: file.name,
+                processed_files_count,
+                total_files_count,
+                processed_bytes,
+                total_bytes,
+                tokens_saved
+            };
+
             self.postMessage({
                 type: 'progress',
                 id,
-                progress: Math.round((processed / total) * 100)
+                progress: Math.round((processed_files_count / total_files_count) * 100), // kept for legacy if needed
+                progressPayload: payload
             } satisfies WorkerResponse);
         }
     }
 
-    const tokenSavings = mode === 'raw' || originalLength === 0
+    const tokenSavings = mode === 'raw' || originalLengthTotal === 0
         ? 0
-        : Math.max(0, Math.round(((originalLength - processedLength) / originalLength) * 100));
+        : Math.max(0, Math.round(((originalLengthTotal - processedLengthTotal) / originalLengthTotal) * 100));
 
     self.postMessage({
         type: 'result',

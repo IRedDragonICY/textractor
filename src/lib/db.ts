@@ -5,10 +5,11 @@ import { Session, RecentProject, SessionManagerState } from "@/types/session";
 const SESSIONS_STORE = 'sessions';
 const RECENT_PROJECTS_STORE = 'recentProjects';
 const STATE_STORE = 'appState';
+const PROCESSED_CODE_STORE = 'processed-code';
 
 export const initDB = (): Promise<IDBDatabase> => {
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION + 1); // Increment version for new stores
+        const request = indexedDB.open(DB_NAME, DB_VERSION + 2); // Increment version for new stores
         request.onerror = () => reject(request.error);
         request.onsuccess = () => resolve(request.result);
         request.onupgradeneeded = (event) => {
@@ -27,6 +28,9 @@ export const initDB = (): Promise<IDBDatabase> => {
             if (!db.objectStoreNames.contains(STATE_STORE)) {
                 db.createObjectStore(STATE_STORE);
             }
+            if (!db.objectStoreNames.contains(PROCESSED_CODE_STORE)) {
+                db.createObjectStore(PROCESSED_CODE_STORE);
+            }
         };
     });
 };
@@ -43,7 +47,7 @@ export const saveSession = async (files: FileData[]) => {
         }));
 
         store.put(serializableFiles, 'currentSession');
-        
+
         return new Promise<void>((resolve, reject) => {
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
@@ -90,7 +94,7 @@ export const saveSessions = async (sessions: Session[]): Promise<void> => {
         const tx = db.transaction(SESSIONS_STORE, 'readwrite');
         const store = tx.objectStore(SESSIONS_STORE);
         store.put(sessions, 'allSessions');
-        
+
         return new Promise<void>((resolve, reject) => {
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
@@ -125,7 +129,7 @@ export const saveRecentProjects = async (projects: RecentProject[]): Promise<voi
         const tx = db.transaction(RECENT_PROJECTS_STORE, 'readwrite');
         const store = tx.objectStore(RECENT_PROJECTS_STORE);
         store.put(projects, 'allRecentProjects');
-        
+
         return new Promise<void>((resolve, reject) => {
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
@@ -160,7 +164,7 @@ export const saveAppState = async (state: { activeSessionId: string | null }): P
         const tx = db.transaction(STATE_STORE, 'readwrite');
         const store = tx.objectStore(STATE_STORE);
         store.put(state, 'appState');
-        
+
         return new Promise<void>((resolve, reject) => {
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
@@ -236,5 +240,90 @@ export const clearOldLocalStorage = (): void => {
         localStorage.removeItem('contextractor_session_state');
     } catch (e) {
         console.error("Failed to clear old localStorage:", e);
+    }
+};
+
+// ============================================
+// Processed Code Cache Functions
+// ============================================
+
+import { CodeProcessingMode } from '@/types';
+
+export interface ProcessedResult {
+    lines: string[];
+    tokenSavings: number;
+    timestamp: number;
+    filesHash: string;
+}
+
+export const getProcessedResult = async (
+    sessionId: string,
+    outputStyle: string,
+    mode: CodeProcessingMode,
+    filesHash: string
+): Promise<ProcessedResult | undefined> => {
+    try {
+        const db = await initDB();
+        const tx = db.transaction(PROCESSED_CODE_STORE, 'readonly');
+        const store = tx.objectStore(PROCESSED_CODE_STORE);
+        const key = `${sessionId}:${outputStyle}:${mode}`;
+
+        const request = store.get(key);
+
+        return new Promise((resolve) => {
+            request.onsuccess = () => {
+                const result = request.result;
+                if (result && result.filesHash === filesHash) {
+                    resolve(result);
+                } else {
+                    // Invalid or stale
+                    if (result) deleteProcessedResult(sessionId, outputStyle, mode);
+                    resolve(undefined);
+                }
+            };
+            request.onerror = () => resolve(undefined);
+        });
+    } catch (e) {
+        console.error("Failed to load processed result:", e);
+        return undefined;
+    }
+};
+
+export const saveProcessedResult = async (
+    sessionId: string,
+    outputStyle: string,
+    mode: CodeProcessingMode,
+    result: ProcessedResult
+): Promise<void> => {
+    try {
+        const db = await initDB();
+        const tx = db.transaction(PROCESSED_CODE_STORE, 'readwrite');
+        const store = tx.objectStore(PROCESSED_CODE_STORE);
+        const key = `${sessionId}:${outputStyle}:${mode}`;
+
+        store.put(result, key);
+
+        return new Promise<void>((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    } catch (e) {
+        console.error("Failed to save processed result:", e);
+    }
+};
+
+export const deleteProcessedResult = async (
+    sessionId: string,
+    outputStyle: string,
+    mode: CodeProcessingMode
+): Promise<void> => {
+    try {
+        const db = await initDB();
+        const tx = db.transaction(PROCESSED_CODE_STORE, 'readwrite');
+        const store = tx.objectStore(PROCESSED_CODE_STORE);
+        const key = `${sessionId}:${outputStyle}:${mode}`;
+        store.delete(key);
+    } catch (e) {
+        console.error("Failed to delete processed result:", e);
     }
 };

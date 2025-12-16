@@ -5,6 +5,8 @@
 import { CodeProcessingMode } from '@/types';
 import { processCode as regexProcess } from '@/lib/code-processing';
 import type { WorkerMessage, WorkerResponse } from '@/workers/code-processing.worker';
+import { ProcessingProgress } from '@/types/processing';
+import { getProcessedResult, saveProcessedResult } from '@/lib/db';
 
 // ============================================
 // SMART PROCESSING CACHE - Instant Tab Switching
@@ -52,26 +54,26 @@ export function getCachedResult(
 ): { lines: string[]; tokenSavings: number } | null {
     const sessionCache = processingCache.get(sessionId);
     if (!sessionCache) return null;
-    
+
     const currentHash = generateFilesHash(files);
-    
+
     // If files changed, invalidate entire session cache
     if (sessionCache.filesHash !== currentHash) {
         processingCache.delete(sessionId);
         return null;
     }
-    
+
     const cacheKey = `${outputStyle}_${mode}`;
     const entry = sessionCache.entries.get(cacheKey);
-    
+
     if (!entry) return null;
-    
+
     // Check TTL
     if (Date.now() - entry.timestamp > CACHE_TTL) {
         sessionCache.entries.delete(cacheKey);
         return null;
     }
-    
+
     return { lines: entry.lines, tokenSavings: entry.tokenSavings };
 }
 
@@ -88,7 +90,7 @@ export function setCachedResult(
 ): void {
     const filesHash = generateFilesHash(files);
     let sessionCache = processingCache.get(sessionId);
-    
+
     // Create new session cache or invalidate if files changed
     if (!sessionCache || sessionCache.filesHash !== filesHash) {
         sessionCache = {
@@ -97,7 +99,7 @@ export function setCachedResult(
         };
         processingCache.set(sessionId, sessionCache);
     }
-    
+
     // Evict old entries if at capacity
     if (sessionCache.entries.size >= MAX_CACHE_ENTRIES_PER_SESSION) {
         // Remove oldest entry
@@ -111,7 +113,7 @@ export function setCachedResult(
         });
         if (oldestKey) sessionCache.entries.delete(oldestKey);
     }
-    
+
     const cacheKey = `${outputStyle}_${mode}`;
     sessionCache.entries.set(cacheKey, {
         lines,
@@ -254,7 +256,11 @@ function buildRawLines(
 let worker: Worker | null = null;
 let readyPromise: Promise<void> | null = null;
 let readyResolve: (() => void) | null = null;
-const pendingRequests = new Map<string, { resolve: (value: { lines: string[]; tokenSavings: number }) => void; reject: (reason?: unknown) => void }>();
+const pendingRequests = new Map<string, {
+    resolve: (value: { lines: string[]; tokenSavings: number }) => void;
+    reject: (reason?: unknown) => void;
+    onProgress?: (progress: ProcessingProgress) => void;
+}>();
 
 function getCodeProcessingWorker(): Worker {
     if (typeof window === 'undefined') {
@@ -278,13 +284,20 @@ function getCodeProcessingWorker(): Worker {
             return;
         }
 
-        const { id, type, lines, tokenSavings } = data as WorkerResponse;
-        if (type === 'result') {
-            const pending = pendingRequests.get(id);
-            if (pending) {
-                pending.resolve({ lines: lines || [], tokenSavings: tokenSavings ?? 0 });
-                pendingRequests.delete(id);
-            }
+        const response = data as WorkerResponse;
+        const { id, type } = response;
+
+        const pending = pendingRequests.get(id);
+        if (!pending) return;
+
+        if (type === 'progress' && response.progressPayload && pending.onProgress) {
+            pending.onProgress(response.progressPayload);
+        } else if (type === 'result') {
+            pending.resolve({ lines: response.lines || [], tokenSavings: response.tokenSavings ?? 0 });
+            pendingRequests.delete(id);
+        } else if (type === 'error') {
+            pending.reject(new Error(response.error || 'Unknown worker error'));
+            pendingRequests.delete(id);
         }
     };
 
@@ -300,14 +313,15 @@ function getCodeProcessingWorker(): Worker {
 async function processWithWorker(
     files: Array<{ id: string; name: string; path: string; content: string; isText: boolean }>,
     outputStyle: string,
-    mode: CodeProcessingMode
+    mode: CodeProcessingMode,
+    onProgress?: (progress: ProcessingProgress) => void
 ): Promise<{ lines: string[]; tokenSavings: number }> {
     const w = getCodeProcessingWorker();
     await readyPromise;
 
     return new Promise((resolve, reject) => {
         const id = crypto.randomUUID();
-        pendingRequests.set(id, { resolve, reject });
+        pendingRequests.set(id, { resolve, reject, onProgress });
 
         (w as Worker).postMessage({
             type: 'process',
@@ -317,7 +331,7 @@ async function processWithWorker(
             mode,
         } satisfies WorkerMessage);
 
-        // Safety net: if the worker never responds, fall back to synchronous processing instead of throwing.
+        // Safety net
         setTimeout(() => {
             const pending = pendingRequests.get(id);
             if (pending) {
@@ -368,7 +382,9 @@ const TAURI_SUPPORTED_MODES: CodeProcessingMode[] = ['raw', 'remove-comments', '
 export function processCodeAsync(
     files: Array<{ id: string; name: string; path: string; content: string; isText: boolean }>,
     outputStyle: string,
-    mode: CodeProcessingMode
+    mode: CodeProcessingMode,
+    onProgress?: (progress: ProcessingProgress) => void,
+    sessionId?: string
 ): Promise<{ lines: string[]; tokenSavings: number }> {
     // Fast path for raw mode - no worker needed, build lines directly
     if (mode === 'raw') {
@@ -378,18 +394,42 @@ export function processCodeAsync(
     const tauriInvoke = getTauriInvoker();
     if (tauriInvoke && TAURI_SUPPORTED_MODES.includes(mode)) {
         return processWithTauri(files, outputStyle, mode, tauriInvoke).catch(() =>
-            processWithWorker(files, outputStyle, mode)
+            processWithWorker(files, outputStyle, mode, onProgress)
         );
     }
 
-    // Preferred path: AST worker with regex fallback inside the worker. If worker creation fails,
-    // fall back synchronously on main thread.
-    try {
-        return processWithWorker(files, outputStyle, mode);
-    } catch (error) {
-        console.warn('Worker unavailable, falling back to synchronous processing', error);
-        return Promise.resolve(processSynchronously(files, outputStyle, mode));
-    }
+    // DB Cache Check for Web Mode (if not using Tauri)
+    const textFiles = files.filter(f => f.isText);
+
+    return (async () => {
+        if (sessionId) {
+            const filesHash = generateFilesHash(textFiles);
+            const dbResult = await getProcessedResult(sessionId, outputStyle, mode, filesHash);
+            if (dbResult) {
+                return { lines: dbResult.lines, tokenSavings: dbResult.tokenSavings };
+            }
+        }
+
+        try {
+            const result = await processWithWorker(files, outputStyle, mode, onProgress);
+
+            // Save to DB if session ID is available
+            if (sessionId) {
+                const filesHash = generateFilesHash(textFiles);
+                await saveProcessedResult(sessionId, outputStyle, mode, {
+                    lines: result.lines,
+                    tokenSavings: result.tokenSavings,
+                    timestamp: Date.now(),
+                    filesHash
+                });
+            }
+
+            return result;
+        } catch (error) {
+            console.warn('Worker unavailable, falling back to synchronous processing', error);
+            return processSynchronously(files, outputStyle, mode);
+        }
+    })();
 }
 
 export function terminateWorker(): void {

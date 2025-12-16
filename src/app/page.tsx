@@ -62,6 +62,10 @@ import {
     setCachedResult,
     clearSessionCache
 } from '@/lib/code-processing-worker';
+import { ProcessingStatus } from '@/components/ProcessingStatus';
+import { useTauriProcessingEvents } from '@/hooks/useTauriProcessingEvents';
+import { useProcessingStore } from '@/stores/processingStore';
+import { invoke } from '@tauri-apps/api/core';
 
 // Types & Constants
 import { OutputStyle, FileData, ViewMode, TreeNode, CodeProcessingMode as CodeProcessingModeType } from '@/types';
@@ -73,12 +77,15 @@ import { useTemplateState } from '@/store';
 // Log to verify file is loaded - will show in console
 console.log('[page.tsx] File loaded, __TAURI__:', typeof window !== 'undefined' ? ('__TAURI__' in window) : 'SSR');
 
+const EMPTY_ARRAY: string[] = [];
+
 // Main App Wrapper with Theme Provider
 export default function ContextractorApp() {
     const themeValue = useThemeProvider();
 
     return (
         <ThemeProvider value={themeValue}>
+            <ProcessingStatus />
             <Contextractor />
         </ThemeProvider>
     );
@@ -174,6 +181,10 @@ function Contextractor() {
     // Refs
     const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
+    // Initialize Tauri processing events
+    useTauriProcessingEvents();
+    const { startProcessing, updateProgress, endProcessing } = useProcessingStore();
+
     // ============================================
     // OPTIMIZED CODE PROCESSING - Zero-Delay Tab Switching
     // ============================================
@@ -190,10 +201,14 @@ function Contextractor() {
 
     // Use deferred value for expensive renders - keeps UI responsive during processing
     const deferredCombinedLines = useDeferredValue(combinedLines);
-    const isStale = deferredCombinedLines !== combinedLines;
 
     // Memoized text files to prevent unnecessary re-renders
     const textFiles = useMemo(() => files.filter(f => f.isText), [files]);
+
+    // Safety: Ensure lines are cleared immediately when files are removed/switched
+    // This prevents "Zero-sized element" errors in Virtuoso due to stale lines with empty file groups
+    const effectiveLines = textFiles.length === 0 ? EMPTY_ARRAY : deferredCombinedLines;
+    const isStale = effectiveLines !== combinedLines;
 
     const getHeaderLine = useCallback((pathLabel: string) => {
         switch (outputStyle) {
@@ -272,8 +287,8 @@ function Contextractor() {
     }, [textFiles, getHeaderLine]);
 
     const processedLineIndexMap = useMemo(
-        () => buildLineIndexMap(deferredCombinedLines),
-        [buildLineIndexMap, deferredCombinedLines]
+        () => buildLineIndexMap(effectiveLines),
+        [buildLineIndexMap, effectiveLines]
     );
     const rawLineIndexMap = useMemo(
         () => buildLineIndexMap(rawOutputLines),
@@ -319,8 +334,8 @@ function Contextractor() {
     }, [textFiles, getHeaderLine]);
 
     const processedFileGroups = useMemo(
-        () => buildFileGroups(deferredCombinedLines),
-        [buildFileGroups, deferredCombinedLines]
+        () => buildFileGroups(effectiveLines),
+        [buildFileGroups, effectiveLines]
     );
     const rawFileGroups = useMemo(
         () => buildFileGroups(rawOutputLines),
@@ -367,23 +382,120 @@ function Contextractor() {
         // Process in background
         const abortController = new AbortController();
 
-        processCodeAsync(
-            textFiles.map(f => ({
-                id: f.id,
-                name: f.name,
-                path: f.path,
-                content: f.content,
-                isText: f.isText
-            })),
-            outputStyle,
-            codeProcessingMode
-        )
+        // Calculate total bytes for progress
+        const totalBytes = textFiles.reduce((acc, f) => acc + f.content.length, 0);
+
+        // Start progress tracking
+        startProcessing(textFiles.length, totalBytes);
+
+        const performProcessing = async () => {
+            // Check if we are in Tauri and can use the new async command (for non-raw modes)
+            // Raw mode is instant anyway via the fast path in processCodeAsync
+            const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+
+            if (isTauri) {
+                try {
+                    // Prepare files for Rust command
+                    const fileInputs = textFiles.map(f => ({
+                        id: f.id,
+                        name: f.name,
+                        path: f.path,
+                        content: f.content,
+                        is_text: true, // Rust expects snake_case
+                    }));
+
+                    const processedFiles: { id: string, content: string }[] = await invoke('process_files_with_progress', {
+                        files: fileInputs,
+                        mode: codeProcessingMode
+                    });
+
+                    // Reconstruct lines from the processed file contents
+                    // We need to maintain order
+                    const lines: string[] = [];
+                    let originalLength = 0;
+                    let processedLength = 0;
+
+                    // Create a map for quick lookup
+                    const processedMap = new Map(processedFiles.map(p => [p.id, p.content]));
+
+                    for (let i = 0; i < textFiles.length; i++) {
+                        const f = textFiles[i];
+                        const ext = f.name.split('.').pop() || 'txt';
+                        const pathLabel = f.path || f.name;
+
+                        const content = processedMap.get(f.id) || f.content;
+
+                        // Helpers would be better but keeping it inline to match existing structure
+                        // Using the helper from worker file logic but implemented here or imported?
+                        // `processWithTauri` in worker file handles `appendFileLines`. 
+                        // But here we are bypassing `processCodeAsync` helper for Tauri path?
+                        // Actually, `processCodeAsync` helper is cleaner if updated.
+                        // But `processCodeAsync` helper calls `process_code` (singular).
+                        // I should probably rewrite `processCodeAsync` helper to use the new command if I want to reuse it, 
+                        // OR just handle it here. 
+                        // Handling here gives me direct control over the specific "smart processing" flow.
+
+                        // Let's duplicate append logic briefly or export it?
+                        // Actually, let's just use the `processCodeAsync` for Web and this custom invocation for Tauri,
+                        // merging the results logic.
+
+                        if (i > 0) lines.push('');
+
+                        if (outputStyle === 'hash') lines.push(`# --- ${pathLabel} ---`);
+                        else if (outputStyle === 'minimal') lines.push(`--- ${pathLabel} ---`);
+                        else if (outputStyle === 'xml') lines.push(`<file name="${pathLabel}">`);
+                        else if (outputStyle === 'markdown') { lines.push(`### ${pathLabel}`); lines.push(`\`\`\`${ext}`); }
+                        else lines.push(`/* --- ${pathLabel} --- */`);
+
+                        const contentLines = content.split('\n');
+                        for (const line of contentLines) lines.push(line);
+
+                        if (outputStyle === 'xml') lines.push('</file>');
+                        else if (outputStyle === 'markdown') lines.push('```');
+
+                        originalLength += f.content.length;
+                        processedLength += content.length;
+                    }
+
+                    const savings = originalLength === 0
+                        ? 0
+                        : Math.max(0, Math.round(((originalLength - processedLength) / originalLength) * 100));
+
+                    return { lines, tokenSavings: savings };
+
+                } catch (e) {
+                    console.error("Tauri processing failed, falling back", e);
+                    // Fallback to normal `processCodeAsync` (which might use worker or sync invoke)
+                    return processCodeAsync(
+                        textFiles,
+                        outputStyle,
+                        codeProcessingMode,
+                        updateProgress, // Pass callback for Web Worker fallback
+                        activeSessionId || undefined
+                    );
+                }
+            } else {
+                // Web mode or Raw mode
+                return processCodeAsync(
+                    textFiles,
+                    outputStyle,
+                    codeProcessingMode,
+                    updateProgress,
+                    activeSessionId || undefined
+                );
+            }
+        };
+
+        performProcessing()
             .then(({ lines, tokenSavings: savings }) => {
                 if (!abortController.signal.aborted) {
                     setCombinedLines(lines);
                     setTokenSavings(savings);
                     // Only clear if this session is still the one processing
                     setProcessingSessionId(prev => prev === activeSessionId ? null : prev);
+
+                    // Mark global processing as done so the status bar hides
+                    endProcessing([]);
 
                     // Cache for next time
                     if (activeSessionId) {
@@ -402,13 +514,18 @@ function Contextractor() {
                 if (!abortController.signal.aborted && error.message !== 'Cancelled') {
                     console.error('Processing error:', error);
                     setProcessingSessionId(prev => prev === activeSessionId ? null : prev);
+                    endProcessing([]);
                 }
             });
 
         return () => {
             abortController.abort();
+            // Clear global processing status when effect is cleaned up (e.g. switching tabs/modes)
+            endProcessing([]);
         };
-    }, [textFiles, outputStyle, codeProcessingMode, activeSessionId, rawOutputLines]);
+    }, [textFiles, outputStyle, codeProcessingMode, activeSessionId, rawOutputLines, startProcessing, updateProgress]);
+
+    // Jump code preview to a file's header when clicked in explorer/list
 
     // Jump code preview to a file's header when clicked in explorer/list
     const handleFocusFile = useCallback((fileId: string) => {
@@ -643,7 +760,7 @@ function Contextractor() {
     const {
         searchTerm, setSearchTerm, searchMatches, currentMatchIdx,
         handleNextMatch, handlePrevMatch
-    } = useSearchLines(deferredCombinedLines);
+    } = useSearchLines(effectiveLines);
 
     // DnD Sensors
     const sensors = useSensors(
@@ -1587,7 +1704,7 @@ function Contextractor() {
                                                 </div>
                                                 <div className="flex-1 min-h-0">
                                                     <VirtualizedCodeViewer
-                                                        lines={deferredCombinedLines}
+                                                        lines={effectiveLines}
                                                         searchTerm={searchTerm}
                                                         currentMatchIdx={currentMatchIdx}
                                                         searchMatches={searchMatches}
@@ -1600,7 +1717,7 @@ function Contextractor() {
                                         </div>
                                     ) : (
                                         <VirtualizedCodeViewer
-                                            lines={deferredCombinedLines}
+                                            lines={effectiveLines}
                                             searchTerm={searchTerm}
                                             currentMatchIdx={currentMatchIdx}
                                             searchMatches={searchMatches}
