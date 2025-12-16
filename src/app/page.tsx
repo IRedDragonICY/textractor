@@ -208,7 +208,8 @@ function Contextractor() {
     // Safety: Ensure lines are cleared immediately when files are removed/switched
     // This prevents "Zero-sized element" errors in Virtuoso due to stale lines with empty file groups
     const effectiveLines = textFiles.length === 0 ? EMPTY_ARRAY : deferredCombinedLines;
-    const isStale = effectiveLines !== combinedLines;
+    // Stale check must return false if there are no files, regardless of references
+    const isStale = textFiles.length > 0 && effectiveLines !== combinedLines;
 
     const getHeaderLine = useCallback((pathLabel: string) => {
         switch (outputStyle) {
@@ -347,7 +348,7 @@ function Contextractor() {
     // For other modes, this shows raw first, then updates with processed
     useEffect(() => {
         if (textFiles.length === 0) {
-            setCombinedLines([]);
+            setCombinedLines(EMPTY_ARRAY);
             setTokenSavings(undefined);
             // Safety: Ensure processing state is cleared if files are empty
             // This fixes a visual bug where processing gets stuck if files are cleared rapidly
