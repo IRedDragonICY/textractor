@@ -8,15 +8,15 @@ const isTauri = process.env.TAURI_ENV_PLATFORM !== undefined;
 const nextConfig: NextConfig = {
   // Enable static export for Tauri
   output: isProd || isTauri ? "export" : undefined,
-  
+
   // Disable image optimization for static export
   images: {
     unoptimized: true,
   },
-  
+
   // Trailing slash for file-based routing in Tauri
   trailingSlash: true,
-  
+
   // Performance optimizations
   compiler: {
     // Remove console.log in production
@@ -24,7 +24,7 @@ const nextConfig: NextConfig = {
       exclude: ['error', 'warn'],
     } : false,
   },
-  
+
   // Turbopack configuration (now top-level in Next.js 16)
   turbopack: {
     // Resolve aliases for Turbopack (dev)
@@ -34,7 +34,7 @@ const nextConfig: NextConfig = {
       module: EMPTY_SHIM_REL,
     },
   },
-  
+
   // Modern JavaScript optimizations
   experimental: {
     // Optimize package imports for tree shaking

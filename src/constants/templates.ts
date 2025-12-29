@@ -1,3 +1,6 @@
+// Prompt templates with runtime file loading
+// Full prompts stored in public/prompts/<category>/<name>.md
+
 export const TEMPLATE_PLACEHOLDER = '{{CODE}}';
 
 export interface PromptTemplate {
@@ -5,180 +8,234 @@ export interface PromptTemplate {
     name: string;
     description: string;
     category: 'analysis' | 'refactor' | 'doc' | 'test' | 'security' | 'custom';
-    template: string; // Must contain {{CODE}}
+    template: string; // For custom templates or cached content
+    promptFile?: string; // Path to .md file (relative to /prompts/)
 }
 
+// Prompt file paths for dynamic loading
+export const PROMPT_FILES: Record<string, string> = {
+    'analysis-explain': 'analysis/explain.md',
+    'analysis-time-complexity': 'analysis/time-complexity.md',
+    'analysis-architecture': 'analysis/architecture.md',
+    'analysis-qol-improvements': 'analysis/qol-improvements.md',
+    'refactor-clean-code': 'refactor/clean-code.md',
+    'refactor-modernize-es6': 'refactor/modernize-es6.md',
+    'refactor-performance': 'refactor/performance.md',
+    'refactor-dry': 'refactor/dry.md',
+    'refactor-ts-to-py': 'refactor/ts-to-py.md',
+    'refactor-tailwind-to-css': 'refactor/tailwind-to-css.md',
+    'security-audit': 'security/audit.md',
+    'security-vulnerabilities': 'security/vulnerabilities.md',
+    'security-sql-injection': 'security/sql-injection.md',
+    'doc-jsdoc': 'doc/jsdoc.md',
+    'doc-readme': 'doc/readme.md',
+    'doc-non-tech': 'doc/non-tech.md',
+    'test-generate-unit': 'test/generate-unit.md',
+    'test-edge-cases': 'test/edge-cases.md',
+};
+
+// Cache for loaded prompts
+const promptCache = new Map<string, string>();
+
+/**
+ * Load a prompt template from its markdown file
+ * @param templateId - The template ID (e.g., 'analysis-explain')
+ * @returns The prompt content or fallback message
+ */
+export async function loadPromptContent(templateId: string): Promise<string> {
+    // Check cache first
+    if (promptCache.has(templateId)) {
+        return promptCache.get(templateId)!;
+    }
+
+    const filePath = PROMPT_FILES[templateId];
+    if (!filePath) {
+        return `Template not found: ${templateId}\n\n${TEMPLATE_PLACEHOLDER}`;
+    }
+
+    try {
+        const response = await fetch(`/prompts/${filePath}`);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        const content = await response.text();
+        promptCache.set(templateId, content);
+        return content;
+    } catch (error) {
+        console.error(`Failed to load prompt ${templateId}:`, error);
+        return `Failed to load template. Using fallback.\n\n${TEMPLATE_PLACEHOLDER}`;
+    }
+}
+
+/**
+ * Get prompt content synchronously (from cache ONLY)
+ * Returns the cached content or a placeholder
+ */
+export function getPromptContentSync(templateId: string): string {
+    return promptCache.get(templateId) ?? TEMPLATE_PLACEHOLDER;
+}
+
+/**
+ * Preload all prompt templates into cache
+ */
+export async function preloadAllPrompts(): Promise<void> {
+    const promises = Object.keys(PROMPT_FILES).map(id => loadPromptContent(id));
+    await Promise.all(promises);
+}
+
+// Default templates with metadata only (content loaded at runtime)
 export const DEFAULT_PROMPT_TEMPLATES: PromptTemplate[] = [
     // Analysis
     {
         id: 'analysis-explain',
         name: 'Explain Code',
-        description: 'Summarize intent, inputs, outputs, and side effects.',
+        description: 'Comprehensive line-by-line code explanation with anti-laziness directives.',
         category: 'analysis',
-        template: `You are a senior engineer. Explain what this code does with a concise summary, detailing inputs, outputs, data flow, error handling, and notable edge cases. Provide bullet highlights and keep the tone direct.
-
-${TEMPLATE_PLACEHOLDER}`,
+        template: TEMPLATE_PLACEHOLDER, // Loaded dynamically
+        promptFile: 'analysis/explain.md',
     },
     {
         id: 'analysis-time-complexity',
         name: 'Time Complexity Analysis',
-        description: 'Evaluate time/space complexity and hotspots.',
+        description: 'Rigorous algorithm complexity analysis with mathematical derivations.',
         category: 'analysis',
-        template: `Analyze the time and space complexity of the following code. Identify the dominant operations, worst/average/best cases where relevant, and call out any bottlenecks or hot paths. Suggest tighter bounds if possible.
-
-${TEMPLATE_PLACEHOLDER}`,
+        template: TEMPLATE_PLACEHOLDER,
+        promptFile: 'analysis/time-complexity.md',
     },
     {
         id: 'analysis-architecture',
         name: 'Architectural Review',
-        description: 'Assess modularity, layering, and coupling.',
+        description: 'Complete architectural assessment with coupling, cohesion, and quality metrics.',
         category: 'analysis',
-        template: `Perform an architectural review of this code. Discuss layering, separation of concerns, coupling, cohesion, and any implicit contracts. Identify risks to scalability, observability, and maintainability. Provide a short list of actionable improvements.
-
-${TEMPLATE_PLACEHOLDER}`,
+        template: TEMPLATE_PLACEHOLDER,
+        promptFile: 'analysis/architecture.md',
     },
     {
         id: 'analysis-qol-improvements',
         name: 'QoL / Feature Suggestions',
-        description: 'Spot missing quality-of-life features and quick wins.',
+        description: 'Exhaustive quality-of-life improvements (50+ suggestions minimum).',
         category: 'analysis',
-        template: `Review this code and propose pragmatic quality-of-life improvements and small feature additions. Focus on friction points (DX/UX), missing safeguards, default behaviors, sensible shortcuts, accessibility, and configuration toggles. Prioritize by impact vs effort and note any dependencies.
-
-${TEMPLATE_PLACEHOLDER}`,
+        template: TEMPLATE_PLACEHOLDER,
+        promptFile: 'analysis/qol-improvements.md',
     },
 
-    // Refactor / Conversion
+    // Refactor
     {
         id: 'refactor-clean-code',
         name: 'Clean Code Refactor',
-        description: 'Improve readability, naming, and structure.',
+        description: 'Complete code smell detection and refactoring with before/after code.',
         category: 'refactor',
-        template: `Refactor the following code for clarity and maintainability. Improve naming, simplify control flow, remove dead code, and ensure consistent error handling. Preserve behavior and add brief reasoning for key changes.
-
-${TEMPLATE_PLACEHOLDER}`,
+        template: TEMPLATE_PLACEHOLDER,
+        promptFile: 'refactor/clean-code.md',
     },
     {
         id: 'refactor-modernize-es6',
         name: 'Modernize Syntax (ES6+)',
-        description: 'Upgrade to modern JavaScript/TypeScript patterns.',
+        description: 'Exhaustive modernization of every legacy JavaScript pattern.',
         category: 'refactor',
-        template: `Modernize this code to ES6+ standards. Prefer const/let, arrow functions, destructuring, optional chaining, nullish coalescing, template literals, and module syntax. Keep behavior identical and note any noteworthy changes.
-
-${TEMPLATE_PLACEHOLDER}`,
+        template: TEMPLATE_PLACEHOLDER,
+        promptFile: 'refactor/modernize-es6.md',
     },
     {
         id: 'refactor-performance',
         name: 'Optimize Performance',
-        description: 'Find hotspots and propose faster approaches.',
+        description: 'Complete hotspot analysis with quantified optimizations.',
         category: 'refactor',
-        template: `Identify performance hotspots in this code. Recommend concrete optimizations (algorithmic improvements, memoization, batching, reduced allocations, better data structures). Keep readability reasonable and note trade-offs.
-
-${TEMPLATE_PLACEHOLDER}`,
+        template: TEMPLATE_PLACEHOLDER,
+        promptFile: 'refactor/performance.md',
     },
     {
         id: 'refactor-dry',
         name: 'Apply DRY Principles',
-        description: 'Remove duplication and centralize shared logic.',
+        description: 'Exhaustive duplication detection with extracted utility code.',
         category: 'refactor',
-        template: `Refactor the code to follow DRY principles. Consolidate repeated logic, extract reusable helpers, and clarify boundaries between responsibilities. Preserve behavior and provide a brief summary of extracted pieces.
-
-${TEMPLATE_PLACEHOLDER}`,
+        template: TEMPLATE_PLACEHOLDER,
+        promptFile: 'refactor/dry.md',
     },
     {
         id: 'refactor-ts-to-py',
         name: 'TypeScript to Python',
-        description: 'Convert logic to idiomatic Python 3.',
+        description: 'Complete TypeScript to idiomatic Python 3 conversion.',
         category: 'refactor',
-        template: `Convert the following TypeScript/JavaScript code to idiomatic Python 3. Use standard library features, type hints where helpful, and maintain functionality. Explain any key semantic changes briefly.
-
-${TEMPLATE_PLACEHOLDER}`,
+        template: TEMPLATE_PLACEHOLDER,
+        promptFile: 'refactor/ts-to-py.md',
     },
     {
         id: 'refactor-tailwind-to-css',
         name: 'Tailwind to CSS',
-        description: 'Expand Tailwind utility classes into plain CSS.',
+        description: 'Complete Tailwind utility classes to organized CSS conversion.',
         category: 'refactor',
-        template: `Rewrite the styling by converting Tailwind utility classes into plain CSS (or SCSS). Provide a minimal, organized stylesheet and update the markup accordingly. Preserve visual appearance.
-
-${TEMPLATE_PLACEHOLDER}`,
+        template: TEMPLATE_PLACEHOLDER,
+        promptFile: 'refactor/tailwind-to-css.md',
     },
 
     // Security
     {
         id: 'security-audit',
         name: 'Security Audit',
-        description: 'Review code for common security pitfalls.',
+        description: 'Complete OWASP-based security audit with remediation checklist.',
         category: 'security',
-        template: `Perform a security audit of the following code. Identify injection risks, insecure deserialization, unsafe eval/exec, XSS/CSRF vectors, auth/authorization gaps, and secrets handling issues. Provide a prioritized remediation checklist.
-
-${TEMPLATE_PLACEHOLDER}`,
+        template: TEMPLATE_PLACEHOLDER,
+        promptFile: 'security/audit.md',
     },
     {
         id: 'security-vulnerabilities',
         name: 'Find Vulnerabilities',
-        description: 'Locate and explain exploitable issues.',
+        description: 'Offensive security analysis with proof-of-concept exploits.',
         category: 'security',
-        template: `Locate potential vulnerabilities in this code. For each finding, provide a short exploit scenario and a recommended fix aligned with best practices. Focus on practical, high-impact issues first.
-
-${TEMPLATE_PLACEHOLDER}`,
+        template: TEMPLATE_PLACEHOLDER,
+        promptFile: 'security/vulnerabilities.md',
     },
     {
         id: 'security-sql-injection',
         name: 'SQL Injection Check',
-        description: 'Audit database calls for injection risks.',
+        description: 'Complete database query audit for injection vulnerabilities.',
         category: 'security',
-        template: `Audit this code for SQL injection risks. Flag string concatenation in queries, missing parameter binding, and unsafe user input handling. Suggest secure patterns using parameterized queries or ORM safeguards.
-
-${TEMPLATE_PLACEHOLDER}`,
+        template: TEMPLATE_PLACEHOLDER,
+        promptFile: 'security/sql-injection.md',
     },
 
     // Documentation
     {
         id: 'doc-jsdoc',
         name: 'Generate JSDoc/TSDoc',
-        description: 'Produce type-aware documentation blocks.',
+        description: 'Complete JSDoc/TSDoc documentation for all public APIs.',
         category: 'doc',
-        template: `Generate high-quality JSDoc/TSDoc comments for the following code. Document parameter types, return types, errors thrown, side effects, and examples where useful. Keep comments succinct and accurate.
-
-${TEMPLATE_PLACEHOLDER}`,
+        template: TEMPLATE_PLACEHOLDER,
+        promptFile: 'doc/jsdoc.md',
     },
     {
         id: 'doc-readme',
         name: 'Write README.md',
-        description: 'Draft a concise README with usage and setup.',
+        description: 'Complete scannable README with examples and troubleshooting.',
         category: 'doc',
-        template: `Write a concise README for this code. Include: project summary, key features, setup/install steps, configuration, commands, usage examples, and troubleshooting notes. Keep it scannable.
-
-${TEMPLATE_PLACEHOLDER}`,
+        template: TEMPLATE_PLACEHOLDER,
+        promptFile: 'doc/readme.md',
     },
     {
         id: 'doc-non-tech',
         name: 'Explain for Non-Tech',
-        description: 'Translate technical details for stakeholders.',
+        description: 'Plain-language explanation for non-technical stakeholders.',
         category: 'doc',
-        template: `Explain the following codebase to a non-technical stakeholder. Focus on purpose, value, user impact, and operational considerations. Avoid jargon; use plain language and short paragraphs.
-
-${TEMPLATE_PLACEHOLDER}`,
+        template: TEMPLATE_PLACEHOLDER,
+        promptFile: 'doc/non-tech.md',
     },
 
     // Testing
     {
         id: 'test-generate-unit',
         name: 'Generate Unit Tests (Jest/Vitest)',
-        description: 'Create focused, deterministic unit tests.',
+        description: 'Complete test suite covering happy paths, edge cases, and errors.',
         category: 'test',
-        template: `Generate unit tests in Jest or Vitest for the following code. Cover happy paths, edge cases, and failure modes. Use clear arrange/act/assert structure and avoid testing implementation details.
-
-${TEMPLATE_PLACEHOLDER}`,
+        template: TEMPLATE_PLACEHOLDER,
+        promptFile: 'test/generate-unit.md',
     },
     {
         id: 'test-edge-cases',
         name: 'Edge Case Analysis',
-        description: 'List missing edge cases and risks.',
+        description: 'Exhaustive edge case and failure scenario identification.',
         category: 'test',
-        template: `List edge cases and failure scenarios this code should handle. Identify missing checks, boundary conditions, concurrency/race risks, and input validation gaps. Provide concise recommendations.
-
-${TEMPLATE_PLACEHOLDER}`,
+        template: TEMPLATE_PLACEHOLDER,
+        promptFile: 'test/edge-cases.md',
     },
 ];
-
