@@ -71,7 +71,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { OutputStyle, FileData, ViewMode, TreeNode, CodeProcessingMode as CodeProcessingModeType } from '@/types';
 import { UI_ICONS_MAP } from '@/lib/icon-mapping';
 import { OutputStyleType, ViewModeType, CodeProcessingModeType as SessionCodeProcessingModeType } from '@/types/session';
-import { DEFAULT_PROMPT_TEMPLATES, TEMPLATE_PLACEHOLDER } from '@/constants/templates';
+import { DEFAULT_PROMPT_TEMPLATES, TEMPLATE_PLACEHOLDER, loadPromptContent } from '@/constants/templates';
 import { useTemplateState } from '@/store';
 
 // Log to verify file is loaded - will show in console
@@ -596,11 +596,13 @@ function Contextractor() {
         }
     }, [files, handleFocusFile, lastSelectedFileId]);
 
-    const applyTemplateToText = useCallback((text: string) => {
+    const applyTemplateToText = useCallback((text: string, overrideTemplate?: string) => {
         if (!selectedTemplate) return text;
-        const body = selectedTemplate.template.includes(TEMPLATE_PLACEHOLDER)
-            ? selectedTemplate.template
-            : `${selectedTemplate.template.trim()}\n\n${TEMPLATE_PLACEHOLDER}`;
+        // Use override if provided, otherwise fallback to template object (which might be placeholder)
+        const templateContent = overrideTemplate ?? selectedTemplate.template;
+        const body = templateContent.includes(TEMPLATE_PLACEHOLDER)
+            ? templateContent
+            : `${templateContent.trim()}\n\n${TEMPLATE_PLACEHOLDER}`;
         return body.split(TEMPLATE_PLACEHOLDER).join(text);
     }, [selectedTemplate]);
 
@@ -1021,10 +1023,30 @@ function Contextractor() {
         performCopy();
     };
 
-    const performCopy = () => {
+    const performCopy = async () => {
         if (!hasContent) return;
-        const contentToCopy = getCombinedText({ applyTemplate: true });
+
+        let contentToCopy = getCombinedText({ applyTemplate: false }); // Get raw combined text
         const appliedTemplate = selectedTemplate?.name ?? null;
+
+        // If a template is selected, load its full content asynchronously
+        if (selectedTemplate) {
+            setProcessing(true); // Re-use processing spinner or add a local one? 
+            // Better to just show a toast or something, but 'Processing...' button state handles it if we set isProcessing?
+            // Actually isProcessing is tied to session processing. 
+            // We can just rely on the async nature. 
+
+            try {
+                const templateContent = await loadPromptContent(selectedTemplate.id);
+                contentToCopy = applyTemplateToText(contentToCopy, templateContent);
+            } catch (error) {
+                console.error('Failed to load template:', error);
+                // Fallback to default (placeholder) if load fails, or just raw text?
+                // logic continues with raw text or placeholder
+            } finally {
+                setProcessing(false); // If we used it
+            }
+        }
 
         navigator.clipboard.writeText(contentToCopy)
             .then(() => {
@@ -1034,7 +1056,11 @@ function Contextractor() {
                     setIsCopied(false);
                     setCopiedTemplateName(null);
                 }, 3000);
+            })
+            .catch(err => {
+                console.error('Failed to copy', err);
             });
+
         setSecurityWarningOpen(false);
     };
 
