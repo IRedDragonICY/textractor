@@ -45,6 +45,7 @@ export interface GitHubTreeItem {
     sha: string;
     size?: number;
     url: string;
+    downloadUrl?: string;
 }
 
 export interface GitHubRepoInfo {

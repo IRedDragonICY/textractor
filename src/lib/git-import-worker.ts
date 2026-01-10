@@ -80,7 +80,7 @@ class GitImportManager {
     private speedSamples: number[] = [];
     private lastBytesDownloaded = 0;
     private lastSpeedUpdate = 0;
-    
+
     // Configuration - adaptive for speed and UI responsiveness
     private readonly BASE_CONCURRENCY = 6;
     private readonly MAX_CONCURRENCY = 12;
@@ -92,7 +92,7 @@ class GitImportManager {
             this.listeners.set(taskId, new Set());
         }
         this.listeners.get(taskId)!.add(callback);
-        
+
         // Send current progress immediately if task exists
         const task = this.tasks.get(taskId);
         if (task) {
@@ -130,7 +130,7 @@ class GitImportManager {
         onError: (error: Error) => void
     ): string {
         const taskId = this.generateTaskId();
-        
+
         const task: ImportTask = {
             id: taskId,
             repoUrl,
@@ -190,26 +190,29 @@ class GitImportManager {
     }
 
     private async executeImport(task: ImportTask): Promise<void> {
-        const selectedPaths = this.getSelectedPaths(task.tree);
-        
-        if (selectedPaths.length === 0) {
+        const selectedItems = this.getSelectedItems(task.tree);
+
+        if (selectedItems.length === 0) {
             throw new Error('No files selected');
         }
 
         // Initialize progress
         task.progress.phase = 'fetching';
-        task.progress.total = selectedPaths.length;
-        task.progress.bytesTotal = this.estimateTotalBytes(task.tree, selectedPaths);
+        task.progress.total = selectedItems.length;
+
+        // Calculate total bytes directly from items
+        const fallback = 3000;
+        task.progress.bytesTotal = selectedItems.reduce((total, item) => total + (item.size ?? fallback), 0);
         task.progress.startTime = Date.now();
         task.onProgress({ ...task.progress });
 
         // Yield after initializing
         await this.yieldToMain();
 
-        const filesToFetch = selectedPaths.map(path => ({
-            name: path.split('/').pop() || path,
-            path,
-            url: `${task.metadata?.baseUrl}/${path}`
+        const filesToFetch = selectedItems.map(item => ({
+            name: item.path.split('/').pop() || item.path,
+            path: item.path,
+            url: item.url || `${task.metadata?.baseUrl}/${item.path}`
         }));
 
         const completedFiles: FileData[] = [];
@@ -271,7 +274,7 @@ class GitImportManager {
         // Processing phase - count tokens in background
         task.progress.phase = 'processing';
         task.onProgress({ ...task.progress });
-        
+
         // Count tokens in chunks to not block UI
         await this.countTokensInChunks(completedFiles, task);
 
@@ -302,7 +305,7 @@ class GitImportManager {
 
             const text = await response.text();
             const contentLength = text.length;
-            
+
             // Update bytes downloaded
             task.progress.bytesDownloaded += contentLength;
 
@@ -332,12 +335,12 @@ class GitImportManager {
     private async countTokensInChunks(files: FileData[], task: ImportTask): Promise<void> {
         // Process in small chunks
         const CHUNK_SIZE = 3;
-        
+
         for (let i = 0; i < files.length; i += CHUNK_SIZE) {
             if (task.status === 'cancelled') return;
 
             const chunk = files.slice(i, i + CHUNK_SIZE);
-            
+
             for (const file of chunk) {
                 file.tokenCount = countTokens(file.content);
             }
@@ -372,27 +375,31 @@ class GitImportManager {
         }
     }
 
-    private getSelectedPaths(nodes: GitTreeNode[]): string[] {
-        const paths: string[] = [];
+    private getSelectedItems(nodes: GitTreeNode[]): { path: string, url?: string, size?: number }[] {
+        const items: { path: string, url?: string, size?: number }[] = [];
         const stack = [...nodes];
-        
+
         while (stack.length > 0) {
             const node = stack.pop()!;
             if (node.type === 'file' && node.selected) {
-                paths.push(node.path);
+                items.push({
+                    path: node.path,
+                    url: node.url,
+                    size: node.size
+                });
             }
             if (node.children.length > 0) {
                 stack.push(...node.children);
             }
         }
-        
-        return paths;
+
+        return items;
     }
 
-    private estimateTotalBytes(nodes: GitTreeNode[], selectedPaths: string[]): number {
+    private estimateTotalBytes_UNUSED(nodes: GitTreeNode[], selectedPaths: string[]): number {
         const sizeMap = new Map<string, number>();
         const stack = [...nodes];
-        
+
         while (stack.length > 0) {
             const node = stack.pop()!;
             if (node.type === 'file' && typeof node.size === 'number') {

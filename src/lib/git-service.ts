@@ -315,7 +315,7 @@ const buildGitTree = (items: GitHubTreeItem[], metadata: GitRepoMetadata): GitTr
             children: [],
             selected: false,
             indeterminate: false,
-            url: isFolder ? undefined : `${metadata.baseUrl}/${item.path}`
+            url: isFolder ? undefined : (item.downloadUrl || `${metadata.baseUrl}/${item.path}`)
         };
 
         if (parts.length === 1) {
@@ -457,10 +457,18 @@ export const fetchGitTree = async (
                         try {
                             const subTreeItems = await fetchTreeItems(subOwner, subRepo, sub.sha);
 
+                            // Calculate base URL for submodule content
+                            const subBaseUrl = buildBaseUrlForProvider({
+                                ...metadata,
+                                owner: subOwner,
+                                repo: subRepo
+                            }, sub.sha);
+
                             // Prefix paths and add to allItems
                             const prefixedItems = subTreeItems.map(item => ({
                                 ...item,
-                                path: `${sub.path}/${item.path}`
+                                path: `${sub.path}/${item.path}`,
+                                downloadUrl: `${subBaseUrl}/${item.path}`
                             }));
 
                             allItems.push(...prefixedItems);
