@@ -294,9 +294,17 @@ const buildGitTree = (items: GitHubTreeItem[], metadata: GitRepoMetadata): GitTr
 
     // Single pass to build tree
     for (const item of sortedItems) {
+        // Allow 'tree' (folder), 'blob' (file), and 'commit' (submodule)
+        if (item.type !== 'tree' && item.type !== 'blob' && item.type !== 'commit') {
+            continue;
+        }
+
         const parts = item.path.split('/');
         const name = parts[parts.length - 1];
-        const isFolder = item.type === 'tree';
+        // Treat submodules ('commit') as folders for UI display purposes
+        // This prevents them from being downloaded as files (which causes errors)
+        // They will appear as empty folders since we don't recurse into them
+        const isFolder = item.type === 'tree' || item.type === 'commit';
 
         const node: GitTreeNode = {
             id: item.path,
@@ -340,6 +348,24 @@ const buildGitTree = (items: GitHubTreeItem[], metadata: GitRepoMetadata): GitTr
     return root;
 };
 
+// Parse .gitmodules file content
+const parseGitModules = (content: string): Map<string, string> => {
+    const modules = new Map<string, string>();
+    const sectionRegex = /\[submodule "([^"]+)"\]([\s\S]*?)(?=\[submodule|$)/g;
+    let match;
+
+    while ((match = sectionRegex.exec(content)) !== null) {
+        const block = match[2];
+        const pathMatch = block.match(/^\s*path\s*=\s*(.+)$/m);
+        const urlMatch = block.match(/^\s*url\s*=\s*(.+)$/m);
+
+        if (pathMatch && urlMatch) {
+            modules.set(pathMatch[1].trim(), urlMatch[1].trim());
+        }
+    }
+    return modules;
+};
+
 // Fetch repository tree structure
 export const fetchGitTree = async (
     gitUrl: string,
@@ -348,7 +374,7 @@ export const fetchGitTree = async (
 ): Promise<{ tree: GitTreeNode[]; metadata: GitRepoMetadata }> => {
     setLoadingText("Parsing repository URL...");
     const metadata = await parseGitUrl(gitUrl);
-    
+
     // Override branch if ref is provided
     if (ref) {
         metadata.branch = ref;
@@ -364,24 +390,93 @@ export const fetchGitTree = async (
 
     // Default to GitHub-style API
     setLoadingText(`Scanning repository structure (${metadata.branch})...`);
-    const treeApiUrl = `https://api.github.com/repos/${metadata.owner}/${metadata.repo}/git/trees/${metadata.branch}?recursive=1`;
-    const treeRes = await fetch(treeApiUrl);
-    
-    if (!treeRes.ok) {
-        const errorData = await treeRes.json().catch(() => ({}));
-        if (treeRes.status === 403) {
-            throw new Error("Rate limit exceeded. Please try again later or use a smaller repository.");
+
+    // Helper to fetch tree items for a repo
+    const fetchTreeItems = async (owner: string, repo: string, treeRef: string): Promise<GitHubTreeItem[]> => {
+        const url = `https://api.github.com/repos/${owner}/${repo}/git/trees/${treeRef}?recursive=1`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Failed to fetch tree for ${owner}/${repo}`);
+        const data = await res.json();
+        return (data.tree as GitHubTreeItem[]) || [];
+    };
+
+    let allItems: GitHubTreeItem[] = [];
+
+    try {
+        allItems = await fetchTreeItems(metadata.owner, metadata.repo, metadata.branch);
+    } catch (error) {
+        if (error instanceof Error && error.message.includes('Rate limit')) {
+            throw new Error("Rate limit exceeded. Please try again later.");
         }
-        throw new Error(errorData.message || "Failed to fetch repository structure");
+        throw new Error("Failed to fetch repository structure");
     }
 
-    const treeData = await treeRes.json();
-    if (treeData.truncated) {
-        console.warn("Repository is large, some files may be missing.");
+    // Check for .gitmodules to handle submodules
+    const gitModulesItem = allItems.find(item => item.path === '.gitmodules');
+    if (gitModulesItem) {
+        setLoadingText("Found submodules, fetching configuration...");
+        try {
+            const res = await fetch(`${metadata.baseUrl}/.gitmodules`);
+            if (res.ok) {
+                const content = await res.text();
+                const submoduleMap = parseGitModules(content);
+
+                // Find submodule commits in the tree
+                const submoduleCommits = allItems.filter(item => item.type === 'commit');
+
+                for (const sub of submoduleCommits) {
+                    const subUrl = submoduleMap.get(sub.path);
+                    if (subUrl && sub.sha) {
+                        setLoadingText(`Fetching submodule: ${sub.path}...`);
+
+                        // Resolve submodule URL
+                        let subOwner = metadata.owner;
+                        let subRepo = metadata.repo;
+
+                        if (subUrl.startsWith('http')) {
+                            try {
+                                const urlObj = new URL(subUrl.replace(/\.git$/, ''));
+                                const parts = urlObj.pathname.split('/').filter(Boolean);
+                                if (parts.length >= 2) {
+                                    subOwner = parts[parts.length - 2];
+                                    subRepo = parts[parts.length - 1];
+                                }
+                            } catch { }
+                        } else {
+                            // Relative path resolution
+                            if (subUrl.startsWith('../')) {
+                                subRepo = subUrl.replace(/^\.\.\//, '').replace(/\.git$/, '');
+                            } else if (subUrl.startsWith('./')) {
+                                subRepo = subUrl.replace(/^\.\//, '').replace(/\.git$/, '');
+                            } else {
+                                subRepo = subUrl.replace(/\.git$/, '');
+                            }
+                        }
+
+                        // Fetch submodule tree
+                        try {
+                            const subTreeItems = await fetchTreeItems(subOwner, subRepo, sub.sha);
+
+                            // Prefix paths and add to allItems
+                            const prefixedItems = subTreeItems.map(item => ({
+                                ...item,
+                                path: `${sub.path}/${item.path}`
+                            }));
+
+                            allItems.push(...prefixedItems);
+                        } catch (e) {
+                            console.warn(`Failed to fetch submodule ${sub.path}:`, e);
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("Failed to process .gitmodules:", e);
+        }
     }
 
     setLoadingText("Building file tree...");
-    const tree = buildGitTree(treeData.tree as GitHubTreeItem[], metadata);
+    const tree = buildGitTree(allItems, metadata);
 
     return { tree, metadata };
 };
@@ -486,7 +581,7 @@ export const fetchSelectedFiles = async (
     onProgress?: (current: number, total: number) => void
 ): Promise<FileData[]> => {
     const selectedPaths = getSelectedPaths(nodes);
-    
+
     if (selectedPaths.length === 0) {
         throw new Error("No files selected");
     }
@@ -498,7 +593,7 @@ export const fetchSelectedFiles = async (
     }));
 
     setLoadingText(`Fetching ${filesToFetch.length} files...`);
-    
+
     // Use optimized concurrent fetching with higher batch size
     const BATCH_SIZE = 15; // Increased from 10
     const newFiles: FileData[] = [];
@@ -528,7 +623,7 @@ export const fetchSelectedFiles = async (
         });
         const results = await Promise.all(promises);
         results.forEach(r => r && newFiles.push(r));
-        
+
         const progress = Math.min(i + BATCH_SIZE, filesToFetch.length);
         setLoadingText(`Fetching... ${progress}/${filesToFetch.length}`);
         onProgress?.(progress, filesToFetch.length);
@@ -539,11 +634,11 @@ export const fetchSelectedFiles = async (
 
 // Legacy function for backward compatibility
 export const fetchGitFiles = async (
-    gitUrl: string, 
+    gitUrl: string,
     setLoadingText: (text: string) => void
 ): Promise<FileData[]> => {
     const { tree, metadata } = await fetchGitTree(gitUrl, setLoadingText);
-    
+
     // Select all files by default
     const selectAll = (nodes: GitTreeNode[]): GitTreeNode[] => {
         return nodes.map(node => ({
@@ -552,7 +647,7 @@ export const fetchGitFiles = async (
             children: selectAll(node.children)
         }));
     };
-    
+
     const selectedTree = selectAll(tree);
     return fetchSelectedFiles(selectedTree, metadata, setLoadingText);
 };
